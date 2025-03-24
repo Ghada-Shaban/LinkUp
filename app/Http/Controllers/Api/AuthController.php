@@ -160,7 +160,7 @@ class AuthController extends Controller
         return $savedSlots;
     } 
     
-    private function registerTrainee(array $validated, Request $request)
+    protected function registerTrainee(array $validated, Request $request)
     {
         $validLanguages = $this->getEnumValues('trainee_preferred_languages', 'Language');
         $validInterests = $this->getEnumValues('trainee_areas_of_interest', 'Area_Of_Interest');
