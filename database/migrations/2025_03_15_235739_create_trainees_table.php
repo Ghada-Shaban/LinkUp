@@ -20,8 +20,8 @@ return new class extends Migration
           ->onDelete('cascade');
             $table->enum('Education_Level', [
                 'Associate Degree',
-                'Bachelor’s Degree',
-                'Master’s Degree',
+                'Bachelors Degree',
+                'Masters Degree',
                 'PhD',
                 'Other'
             ]);
