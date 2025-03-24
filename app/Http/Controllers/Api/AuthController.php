@@ -220,6 +220,7 @@ class AuthController extends Controller
                     'Area_Of_Interest' => $interest
                 ]);
             }
+            Mail::to($user->Email)->send(new WelcomeMail($user));
 
             return response()->json([
                 'message' => 'Trainee registered successfully',
