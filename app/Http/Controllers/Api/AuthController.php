@@ -169,7 +169,7 @@ class AuthController extends Controller
             'Full_Name' => 'required|string|max:255',
             'Email' => 'required|email|unique:users,email',
             'Password' => 'required|string|min:8',
-            'Education_Level' => 'Education_Level' => ['required', 'string', Rule::in($validEducationLevels)],
+            'Education_Level' => ['required', 'string', Rule::in($validEducationLevels)],
             'Institution_Or_School' => 'required|string',
             'Story' => 'nullable|string',
             'Field_Of_Study' => 'required|string',
