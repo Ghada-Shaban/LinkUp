@@ -29,6 +29,7 @@ class AuthController extends Controller
             'trainee' => [
                 'preferred_languages' => $this->getEnumValues('trainee_preferred_languages', 'Language'),
                 'areas_of_interest' => $this->getEnumValues('trainee_areas_of_interest', 'Area_Of_Interest'),
+                 'education_levels' => $this->getEnumValues('trainees', 'Education_Level')
             ],
             'coach' => [
                 'skills' => $this->getEnumValues('coach_skills', 'Skill'),
@@ -163,12 +164,12 @@ class AuthController extends Controller
     {
         $validLanguages = $this->getEnumValues('trainee_preferred_languages', 'Language');
         $validInterests = $this->getEnumValues('trainee_areas_of_interest', 'Area_Of_Interest');
-    
+        $validEducationLevels = $this->getEnumValues('trainees', 'Education_Level')
         $validated = array_merge($validated, $request->validate([
             'Full_Name' => 'required|string|max:255',
             'Email' => 'required|email|unique:users,email',
             'Password' => 'required|string|min:8',
-            'Education_Level' => 'required|string',
+            'Education_Level' => 'Education_Level' => ['required', 'string', Rule::in($validEducationLevels)],
             'Institution_Or_School' => 'required|string',
             'Story' => 'nullable|string',
             'Field_Of_Study' => 'required|string',
