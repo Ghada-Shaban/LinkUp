@@ -164,7 +164,7 @@ class AuthController extends Controller
     {
         $validLanguages = $this->getEnumValues('trainee_preferred_languages', 'Language');
         $validInterests = $this->getEnumValues('trainee_areas_of_interest', 'Area_Of_Interest');
-        $validEducationLevels = $this->getEnumValues('trainees', 'Education_Level')
+        $validEducationLevels = $this->getEnumValues('trainees', 'Education_Level');
         $validated = array_merge($validated, $request->validate([
             'Full_Name' => 'required|string|max:255',
             'Email' => 'required|email|unique:users,email',
