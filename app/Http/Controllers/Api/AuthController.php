@@ -196,6 +196,8 @@ class AuthController extends Controller
                 'Linkedin_Link' => !empty($validated['Linkedin_Link']) ? $validated['Linkedin_Link'] : null
             ]);
 
+            Mail::to($user->Email)->send(new WelcomeMail($user));
+            
             $trainee = Trainee::create([
                 'User_ID' => $user->User_ID,
                 'Education_Level' => $validated['Education_Level'],
@@ -220,7 +222,6 @@ class AuthController extends Controller
                     'Area_Of_Interest' => $interest
                 ]);
             }
-            Mail::to($user->Email)->send(new WelcomeMail($user));
 
             return response()->json([
                 'message' => 'Trainee registered successfully',
