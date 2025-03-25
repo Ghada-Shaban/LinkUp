@@ -27,10 +27,12 @@ Route::prefix('auth')->group(function () {
     Route::post('/register', [AuthController::class, 'register']);
     Route::post('/login', [AuthController::class, 'login']);
     Route::middleware('auth:sanctum')->post('/logout', [AuthController::class, 'logout']);
+    Route::get('/Trainee-values', [AuthController::class, 'getTraineeRegistrationEnumValues']);
+    Route::get('/Coach-values', [AuthController::class, 'getCoachRegistrationEnumValues']);
     // Route::post('/coach/set-availability', [AuthController::class, 'setAvailability']);
 });
 
-Route::get('/registration-enum-values', [AuthController::class, 'getRegistrationEnumValues']);
+
 
 Route::prefix('password')->group(function () {
     Route::post('/forgot', [\App\Http\Controllers\Api\PasswordResetController::class, 'sendOtp']); // إرسال OTP
