@@ -21,23 +21,26 @@ use Illuminate\Validation\Rule;
 
 class AuthController extends Controller
 {  
-
-    public function getRegistrationEnumValues()
-{
-    return response()->json([
-        'registration' => [
+ public function getTraineeRegistrationEnumValues()
+    {
+        return response()->json([
             'trainee' => [
                 'preferred_languages' => $this->getEnumValues('trainee_preferred_languages', 'Language'),
                 'areas_of_interest' => $this->getEnumValues('trainee_areas_of_interest', 'Area_Of_Interest'),
-                 'education_levels' => $this->getEnumValues('trainees', 'Education_Level')
-            ],
+                'education_levels' => $this->getEnumValues('trainees', 'Education_Level')
+            ]
+        ]);
+    }
+    
+    public function getCoachRegistrationEnumValues()
+    {
+        return response()->json([
             'coach' => [
                 'skills' => $this->getEnumValues('coach_skills', 'Skill'),
                 'languages' => $this->getEnumValues('coach_languages', 'Language'),
             ]
-        ]
-    ]);
-}
+        ]);
+    }
 
     public function register(Request $request)
     {
