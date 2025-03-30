@@ -39,3 +39,11 @@ Route::prefix('password')->group(function () {
     Route::post('/verify-otp', [\App\Http\Controllers\Api\PasswordResetController::class, 'verifyOtp']); // التحقق من OTP
     Route::post('/reset', [\App\Http\Controllers\Api\PasswordResetController::class, 'resetPassword']); // إعادة تعيين كلمة المرور
 });
+
+
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/coach/{coachId}/services', [CoachServiceController::class, 'getServices']);
+    Route::post('/coach/{coachId}/services', [CoachServiceController::class, 'createService']);
+    Route::put('/coach/{coachId}/services/{serviceId}', [CoachServiceController::class, 'updateService']);
+    Route::delete('/coach/{coachId}/services/{serviceId}', [CoachServiceController::class, 'deleteService']);
+});
