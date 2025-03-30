@@ -46,4 +46,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/coach/{coachId}/services', [CoachServiceController::class, 'createService']);
     Route::put('/coach/{coachId}/services/{serviceId}', [CoachServiceController::class, 'updateService']);
     Route::delete('/coach/{coachId}/services/{serviceId}', [CoachServiceController::class, 'deleteService']);
+    Route::post('/group-mentorship/{groupMentorshipId}/join', [CoachServiceController::class, 'joinGroupMentorship']);
+    Route::get('/coach/{coachId}/services/count', [CoachServiceController::class, 'getServicesCount']); 
 });
