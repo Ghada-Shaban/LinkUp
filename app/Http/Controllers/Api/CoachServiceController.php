@@ -29,7 +29,7 @@ class CoachServiceController extends Controller
         return response()->json(['message' => 'Unauthorized'], 403);
     }
 
-    $services = Service::where('coach_id', $coachId)->get();
+   $services = Service::where('coach_id', $coachId)->with('price')->get();
 
     $countData = [
         'all' => [
