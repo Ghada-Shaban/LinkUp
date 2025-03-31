@@ -32,7 +32,7 @@ class Service extends Model
     }
 
     public function prices() {
-        return $this->hasMany(Price::class, 'service_id');
+        return $this->hasOne(Price::class, 'service_id');
     }
     public function coaches() {
         return $this->belongsToMany(Coach::class, 'chooses', 'service_id', 'coach_id');
