@@ -35,11 +35,8 @@ class CoachServiceController extends Controller
         'all' => [
             'count' => $services->count()
         ],
-        'mentorship_plans' => [
-            'count' => $services->where('service_type', 'Mentorship')
-                ->whereHas('mentorship.mentorshipPlan')
-                ->count()
-        ],
+      
+
         'mentorship' => [ // قسم واحد لكل الـ Mentorship
             'count' => $services->where('service_type', 'Mentorship')->count(),
             
