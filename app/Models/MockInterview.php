@@ -10,6 +10,8 @@ class MockInterview extends Model
     use HasFactory;
     
     protected $table = 'mock_interviews';
+        public $timestamps = false;
+
     protected $primaryKey = "service_id";
 
     public $timestamps = false;
