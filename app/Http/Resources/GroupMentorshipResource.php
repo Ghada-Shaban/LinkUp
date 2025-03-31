@@ -14,7 +14,9 @@ class GroupMentorshipResource extends JsonResource
             'description' => $this->groupMentorship ? $this->groupMentorship->description : null,
             'day' => $this->groupMentorship ? $this->groupMentorship->day : null,
             'start_time' => $this->groupMentorship ? $this->groupMentorship->start_time : null,
-            'price' => $this->price ? $this->price->price : null,
+           'price' => $this->whenLoaded('price', function () {
+    return $this->price->price ?? null;
+}),
             'duration'=>'60 minutes',
             'no.of sessions'=>'4 sessions',
             'frequency'=> 'Monthly',
