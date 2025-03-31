@@ -11,7 +11,9 @@ class ServiceResource extends JsonResource
         return [
             'service_id' => $this->service_id,
             'service_type' => $this->service_type,
-            'price' => $this->price ? $this->price->price : null,
+           'price' => $this->whenLoaded('price', function () {
+    return $this->price->price ?? null;
+}),
             'mentorship' => $this->when($this->service_type === 'Mentorship', function () {
                 return [
                     'mentorship_plan' => $this->mentorship && $this->mentorship->mentorshipPlan ? [
