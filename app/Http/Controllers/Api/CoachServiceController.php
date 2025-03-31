@@ -103,7 +103,7 @@ class CoachServiceController extends Controller
 
     return response()->json([
         'all' => [
-            'services' => ServiceResource::collection($services), // قسم "all" بيحتوي على كل الخدمات
+            'services' => ServiceResource::collection($services)]) // قسم "all" بيحتوي على كل الخدمات
     public function createService(Request $request, $coachId)
     {
         $coach = Coach::findOrFail($coachId);
