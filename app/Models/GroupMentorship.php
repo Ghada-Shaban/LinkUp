@@ -9,6 +9,8 @@ class GroupMentorship extends Model
 {
     use HasFactory;
     protected $table = 'group_mentorships';
+    public $timestamps = false;
+
     protected $primaryKey = "service_id";
     protected $fillable = [
         'service_id', 
