@@ -31,7 +31,7 @@ class Service extends Model
         return $this->hasOne(GroupMentorship::class, 'service_id');
     }
 
-    public function prices() {
+    public function price() {
         return $this->hasOne(Price::class, 'service_id');
     }
     public function coaches() {
