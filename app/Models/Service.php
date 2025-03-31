@@ -13,7 +13,7 @@ class Service extends Model
     protected $primaryKey ='service_id';
     protected $fillable = [
         'service_type',
-        'admin_id'
+        'admin_id', 'coach_id'
     ];
     public function admin()
     {
