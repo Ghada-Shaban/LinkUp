@@ -10,6 +10,8 @@ class MentorshipPlan extends Model
     use HasFactory;
 
     protected $table = 'mentorship_plans';
+    public $timestamps = false;
+
     protected $primaryKey = 'service_id';
     protected $fillable = ['service_id', 'title'];
 
