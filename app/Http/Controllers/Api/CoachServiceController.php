@@ -178,6 +178,7 @@ class CoachServiceController extends Controller
             'service_id' => $service->service_id,
             'price' => $request->price
         ]);
+        $service->load('price');
 
         return response()->json(['message' => 'Service created successfully', 'service' => new ServiceResource($service)], 201);
     }
