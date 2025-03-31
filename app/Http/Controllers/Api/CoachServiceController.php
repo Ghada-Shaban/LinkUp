@@ -52,65 +52,65 @@ class CoachServiceController extends Controller
     return response()->json($countData);
 }
 
-    public function getServices(Request $request, $coachId)
-    {
-        $coach = Coach::findOrFail($coachId);
+   public function getServices(Request $request, $coachId)
+{
+    $coach = Coach::findOrFail($coachId);
 
-        if (auth()->user()->User_ID != $coachId) {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
+    if (auth()->user()->User_ID != $coachId) {
+        return response()->json(['message' => 'Unauthorized'], 403);
+    }
 
-        $allServices = $coach->services()
-            ->with(['mentorship.mentorshipPlan', 'mentorship.mentorshipSession', 'groupMentorship', 'mockInterview', 'price'])
-            ->get();
+    // جلب service_type من Query Parameter (مثلاً ?service_type=Group_Mentorship)
+    $serviceType = $request->query('service_type');
 
-        $mentorshipServices = $coach->services()
-            ->where('service_type', 'Mentorship')
-            ->with(['mentorship.mentorshipPlan', 'mentorship.mentorshipSession', 'price'])
-            ->get();
+    // إعداد الاستعلام الأساسي
+    $query = $coach->services()
+        ->with(['mentorship.mentorshipPlan', 'mentorship.mentorshipSession', 'groupMentorship', 'mockInterview', 'price']);
 
-        $mentorshipPlans = $mentorshipServices->filter(function ($service) {
-            return $service->mentorship && $service->mentorship->mentorshipPlan;
-        });
+    // لو فيه service_type في الطلب، نفلتر بناءً عليه
+    if ($serviceType) {
+        $query->where('service_type', $serviceType);
+    }
 
-        $mentorshipSessions = $mentorshipServices->filter(function ($service) {
-            return $service->mentorship && $service->mentorship->mentorshipSession;
-        });
+    // جلب الخدمات
+    $services = $query->get();
 
-        $groupMentorshipServices = $coach->services()
-            ->where('service_type', 'Group_Mentorship')
-            ->with(['groupMentorship', 'price'])
-            ->get();
-
-        $mockInterviewServices = $coach->services()
-            ->where('service_type', 'Mock_Interview')
-            ->with(['mockInterview', 'price'])
-            ->get();
-
+    // إرجاع الخدمات بناءً على النوع المطلوب
+    if ($serviceType === 'Mentorship') {
         return response()->json([
-            'all' => [
-                
-                'services' => ServiceResource::collection($allServices),
-            ],
-            'mentorship_plans' => [
-               
-                'services' => MentorshipPlanResource::collection($mentorshipPlans),
-            ],
-            'mentorship_sessions' => [
-                
-                'services' => MentorshipSessionResource::collection($mentorshipSessions),
-            ],
-            'group_mentorship' => [
-                
-                'services' => GroupMentorshipResource::collection($groupMentorshipServices),
-            ],
-            'mock_interview' => [
-                
-                'services' => MockInterviewResource::collection($mockInterviewServices),
-            ],
+            'services' => ServiceResource::collection($services)
+        ]);
+    } elseif ($serviceType === 'Group_Mentorship') {
+        return response()->json([
+            'services' => GroupMentorshipResource::collection($services)
+        ]);
+    } elseif ($serviceType === 'Mock_Interview') {
+        return response()->json([
+            'services' => MockInterviewResource::collection($services)
         ]);
     }
 
+    // لو مفيش service_type محدد، ارجع كل الخدمات مقسمة زي قبل كده
+    $mentorshipServices = $services->where('service_type', 'Mentorship');
+    $groupMentorshipServices = $services->where('service_type', 'Group_Mentorship');
+    $mockInterviewServices = $services->where('service_type', 'Mock_Interview');
+    $otherServices = $services->whereNotIn('service_type', ['Mentorship', 'Group_Mentorship', 'Mock_Interview']);
+
+    return response()->json([
+        'all' => [
+            'services' => ServiceResource::collection($otherServices),
+        ],
+        'mentorship' => [
+            'services' => ServiceResource::collection($mentorshipServices),
+        ],
+        'group_mentorship' => [
+            'services' => GroupMentorshipResource::collection($groupMentorshipServices),
+        ],
+        'mock_interview' => [
+            'services' => MockInterviewResource::collection($mockInterviewServices),
+        ],
+    ]);
+}
     public function createService(Request $request, $coachId)
     {
         $coach = Coach::findOrFail($coachId);
