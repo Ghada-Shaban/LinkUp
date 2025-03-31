@@ -11,6 +11,8 @@ class MentorshipSession extends Model
     protected $table = 'mentorship_sessions';
 
     protected $primaryKey = 'service_id';
+        public $timestamps = false;
+
     protected $fillable = ['service_id', 'session_type'];
 
     public function mentorship()
