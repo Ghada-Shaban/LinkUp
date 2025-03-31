@@ -13,7 +13,6 @@ class Mentorship extends Model
     public $timestamps = false;
 
 
-    public $timestamps = false;
     protected $fillable = [
         'service_id',
         'mentorship_type'
