@@ -52,14 +52,8 @@ class CoachServiceController extends Controller
     return response()->json($countData);
 }
 
- public function getServicesCount($coachId)
+public function getServicesCount($coachId)
     {
-        $coach = Coach::findOrFail($coachId);
-
-        if (auth()->user()->User_ID != $coachId) {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
-
         $services = Service::where('coach_id', $coachId)->with('price')->get();
 
         $countData = [
@@ -106,10 +100,6 @@ class CoachServiceController extends Controller
     {
         $coach = Coach::findOrFail($coachId);
 
-        if (auth()->user()->User_ID != $coachId) {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
-
         $services = $coach->services()
             ->with(['mentorship.mentorshipPlan', 'mentorship.mentorshipSession', 'groupMentorship', 'mockInterview', 'price'])
             ->get();
@@ -123,10 +113,6 @@ class CoachServiceController extends Controller
     private function getMentorshipPlans(Request $request, $coachId)
     {
         $coach = Coach::findOrFail($coachId);
-
-        if (auth()->user()->User_ID != $coachId) {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
 
         $services = $coach->services()
             ->where('service_type', 'Mentorship')
@@ -146,10 +132,6 @@ class CoachServiceController extends Controller
     {
         $coach = Coach::findOrFail($coachId);
 
-        if (auth()->user()->User_ID != $coachId) {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
-
         $services = $coach->services()
             ->where('service_type', 'Mentorship')
             ->with(['mentorship.mentorshipSession', 'price'])
@@ -168,10 +150,6 @@ class CoachServiceController extends Controller
     {
         $coach = Coach::findOrFail($coachId);
 
-        if (auth()->user()->User_ID != $coachId) {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
-
         $services = $coach->services()
             ->where('service_type', 'Group_Mentorship')
             ->with(['groupMentorship', 'price'])
@@ -187,10 +165,6 @@ class CoachServiceController extends Controller
     {
         $coach = Coach::findOrFail($coachId);
 
-        if (auth()->user()->User_ID != $coachId) {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
-
         $services = $coach->services()
             ->where('service_type', 'Mock_Interview')
             ->with(['mockInterview', 'price'])
@@ -204,10 +178,6 @@ class CoachServiceController extends Controller
     public function createService(Request $request, $coachId)
     {
         $coach = Coach::findOrFail($coachId);
-
-        if (auth()->user()->User_ID != $coachId) {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
 
         $request->validate([
             'service_type' => 'required|in:Mentorship,Mock_Interview,Group_Mentorship',
@@ -275,10 +245,6 @@ class CoachServiceController extends Controller
     {
         $coach = Coach::findOrFail($coachId);
 
-        if (auth()->user()->User_ID != $coachId) {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
-
         $service = Service::where('service_id', $serviceId)
             ->where('coach_id', $coachId)
             ->firstOrFail();
@@ -343,10 +309,6 @@ class CoachServiceController extends Controller
     public function deleteService(Request $request, $coachId, $serviceId)
     {
         $coach = Coach::findOrFail($coachId);
-
-        if (auth()->user()->User_ID != $coachId) {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
 
         $service = Service::where('service_id', $serviceId)
             ->where('coach_id', $coachId)
