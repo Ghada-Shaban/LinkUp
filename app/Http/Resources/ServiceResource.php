@@ -18,13 +18,13 @@ class ServiceResource extends JsonResource
                         'title' => $this->mentorship->mentorshipPlan->title,
                         'duration'=>'60 minutes',
                         'no.of sessions'=>'4 sessions',
-                        'frequency'=> 'Monthly'
+                     
                     ] : null,
                     'mentorship_session' => $this->mentorship && $this->mentorship->mentorshipSession ? [
                         'session_type' => $this->mentorship->mentorshipSession->session_type,
                         'duration'=>'60 minutes',
                         'no.of sessions'=>'1 session',
-                        'frequency'=> 'Weekly'
+                      
                     ] : null,
                 ];
             }),
@@ -36,7 +36,7 @@ class ServiceResource extends JsonResource
                     'start_time' => $this->groupMentorship ? $this->groupMentorship->start_time : null,
                     'duration'=>'60 minutes',
                     'no.of sessions'=>'4 sessions',
-                    'frequency'=> 'Monthly',
+'                 min_participants' => $this->groupMentorship->min_participants,
                     'max_participants' => $this->groupMentorship->max_participants,
                     'available_slots' => $this->groupMentorship->available_slots,
                 ];
@@ -47,7 +47,7 @@ class ServiceResource extends JsonResource
                     'interview_level' => $this->mockInterview ? $this->mockInterview->interview_level : null,
                     'duration'=>'60 minutes',
                     'no.of sessions'=>'1 session',
-                    'frequency'=> 'Weekly'
+                    
                 ];
             }),
         ];
