@@ -42,11 +42,14 @@ Route::prefix('password')->group(function () {
 });
 
 
-Route::middleware('auth:sanctum')->group(function () {
-    Route::get('/coach/{coachId}/services', [CoachServiceController::class, 'getServices']);
-    Route::post('/coach/{coachId}/services', [CoachServiceController::class, 'createService']);
-    Route::put('/coach/{coachId}/services/{serviceId}', [CoachServiceController::class, 'updateService']);
-    Route::delete('/coach/{coachId}/services/{serviceId}', [CoachServiceController::class, 'deleteService']);
-    Route::post('/group-mentorship/{groupMentorshipId}/join', [CoachServiceController::class, 'joinGroupMentorship']);
-    Route::get('/coach/{coachId}/services/count', [CoachServiceController::class, 'getServicesCount']); 
+Route::prefix('coach/{coachId}')->middleware(['auth:api', 'check.coach.ownership'])->group(function () {
+    // Route لجلب الخدمات بناءً على service_type
+    Route::get('services', [CoachServiceController::class, 'getServices']);
+
+    // باقي الـ Routes
+    Route::get('services/count', [CoachServiceController::class, 'getServicesCount']);
+    Route::post('services', [CoachServiceController::class, 'createService']);
+    Route::put('services/{serviceId}', [CoachServiceController::class, 'updateService']);
+    Route::delete('services/{serviceId}', [CoachServiceController::class, 'deleteService']);
+    Route::post('group-mentorship/{groupMentorshipId}/join', [CoachServiceController::class, 'joinGroupMentorship']);
 });
