@@ -11,7 +11,7 @@ class Service extends Model
     protected $table = 'services';
     public $incrementing = true;
     protected $primaryKey ='service_id';
-    protected $fillable = [
+    protected $fillable = [ 
         'service_type',
         'admin_id', 'coach_id'
     ];
