@@ -51,7 +51,7 @@ class Coach extends Model
     {
         return $this->hasMany(NewSession::class, 'coach_id', 'User_ID'); 
     }
-    public function availableTimes(): HasMany
+    public function availableTimes()
  {
     return $this->hasMany(CoachAvailability::class, 'coach_id', 'User_ID');
  }
