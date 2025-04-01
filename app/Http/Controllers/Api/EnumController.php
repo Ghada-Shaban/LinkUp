@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Cache;
 
 class EnumController extends Controller
 {
-    public function getEnums(Request $request)
+    public function getServiceEnums(Request $request)
     {
         $enums = Cache::remember('enums', 60 * 60 * 24, function () {
             $serviceTypes = $this->getEnumValues('services', 'service_type');
