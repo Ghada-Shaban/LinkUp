@@ -41,9 +41,9 @@ Route::prefix('password')->group(function () {
     Route::post('/reset', [\App\Http\Controllers\Api\PasswordResetController::class, 'resetPassword']); // إعادة تعيين كلمة المرور
 });
 
-
+Route::get('service-enums', [CoachServiceController::class, 'getEnums']);
 Route::prefix('coach/{coachId}')->middleware(['auth:api', 'check.coach.ownership'])->group(function () {
-    Route::get('service-enums', [CoachServiceController::class, 'getEnums']);
+    
     
     // Route لجلب الخدمات بناءً على service_type
     Route::get('services', [CoachServiceController::class, 'getServices']);
