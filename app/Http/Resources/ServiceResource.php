@@ -19,13 +19,13 @@ class ServiceResource extends JsonResource
                         'duration'=>'60 minutes',
                         'no.of sessions'=>'4 sessions',
                      
-                    ] 
+                    ] : null,
                     'mentorship_session' => $this->mentorship && $this->mentorship->mentorshipSession ? [
                         'session_type' => $this->mentorship->mentorshipSession->session_type,
                         'duration'=>'60 minutes',
                         'no.of sessions'=>'1 session',
                       
-                    ] 
+                    ] : null,
                 ];
             }),
             'group_mentorship' => $this->when($this->service_type === 'Group_Mentorship', function () {
