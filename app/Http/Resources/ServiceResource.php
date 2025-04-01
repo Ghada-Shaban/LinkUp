@@ -29,14 +29,17 @@ class ServiceResource extends JsonResource
                 if ($this->mentorship->mentorshipPlan) {
                     $data['mentorship_plan'] = [
                         'title' => $this->mentorship->mentorshipPlan->title,
-                        'duration' => $this->mentorship->mentorshipPlan->duration,
-                        'no_of_sessions' => $this->mentorship->mentorshipPlan->no_of_sessions,
-                        'frequency' => $this->mentorship->mentorshipPlan->frequency,
+                        'duration'=>'60 minutes',
+            'no.of sessions'=>'4 sessions',
+            'frequency'=> 'Monthly'
                     ];
                 }
                 if ($this->mentorship->mentorshipSession) {
                     $data['mentorship_session'] = [
                         'session_type' => $this->mentorship->mentorshipSession->session_type,
+                        'duration'=>'60 minutes',
+                         'no.of sessions'=>'1 session',
+                         'frequency'=> 'Weekly'
                     ];
                 }
 
@@ -53,6 +56,10 @@ class ServiceResource extends JsonResource
                     'description' => $this->groupMentorship->description,
                     'day' => $this->groupMentorship->day,
                     'start_time' => $this->groupMentorship->start_time,
+                    'duration'=>'60 minutes',
+            'no.of sessions'=>'4 sessions',
+            'frequency'=> 'Monthly'
+                    'no.of trainees'=> '5 trainees'
                 ];
             }),
             'mock_interview' => $this->when($this->service_type === 'Mock_Interview', function () {
@@ -64,6 +71,9 @@ class ServiceResource extends JsonResource
                 return [
                     'interview_type' => $this->mockInterview->interview_type,
                     'interview_level' => $this->mockInterview->interview_level,
+                    'duration'=>'60 minutes',
+            'no.of sessions'=>'1 session',
+            'frequency'=> 'Weekly'
                 ];
             }),
           
