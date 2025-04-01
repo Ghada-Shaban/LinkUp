@@ -22,7 +22,7 @@ use Illuminate\Support\Facades\DB;
 
 class CoachServiceController extends Controller
 {
-public function getServicesCount($coachId)
+    public function getServicesCount($coachId)
     {  
         $coach = Coach::findOrFail($coachId);
         $services = Service::where('coach_id', $coachId)->with('price')->get();
@@ -69,27 +69,24 @@ public function getServicesCount($coachId)
 
     // دالة لجلب كل الخدمات (زي قسم "all")
     private function getAllServices(Request $request, $coachId)
-{
-    $coach = Coach::findOrFail($coachId);
+    {
+        $coach = Coach::findOrFail($coachId);
 
-    $services = $coach->services()
-        ->with(['mentorship.mentorshipPlan', 'mentorship.mentorshipSession', 'groupMentorship', 'mockInterview', 'price'])
-        ->get();
+        $services = $coach->services()
+            ->with(['mentorship.mentorshipPlan', 'mentorship.mentorshipSession', 'groupMentorship', 'mockInterview', 'price'])
+            ->get();
 
-    // إضافة available_slots لكل Group Mentorship
-    $services->each(function ($service) {
-        if ($service->service_type === 'Group_Mentorship' && $service->groupMentorship) {
-            $currentParticipants = DB::table('group_mentorship_trainee')
-                ->where('group_mentorship_id', $service->groupMentorship->id)
-                ->count();
-            $service->groupMentorship->available_slots = $service->groupMentorship->max_participants - $currentParticipants;
-        }
-    });
+        // إضافة available_slots لكل Group Mentorship
+        $services->each(function ($service) {
+            if ($service->service_type === 'Group_Mentorship' && $service->groupMentorship) {
+                $service->groupMentorship->available_slots = $service->groupMentorship->max_participants - $service->groupMentorship->current_participants;
+            }
+        });
 
-    return response()->json([
-        'services' => ServiceResource::collection($services)
-    ]);
-}
+        return response()->json([
+            'services' => ServiceResource::collection($services)
+        ]);
+    }
 
     // دالة لجلب خدمات Mentorship Plans فقط
     private function getMentorshipPlans(Request $request, $coachId)
@@ -129,29 +126,25 @@ public function getServicesCount($coachId)
 
     // دالة لجلب خدمات Group Mentorship فقط
     private function getGroupMentorshipServices(Request $request, $coachId)
-{
-    $coach = Coach::findOrFail($coachId);
+    {
+        $coach = Coach::findOrFail($coachId);
 
-    $services = $coach->services()
-        ->where('service_type', 'Group_Mentorship')
-        ->with(['groupMentorship', 'price'])
-        ->get();
+        $services = $coach->services()
+            ->where('service_type', 'Group_Mentorship')
+            ->with(['groupMentorship', 'price'])
+            ->get();
 
-    // إضافة available_slots لكل Group Mentorship
-    $services->each(function ($service) {
-        if ($service->groupMentorship) {
-            $currentParticipants = DB::table('group_mentorship_trainee')
-                ->where('group_mentorship_id', $service->groupMentorship->id)
-                ->count();
-            $service->groupMentorship->available_slots = $service->groupMentorship->max_participants - $currentParticipants;
-        }
-    });
+        // إضافة available_slots لكل Group Mentorship
+        $services->each(function ($service) {
+            if ($service->groupMentorship) {
+                $service->groupMentorship->available_slots = $service->groupMentorship->max_participants - $service->groupMentorship->current_participants;
+            }
+        });
 
-    return response()->json([
-        'services' => GroupMentorshipResource::collection($services)
-    ]);
-
-}
+        return response()->json([
+            'services' => GroupMentorshipResource::collection($services)
+        ]);
+    }
 
     // دالة لجلب خدمات Mock Interview فقط
     private function getMockInterviewServices(Request $request, $coachId)
@@ -229,7 +222,7 @@ public function getServicesCount($coachId)
                 'description' => $request->description,
                 'day' => $request->day,
                 'start_time' => $request->start_time,
-                
+                'trainee_ids' => json_encode([]), // تهيئة trainee_ids كـ Array فارغ
             ]);
         }
 
@@ -292,60 +285,60 @@ public function getServicesCount($coachId)
     }
 
     public function joinGroupMentorship(Request $request, $coachId, $groupMentorshipId)
-{
-    // التأكد من وجود الـ Coach
-    $coach = Coach::findOrFail($coachId);
+    {
+        // التأكد من وجود الـ Coach
+        $coach = Coach::findOrFail($coachId);
 
-    // التأكد من وجود الـ Group Mentorship
-    $groupMentorship = GroupMentorship::where('service_id', $groupMentorshipId)->firstOrFail();
+        // التأكد من وجود الـ Group Mentorship
+        $groupMentorship = GroupMentorship::where('service_id', $groupMentorshipId)->firstOrFail();
 
-    // التأكد إن الـ Group Mentorship تابعة للـ Coach
-    $service = Service::where('service_id', $groupMentorship->service_id)
-        ->where('coach_id', $coach->id)
-        ->where('service_type', 'Group_Mentorship')
-        ->firstOrFail();
+        // التأكد إن الـ Group Mentorship تابعة للـ Coach
+        $service = Service::where('service_id', $groupMentorship->service_id)
+            ->where('coach_id', $coach->id)
+            ->where('service_type', 'Group_Mentorship')
+            ->firstOrFail();
 
-    // جلب الـ Trainee اللي بيعمل Join
-    $trainee = Auth::guard('api')->user()->trainee;
+        // جلب الـ Trainee اللي بيعمل Join
+        $trainee = Auth::guard('api')->user()->trainee;
 
-    // التحقق من عدد الـ Trainees المسجلين
-    $currentParticipants = DB::table('group_mentorship_trainee')
-        ->where('group_mentorship_id', $groupMentorship->id)
-        ->count();
+        // التحقق من وجود max_participants
+        if (is_null($groupMentorship->max_participants)) {
+            return response()->json(['message' => 'Max participants not set for this group mentorship.'], 400);
+        }
 
-    // حساب عدد الـ Slots المتاحة
-    $availableSlots = $groupMentorship->max_participants - $currentParticipants;
+        // حساب عدد الـ Slots المتاحة
+        $availableSlots = $groupMentorship->max_participants - $groupMentorship->current_participants;
 
-    // التحقق إذا كان فيه Slots متاحة
-    if ($availableSlots <= 0) {
-        return response()->json(['message' => 'This group mentorship is full.', 'available_slots' => 0], 400);
+        // التحقق إذا كان فيه Slots متاحة
+        if ($availableSlots <= 0) {
+            return response()->json(['message' => 'This group mentorship is full.', 'available_slots' => 0], 400);
+        }
+
+        // جلب قائمة الـ Trainees المسجلين
+        $traineeIds = $groupMentorship->trainee_ids ? json_decode($groupMentorship->trainee_ids, true) : [];
+
+        // التأكد إن الـ Trainee مش مسجل بالفعل
+        if (in_array($trainee->id, $traineeIds)) {
+            return response()->json(['message' => 'Trainee is already joined to this group mentorship', 'available_slots' => $availableSlots], 400);
+        }
+
+        // إضافة الـ Trainee لقائمة الـ Trainees
+        $traineeIds[] = $trainee->id;
+
+        // تحديث الـ trainee_ids و current_participants
+        $groupMentorship->update([
+            'trainee_ids' => json_encode($traineeIds),
+            'current_participants' => $groupMentorship->current_participants + 1,
+        ]);
+
+        // تحديث عدد الـ Slots المتاحة
+        $availableSlots--;
+
+        return response()->json([
+            'message' => 'Successfully joined the group mentorship.',
+            'available_slots' => $availableSlots
+        ], 200);
     }
-
-    // التأكد إن الـ Trainee مش مسجل بالفعل
-    $alreadyJoined = DB::table('group_mentorship_trainee')
-        ->where('group_mentorship_id', $groupMentorship->id)
-        ->where('trainee_id', $trainee->id)
-        ->exists();
-
-    if ($alreadyJoined) {
-        return response()->json(['message' => 'Trainee is already joined to this group mentorship', 'available_slots' => $availableSlots], 400);
-    }
-
-    // إضافة الـ Trainee للـ Group Mentorship
-    DB::table('group_mentorship_trainee')->insert([
-        'group_mentorship_id' => $groupMentorship->id,
-        'trainee_id' => $trainee->id,
-       
-    ]);
-
-    // تحديث عدد الـ Slots المتاحة
-    $availableSlots--;
-
-    return response()->json([
-        'message' => 'Successfully joined the group mentorship.',
-        'available_slots' => $availableSlots
-    ], 200);
-}
 
     public function deleteService(Request $request, $coachId, $serviceId)
     {
@@ -360,4 +353,3 @@ public function getServicesCount($coachId)
         return response()->json(['message' => 'Service deleted successfully']);
     }
 }
-
