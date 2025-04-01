@@ -2,81 +2,54 @@
 
 namespace App\Http\Resources;
 
-use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 class ServiceResource extends JsonResource
 {
-    /**
-     * Transform the resource into an array.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @return array|\Illuminate\Contracts\Support\Arrayable|\JsonSerializable
-     */
-    public function toArray(Request $request): array
+    public function toArray($request)
     {
         return [
             'service_id' => $this->service_id,
             'service_type' => $this->service_type,
-            'price' => $this->whenLoaded('price', fn() => number_format($this->price->price, 2)),
+            'price' => $this->price ? $this->price->price : null,
             'mentorship' => $this->when($this->service_type === 'Mentorship', function () {
-                $mentorship = $this->whenLoaded('mentorship');
-                if (!$mentorship) {
-                    return null;
-                }
-
-                $data = [];
-                if ($this->mentorship->mentorshipPlan) {
-                    $data['mentorship_plan'] = [
+                return [
+                    'mentorship_plan' => $this->mentorship && $this->mentorship->mentorshipPlan ? [
                         'title' => $this->mentorship->mentorshipPlan->title,
                         'duration'=>'60 minutes',
-            'no.of sessions'=>'4 sessions',
-            'frequency'=> 'Monthly'
-                    ];
-                }
-                if ($this->mentorship->mentorshipSession) {
-                    $data['mentorship_session'] = [
+                        'no.of sessions'=>'4 sessions',
+                        'frequency'=> 'Monthly'
+                    ] : null,
+                    'mentorship_session' => $this->mentorship && $this->mentorship->mentorshipSession ? [
                         'session_type' => $this->mentorship->mentorshipSession->session_type,
                         'duration'=>'60 minutes',
-                         'no.of sessions'=>'1 session',
-                         'frequency'=> 'Weekly'
-                    ];
-                }
-
-                return $data;
+                        'no.of sessions'=>'1 session',
+                        'frequency'=> 'Weekly'
+                    ] : null,
+                ];
             }),
             'group_mentorship' => $this->when($this->service_type === 'Group_Mentorship', function () {
-                $groupMentorship = $this->whenLoaded('groupMentorship');
-                if (!$groupMentorship) {
-                    return null;
-                }
-
                 return [
-                    'title' => $this->groupMentorship->title,
-                    'description' => $this->groupMentorship->description,
-                    'day' => $this->groupMentorship->day,
-                    'start_time' => $this->groupMentorship->start_time,
+                    'title' => $this->groupMentorship ? $this->groupMentorship->title : null,
+                    'description' => $this->groupMentorship ? $this->groupMentorship->description : null,
+                    'day' => $this->groupMentorship ? $this->groupMentorship->day : null,
+                    'start_time' => $this->groupMentorship ? $this->groupMentorship->start_time : null,
                     'duration'=>'60 minutes',
-            'no.of sessions'=>'4 sessions',
-            'frequency'=> 'Monthly',
-                    'no.of trainees'=> '5 trainees'
+                    'no.of sessions'=>'4 sessions',
+                    'frequency'=> 'Monthly',
+                    'max_participants' => $this->groupMentorship->max_participants,
+                    'available_slots' => $this->groupMentorship->available_slots,
                 ];
             }),
             'mock_interview' => $this->when($this->service_type === 'Mock_Interview', function () {
-                $mockInterview = $this->whenLoaded('mockInterview');
-                if (!$mockInterview) {
-                    return null;
-                }
-
                 return [
-                    'interview_type' => $this->mockInterview->interview_type,
-                    'interview_level' => $this->mockInterview->interview_level,
+                    'interview_type' => $this->mockInterview ? $this->mockInterview->interview_type : null,
+                    'interview_level' => $this->mockInterview ? $this->mockInterview->interview_level : null,
                     'duration'=>'60 minutes',
-            'no.of sessions'=>'1 session',
-            'frequency'=> 'Weekly'
+                    'no.of sessions'=>'1 session',
+                    'frequency'=> 'Weekly'
                 ];
             }),
-          
         ];
     }
 }
