@@ -51,7 +51,10 @@ class Coach extends Model
     {
         return $this->hasMany(NewSession::class, 'coach_id', 'User_ID'); 
     }
-
+    public function availableTimes(): HasMany
+ {
+    return $this->hasMany(CoachAvailability::class, 'coach_id', 'User_ID');
+ }
     public function getAverageRatingAttribute()
     {
     return round($this->reviews()->avg('Rating'), 2);}
