@@ -191,7 +191,7 @@ class CoachServiceController extends Controller
             'admin_id' => '1'
         ]);
 
-        $coach->services()->attach($service->service_id);
+       
 
         if ($request->service_type === 'Mentorship') {
             Mentorship::create([
