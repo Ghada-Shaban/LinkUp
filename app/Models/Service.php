@@ -42,7 +42,7 @@ class Service extends Model
     }
 public function coach()
     {
-        return $this->belongsTo(Coach::class, 'coach_id');
+        return $this->belongsTo(Coach::class, 'coach_id','User_ID');
     }
    
     
