@@ -21,7 +21,8 @@ use App\Http\Resources\MockInterviewResource;
 class CoachServiceController extends Controller
 {
 public function getServicesCount($coachId)
-    {
+    {  
+        $coach = Coach::findOrFail($coachId);
         $services = Service::where('coach_id', $coachId)->with('price')->get();
 
         $countData = [
@@ -45,6 +46,7 @@ public function getServicesCount($coachId)
     // دالة رئيسية لجلب الخدمات بناءً على service_type
     public function getServices(Request $request, $coachId)
     {
+        $coach = Coach::findOrFail($coachId);
         $serviceType = $request->query('service_type', 'all'); // القيمة الافتراضية هي 'all'
 
         switch ($serviceType) {
