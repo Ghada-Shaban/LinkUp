@@ -20,38 +20,6 @@ use App\Http\Resources\MockInterviewResource;
 
 class CoachServiceController extends Controller
 {
-
-    public function getServicesCount($coachId)
-{
-    $coach = Coach::findOrFail($coachId);
-
-    if (auth()->user()->User_ID != $coachId) {
-        return response()->json(['message' => 'Unauthorized'], 403);
-    }
-
-   $services = Service::where('coach_id', $coachId)->with('price')->get();
-
-    $countData = [
-        'all' => [
-            'count' => $services->count()
-        ],
-      
-
-        'mentorship' => [ // قسم واحد لكل الـ Mentorship
-            'count' => $services->where('service_type', 'Mentorship')->count(),
-            
-        ],
-        'group_mentorship' => [
-            'count' => $services->where('service_type', 'Group_Mentorship')->count()
-        ],
-        'mock_interview' => [
-            'count' => $services->where('service_type', 'Mock_Interview')->count()
-        ],
-    ];
-
-    return response()->json($countData);
-}
-
 public function getServicesCount($coachId)
     {
         $services = Service::where('coach_id', $coachId)->with('price')->get();
