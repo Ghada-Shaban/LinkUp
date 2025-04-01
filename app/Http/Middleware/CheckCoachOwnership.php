@@ -22,7 +22,7 @@ class CheckCoachOwnership
         return response()->json(['message' => 'Coach not found'], 404);
     }
 
-    if ($user->id != $coach->User_ID) {
+    if ($user->User_ID != $coach->User_ID) {
         return response()->json(['message' => 'Unauthorized: You are not the owner of these services'], 403);
     }
 
