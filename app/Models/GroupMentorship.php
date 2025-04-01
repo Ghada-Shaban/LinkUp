@@ -29,7 +29,7 @@ class GroupMentorship extends Model
     }
 public function getAvailableSlotsAttribute()
     {
-        return max(0, $this->max_participants - $this->current_participants);
+        return $this->max_participants - $this->current_participants;
     }
     
 }
