@@ -17,7 +17,7 @@ class MockInterviewResource extends JsonResource
 }),
             'duration'=>'60 minutes',
             'no.of sessions'=>'1 session',
-            'frequency'=> 'Weekly'
+            
         ];
     }
 }
