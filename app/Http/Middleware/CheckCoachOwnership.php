@@ -8,7 +8,7 @@ use Symfony\Component\HttpFoundation\Response;
 
 class CheckCoachOwnership
 {
-    ppublic function handle(Request $request, Closure $next): Response
+    public function handle(Request $request, Closure $next): Response
 {
     $coachId = (int) $request->route('coachId');
 
