@@ -42,7 +42,10 @@ class Service extends Model
         return $this->hasMany(NewSession::class, 'service_id');
 
     }
-
+public function coach()
+    {
+        return $this->belongsTo(Coach::class, 'coach_id,'User_ID');
+    }
    
     
 }
