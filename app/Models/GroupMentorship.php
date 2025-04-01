@@ -17,7 +17,8 @@ class GroupMentorship extends Model
         'title', 
         'description', 
         'day',
-        'start_time'
+        'start_time',
+    'available_slots',
        
     
     ];
