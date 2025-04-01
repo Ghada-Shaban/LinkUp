@@ -17,12 +17,13 @@ class CheckCoachOwnership
      */
     public function handle(Request $request, Closure $next): Response
     {
-        // جلب coachId من الـ Route
-        $coachId = $request->route('coachId');
+        // جلب coachId من الـ Route وتحويله لـ Integer
+        $coachId = (int) $request->route('coachId');
 
-        // التحقق من إن المستخدم مسجل دخوله وإن User_ID بتاعه يساوي coachId
-        if (!auth()->check() || auth()->user()->User_ID != $coachId) {
-            return response()->json(['message' => 'Unauthorized'], 403);
+        // التحقق من إن المستخدم مسجل دخوله باستخدام الـ Guard المناسب (api)
+        // وإن id بتاعه يساوي coachId
+        if (auth('api')->user()->User_ID!= $coachId) {
+            return response()->json(['message' => 'Unauthorized: You are not the owner of these services'], 403);
         }
 
         return $next($request);
