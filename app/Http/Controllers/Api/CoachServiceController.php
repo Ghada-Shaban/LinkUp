@@ -318,12 +318,12 @@ class CoachServiceController extends Controller
         $traineeIds = $groupMentorship->trainee_ids ? json_decode($groupMentorship->trainee_ids, true) : [];
 
         // التأكد إن الـ Trainee مش مسجل بالفعل
-        if (in_array($trainee->id, $traineeIds)) {
+        if (in_array($trainee->User_ID, $traineeIds)) {
             return response()->json(['message' => 'Trainee is already joined to this group mentorship', 'available_slots' => $availableSlots], 400);
         }
 
         // إضافة الـ Trainee لقائمة الـ Trainees
-        $traineeIds[] = $trainee->id;
+        $traineeIds[] = $trainee->User_ID;
 
         // تحديث الـ trainee_ids و current_participants
         $groupMentorship->update([
