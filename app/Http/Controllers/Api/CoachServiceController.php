@@ -102,7 +102,7 @@ class CoachServiceController extends Controller
             });
 
         return response()->json([
-            'services' => ServiceResource::collection($services)
+            'services' => MentorshipPlanResource::collection($services)
         ]);
     }
 
@@ -120,7 +120,7 @@ class CoachServiceController extends Controller
             });
 
         return response()->json([
-            'services' => ServiceResource::collection($services)
+            'services' => MentorshipSessionResource::collection($services)
         ]);
     }
 
