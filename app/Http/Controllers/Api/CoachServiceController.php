@@ -294,7 +294,7 @@ class CoachServiceController extends Controller
 
         // التأكد إن الـ Group Mentorship تابعة للـ Coach
         $service = Service::where('service_id', $groupMentorship->service_id)
-            ->where('coach_id', $coach->id)
+            ->where('coach_id', $coach->User_ID)
             ->where('service_type', 'Group_Mentorship')
             ->firstOrFail();
 
