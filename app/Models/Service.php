@@ -34,9 +34,7 @@ class Service extends Model
     public function price() {
         return $this->hasOne(Price::class, 'service_id');
     }
-    public function coaches() {
-        return $this->belongsTo(Coach::class, 'chooses', 'service_id', 'coach_id');
-    }
+   
  public function sessions()
     {
         return $this->hasMany(NewSession::class, 'service_id');
