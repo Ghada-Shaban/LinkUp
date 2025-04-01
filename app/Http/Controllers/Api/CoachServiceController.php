@@ -289,44 +289,5 @@ public function getServicesCount($coachId)
         return response()->json(['message' => 'Service deleted successfully']);
     }
 
-  public function getEnums(Request $request)
-{
-    // جلب قيم الـ Enum من الـ Database
-    $serviceTypes = $this->getEnumValues('services', 'service_type');
-    $interviewTypes = $this->getEnumValues('mock_interviews', 'interview_type');
-    $interviewLevels = $this->getEnumValues('mock_interviews', 'interview_level');
-    $days = $this->getEnumValues('group_mentorships', 'day');
-
-    // قيم الـ mentorship_type (مش Enum في الـ Database، لكن مُعرفة في الكود)
-    $mentorshipTypes = [
-        'CV Review',
-        'project Assessment',
-        'Linkedin Optimization',
-        'Mentorship plan'
-    ];
-
-    return response()->json([
-        'enums' => [
-            'service_types' => $serviceTypes,
-            'mentorship_types' => $mentorshipTypes,
-            'interview_types' => $interviewTypes,
-            'interview_levels' => $interviewLevels,
-            'days' => $days,
-        ]
-    ]);
-}
-
-/**
- * دالة مساعدة لجلب قيم الـ Enum من الـ Database
- */
-private function getEnumValues($table, $column)
-{
-    $type = DB::select("SHOW COLUMNS FROM {$table} WHERE Field = '{$column}'")[0]->Type;
-    preg_match("/^enum\((.*)\)$/", $type, $matches);
-    $enumValues = array_map(function ($value) {
-        return trim($value, "'");
-    }, explode(',', $matches[1]));
-
-    return $enumValues;
-}
+  
 }
