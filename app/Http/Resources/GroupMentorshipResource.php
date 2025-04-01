@@ -17,7 +17,6 @@ class GroupMentorshipResource extends JsonResource
             'price' => $this->price ? $this->price->price : null,
             'duration'=>'60 minutes',
             'no.of sessions'=>'4 sessions',
-            'frequency'=> 'Monthly',
             'max_participants' => $this->groupMentorship->max_participants,
             'available_slots' => $this->groupMentorship->available_slots,
 
