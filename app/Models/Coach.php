@@ -39,7 +39,7 @@ class Coach extends Model
 
     public function services()
     {
-        return $this->belongsToMany(Service::class, 'coach_id', 'service_id');
+        return $this->belongsToMany(Service::class,'chooses' 'coach_id', 'service_id');
     }
 
     public function reviews()
