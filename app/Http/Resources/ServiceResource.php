@@ -58,7 +58,7 @@ class ServiceResource extends JsonResource
                     'start_time' => $this->groupMentorship->start_time,
                     'duration'=>'60 minutes',
             'no.of sessions'=>'4 sessions',
-            'frequency'=> 'Monthly'
+            'frequency'=> 'Monthly',
                     'no.of trainees'=> '5 trainees'
                 ];
             }),
