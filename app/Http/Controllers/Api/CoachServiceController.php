@@ -331,8 +331,11 @@ class CoachServiceController extends Controller
             'current_participants' => $groupMentorship->current_participants + 1,
         ]);
 
-        // تحديث عدد الـ Slots المتاحة
-        $availableSlots--;
+        // تحديث الـ Model عشان يجيب القيم الجديدة
+    $groupMentorship->refresh();
+
+    // حساب عدد الـ Slots المتاحة بعد التحديث
+    $availableSlots = $groupMentorship->available_slots;
 
         return response()->json([
             'message' => 'Successfully joined the group mentorship.',
