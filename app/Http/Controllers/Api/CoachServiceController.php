@@ -83,7 +83,7 @@ class CoachServiceController extends Controller
             'services' => ServiceResource::collection($services)
         ]);
     
-
+    }
     // دالة لجلب خدمات Mentorship Plans فقط
     private function getMentorshipPlans(Request $request, $coachId)
     {
