@@ -289,10 +289,8 @@ public function getServicesCount($coachId)
         return response()->json(['message' => 'Service deleted successfully']);
     }
 
-    public function getEnums(Request $request, $coachId)
+  public function getEnums(Request $request)
 {
-    $coach = Coach::findOrFail($coachId);
-
     // جلب قيم الـ Enum من الـ Database
     $serviceTypes = $this->getEnumValues('services', 'service_type');
     $interviewTypes = $this->getEnumValues('mock_interviews', 'interview_type');
