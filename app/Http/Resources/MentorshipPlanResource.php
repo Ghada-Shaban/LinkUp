@@ -16,7 +16,7 @@ class MentorshipPlanResource extends JsonResource
 }),
             'duration'=>'60 minutes',
             'no.of sessions'=>'4 sessions',
-            'frequency'=> 'Monthly'
+            
         ];
     }
 }
