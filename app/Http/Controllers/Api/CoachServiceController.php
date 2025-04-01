@@ -76,17 +76,13 @@ class CoachServiceController extends Controller
             ->with(['mentorship.mentorshipPlan', 'mentorship.mentorshipSession', 'groupMentorship', 'mockInterview', 'price'])
             ->get();
 
-        // إضافة available_slots لكل Group Mentorship
-        $services->each(function ($service) {
-            if ($service->service_type === 'Group_Mentorship' && $service->groupMentorship) {
-                $service->groupMentorship->available_slots = $service->groupMentorship->max_participants - $service->groupMentorship->current_participants;
-            }
-        });
+        
+        };
 
         return response()->json([
             'services' => ServiceResource::collection($services)
         ]);
-    }
+    
 
     // دالة لجلب خدمات Mentorship Plans فقط
     private function getMentorshipPlans(Request $request, $coachId)
@@ -134,12 +130,7 @@ class CoachServiceController extends Controller
             ->with(['groupMentorship', 'price'])
             ->get();
 
-        // إضافة available_slots لكل Group Mentorship
-        $services->each(function ($service) {
-            if ($service->groupMentorship) {
-                $service->groupMentorship->available_slots = $service->groupMentorship->max_participants - $service->groupMentorship->current_participants;
-            }
-        });
+      
 
         return response()->json([
             'services' => GroupMentorshipResource::collection($services)
