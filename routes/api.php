@@ -54,5 +54,8 @@ Route::prefix('coach/{coachId}')->middleware(['auth:api', 'check.coach.ownership
     Route::post('services', [CoachServiceController::class, 'createService']);
     Route::put('services/{serviceId}', [CoachServiceController::class, 'updateService']);
     Route::delete('services/{serviceId}', [CoachServiceController::class, 'deleteService']);
+  
+});
+Route::prefix('coach/{coachId}')->middleware(['auth:api', 'check.trainee'])->group(function () {
     Route::post('group-mentorship/{groupMentorshipId}/join', [CoachServiceController::class, 'joinGroupMentorship']);
 });
