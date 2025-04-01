@@ -42,7 +42,7 @@ Route::prefix('password')->group(function () {
     Route::post('/reset', [\App\Http\Controllers\Api\PasswordResetController::class, 'resetPassword']); // إعادة تعيين كلمة المرور
 });
 
-Route::get('service-enums', [EnumController::class, 'getServiceEnums']);
+Route::get('service/enums', [EnumController::class, 'getServiceEnums']);
 Route::prefix('coach/{coachId}')->middleware(['auth:api', 'check.coach.ownership'])->group(function () {
     
     
