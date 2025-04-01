@@ -18,6 +18,7 @@ class GroupMentorshipResource extends JsonResource
             'duration'=>'60 minutes',
             'no.of sessions'=>'4 sessions',
             'max_participants' => $this->groupMentorship->max_participants,
+              'min_participants' => $this->groupMentorship->min_participants,
             'available_slots' => $this->groupMentorship->available_slots,
 
         ];
