@@ -19,6 +19,8 @@ class GroupMentorship extends Model
         'day',
         'start_time',
     'available_slots',
+    'current_participants',
+    'trainee_ids',
        
     
     ];
