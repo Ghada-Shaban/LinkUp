@@ -47,7 +47,7 @@ Route::prefix('coach/{coachId}')->middleware(['auth:api', 'check.coach.ownership
     
     
     // Route لجلب الخدمات بناءً على service_type
-    Route::get('services', [CoachServiceController::class, '']);
+    Route::get('services', [CoachServiceController::class, 'getServices']);
 
     // باقي الـ Routes
     Route::get('services/count', [CoachServiceController::class, 'getServicesCount']);
