@@ -77,7 +77,7 @@ class CoachServiceController extends Controller
             ->get();
 
         
-        };
+        }
 
         return response()->json([
             'services' => ServiceResource::collection($services)
