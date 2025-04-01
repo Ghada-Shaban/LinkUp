@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 class Coach extends Model
 {
     use HasFactory;
+    use HasApiTokens;
     protected $primaryKey = 'User_ID';
     public $incrementing = false;
 
