@@ -197,7 +197,12 @@ class CoachServiceController extends Controller
             \Log::info('Service created', [
                 'service_id' => $service->service_id,
             ]);
+             $coach->services()->attach($service->service_id);
 
+        \Log::info('Added service to chooses table', [
+            'coach_id' => $coachId,
+            'service_id' => $service->service_id,
+        ]);
             if ($request->service_type === 'Mentorship') {
                 // تأكد من أن القيمة تطابق بالضبط ما هو معرف في الـ enum
                 $mentorshipType = ($request->mentorship_type === 'Mentorship plan') ? 'Mentorship plan' : 'Mentorship session';
