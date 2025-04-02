@@ -124,13 +124,13 @@ public function getServicesCount($coachId)
     }
 
     // دالة لجلب خدمات Group Mentorship فقط
-    private function getGroupMentorshipServices(Request $request, $coachId)
-    {
-        $services = Service::where('coach_id', $coachId)
-            ->where('service_type', 'Group_Mentorship')
-            ->whereHas('groupMentorship') // تأكد من وجود groupMentorship
-            ->with(['groupMentorship', 'price'])
-            ->get();
+   private function getGroupMentorshipServices(Request $request, $coachId)
+{
+    $services = Service::where('coach_id', $coachId)
+        ->where('service_type', 'Group_Mentorship')
+        ->whereHas('groupMentorship') // تأكد من وجود groupMentorship
+        ->with(['groupMentorship', 'price'])
+        ->get();
         
         Log::info('Group Mentorship services count: ' . $services->count());
         
