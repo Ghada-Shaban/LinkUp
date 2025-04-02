@@ -202,10 +202,11 @@ public function createService(Request $request, $coachId)
             $mentorshipType = ($request->mentorship_type === 'Mentorship plan') ? 'Mentorship plan' : 'Mentorship session';
 
             // استخدام DB::table بدل Mentorship::create
-            DB::table('mentorships')->insert([
-                'service_id' => $service->service_id,
-                'mentorship_type' => $mentorshipType,
-            ]);
+          Mentorship::create([
+    'service_id' => $service->service_id,
+    'mentorship_type' => $mentorshipType,
+]);
+
 
             \Log::info('Mentorship created', [
                 'service_id' => $service->service_id,
