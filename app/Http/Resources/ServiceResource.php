@@ -11,7 +11,7 @@ class ServiceResource extends JsonResource
         $data = [
             'service_id' => $this->service_id,
             'service_type' => $this->service_type,
-            'price' => $this->when($this->price, $this->price->price),
+            'price' => $this->price ? $this->price->price : null,
         ];
 
         // إضافة بيانات Mentorship إذا كان هذا هو نوع الخدمة
