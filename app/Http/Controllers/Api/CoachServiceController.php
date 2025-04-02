@@ -160,7 +160,10 @@ class CoachServiceController extends Controller
             'service_type' => 'required|in:Mentorship,Mock_Interview,Group_Mentorship',
             'price' => 'required|numeric',
             //mentorship
-            'mentorship_type' => 'required_if:service_type,Mentorship|in:CV Review,project Assessment,Linkedin Optimization,Mentorship plan',
+           'mentorship_type' => 'required_if:service_type,Mentorship|in:Mentorship plan,Mentorship session',
+
+           //metorship session                
+          'session_type' => 'required_if:mentorship_type,Mentorship session|in:CV Review,project Assessment,Linkedin Optimization',
             
             //metorship plan
             'title' => 'required_if:mentorship_type,Mentorship plan|string|max:255',
@@ -183,21 +186,41 @@ class CoachServiceController extends Controller
         ]);
 
        
-      if ($request->service_type === 'Mentorship') {
-            Mentorship::create([
-                'service_id' => $service->service_id,
-            ]);
-       if ($request->mentorship_type === 'Mentorship plan') {
-    MentorshipPlan::create([
+     if ($request->service_type === 'Mentorship') {
+    $mentorshipType = ($request->mentorship_type === 'Mentorship plan') ? 'Mentorship plan' : 'Mentorship session';
+
+    Mentorship::create([
         'service_id' => $service->service_id,
-        'title' => $request->title,
+        'mentorship_type' => $mentorshipType,
     ]);
-} elseif (!empty($request->mentorship_type)) { 
-    MentorshipSession::create([
+
+    \Log::info('Mentorship created', [
         'service_id' => $service->service_id,
-        'session_type' => $request->session_type,
+        'mentorship_type' => $mentorshipType,
     ]);
-}
+
+    if ($request->mentorship_type === 'Mentorship plan') {
+        MentorshipPlan::create([
+            'service_id' => $service->service_id,
+            'title' => $request->title,
+        ]);
+
+        \Log::info('Mentorship Plan created', [
+            'service_id' => $service->service_id,
+            'title' => $request->title,
+        ]);
+    } elseif ($request->mentorship_type === 'Mentorship session') {
+        MentorshipSession::create([
+            'service_id' => $service->service_id,
+            'session_type' => $request->session_type, // التعديل هنا
+        ]);
+
+        \Log::info('Mentorship Session created', [
+            'service_id' => $service->service_id,
+            'session_type' => $request->session_type,
+        ]);
+    
+
 
         } elseif ($request->service_type === 'Mock_Interview') {
             MockInterview::create([
