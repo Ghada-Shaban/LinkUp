@@ -37,9 +37,10 @@ class Coach extends Model
         return $this->belongsTo(User::class , 'User_ID');
     }
 public function services()
-    {
-        return $this->belongsToMany(Service::class, 'chooses', 'coach_id', 'service_id');
-    }
+{
+    return $this->belongsToMany(Service::class, 'chooses', 'coach_id', 'service_id')
+                ->withPivot('coach_id', 'service_id');
+}
 
     public function reviews()
     {
