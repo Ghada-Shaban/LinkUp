@@ -184,22 +184,18 @@ class CoachServiceController extends Controller
 
        
 
-        if ($request->service_type === 'Mentorship') {
-            Mentorship::create([
-                'service_id' => $service->service_id,
-            ]);
+       if ($request->mentorship_type === 'Mentorship plan') {
+    MentorshipPlan::create([
+        'service_id' => $service->service_id,
+        'title' => $request->title,
+    ]);
+} elseif (!empty($request->mentorship_type)) { 
+    MentorshipSession::create([
+        'service_id' => $service->service_id,
+        'session_type' => $request->session_type,
+    ]);
+}
 
-            if ($request->mentorship_type === 'Mentorship plan') {
-                MentorshipPlan::create([
-                    'service_id' => $service->service_id,
-                    'title' => $request->title,
-                ]);
-            } else {
-                MentorshipSession::create([
-                    'service_id' => $service->service_id,
-                    'session_type' => $request->mentorship_type,
-                ]);
-            }
         } elseif ($request->service_type === 'Mock_Interview') {
             MockInterview::create([
                 'service_id' => $service->service_id,
