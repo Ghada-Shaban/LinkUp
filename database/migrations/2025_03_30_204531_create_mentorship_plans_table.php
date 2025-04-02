@@ -11,6 +11,7 @@ return new class extends Migration
         Schema::create('mentorship_plans', function (Blueprint $table) {
             $table->unsignedBigInteger('service_id')->primary();
             $table->string('title');
+            $table->integer('session_count')->default(4);
             $table->foreign('service_id')->references('service_id')->on('mentorships')->onDelete('cascade');
         });
     }
