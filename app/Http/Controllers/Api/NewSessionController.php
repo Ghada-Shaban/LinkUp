@@ -18,12 +18,12 @@ class NewSessionController extends Controller
         $user = Auth::user(); // جلب المستخدم الحالي
         
         if ($user->role_profile === 'Coach') {
-            // جلب الجلسات التي تم حجزها مع هذا الكوتش
+            // جلب الجلسات المقبولة فقط (Scheduled) للكوتش
             $sessions = NewSession::whereHas('service', function ($query) use ($user) {
                 $query->where('User_ID', $user->User_ID);
             })->where('status', 'Scheduled')->get();
         } elseif ($user->role_profile === 'Trainee') {
-            // جلب الجلسات التي حجزها هذا الترايني
+            // جلب الجلسات المقبولة فقط (Scheduled) للترايني
             $sessions = NewSession::whereHas('books', function ($query) use ($user) {
                 $query->where('trainee_id', $user->User_ID);
             })->where('status', 'Scheduled')->get();
@@ -33,6 +33,37 @@ class NewSessionController extends Controller
 
         return response()->json([
             'sessions' => $sessions
+        ]);
+    }
+
+    /**
+     * قبول جلسة من الكوتش
+     */
+    public function acceptSession($sessionId)
+    {
+        $user = Auth::user();
+        $session = NewSession::findOrFail($sessionId);
+
+        // التأكد أن المستخدم هو الكوتش لهذه الجلسة
+        $isCoachSession = NewSession::where('new_session_id', $sessionId)
+            ->whereHas('service', function ($query) use ($user) {
+                $query->where('User_ID', $user->User_ID);
+            })->exists();
+
+        if (!$isCoachSession) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        if ($session->status !== 'Pending') {
+            return response()->json(['message' => 'Session cannot be accepted'], 400);
+        }
+
+        $session->status = 'Scheduled';
+        $session->save();
+
+        return response()->json([
+            'message' => 'Session accepted successfully!',
+            'session' => $session
         ]);
     }
 
@@ -67,3 +98,4 @@ class NewSessionController extends Controller
         ]);
     }
 }
+
