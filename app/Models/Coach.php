@@ -38,7 +38,7 @@ class Coach extends Model
     }
 public function services()
     {
-        return $this->belongsToMany(Service::class, 'chooses', 'coach_id', 'service_id');
+        return $this->hasMany(Service::class, 'chooses', 'coach_id', 'service_id');
     }
 
     public function reviews()
