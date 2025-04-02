@@ -13,8 +13,8 @@ return new class extends Migration
     {
         Schema::create('mock_interviews', function (Blueprint $table) {
             $table->unsignedBigInteger('service_id')->primary();
-            $table->enum('interview_type', ['Technical Interview', ' Soft Skills', 'Comprehensive Preparation']);
-            $table->enum('interview_level', ['Junior', ' Mid-Level', 'Senior', ' Premium (FAANG)']);
+            $table->enum('interview_type', ['Technical Interview', 'Soft Skills', 'Comprehensive Preparation']);
+            $table->enum('interview_level', ['Junior', 'Mid-Level', 'Senior', 'Premium (FAANG)']);
             $table->foreign('service_id')->references('service_id')->on('services')->onDelete('cascade');
         });
     }
