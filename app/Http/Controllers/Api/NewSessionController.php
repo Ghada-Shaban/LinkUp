@@ -15,15 +15,13 @@ class NewSessionController extends Controller
      */
     public function index()
     {
-        $user = Auth::user(); // جلب المستخدم الحالي
+        $user = Auth::user();
         
         if ($user->role_profile === 'Coach') {
-            // جلب الجلسات المقبولة فقط (Scheduled) للكوتش
             $sessions = NewSession::whereHas('service', function ($query) use ($user) {
                 $query->where('User_ID', $user->User_ID);
             })->where('status', 'Scheduled')->get();
         } elseif ($user->role_profile === 'Trainee') {
-            // جلب الجلسات المقبولة فقط (Scheduled) للترايني
             $sessions = NewSession::whereHas('books', function ($query) use ($user) {
                 $query->where('trainee_id', $user->User_ID);
             })->where('status', 'Scheduled')->get();
@@ -37,32 +35,39 @@ class NewSessionController extends Controller
     }
 
     /**
-     * قبول جلسة من الكوتش
+     * قبول طلب منتورشيب من الكوتش وإنشاء جلسة جديدة
      */
-    public function acceptSession($sessionId)
+    public function acceptSession($requestId)
     {
         $user = Auth::user();
-        $session = NewSession::findOrFail($sessionId);
+        $mentorshipRequest = \App\Models\MentorshipRequest::findOrFail($requestId);
 
-        // التأكد أن المستخدم هو الكوتش لهذه الجلسة
-        $isCoachSession = NewSession::where('new_session_id', $sessionId)
-            ->whereHas('service', function ($query) use ($user) {
-                $query->where('User_ID', $user->User_ID);
-            })->exists();
-
-        if (!$isCoachSession) {
+        // التأكد أن المستخدم هو الكوتش لهذا الطلب
+        if ($user->role_profile !== 'Coach' || $mentorshipRequest->coach_id !== $user->User_ID) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        if ($session->status !== 'Pending') {
-            return response()->json(['message' => 'Session cannot be accepted'], 400);
+        // التأكد أن الطلب في حالة Pending
+        if ($mentorshipRequest->status !== 'pending') {
+            return response()->json(['message' => 'Request cannot be accepted'], 400);
         }
 
+        // تحديث حالة الطلب إلى accepted
+        $mentorshipRequest->status = 'accepted';
+        $mentorshipRequest->save();
+
+        // إنشاء جلسة جديدة في new_sessions
+        $session = new NewSession();
+        $session->date_time = $mentorshipRequest->first_session_time;
+        $session->duration = $mentorshipRequest->duration_minutes;
         $session->status = 'Scheduled';
+        $session->service_id = $mentorshipRequest->service_id;
+        $session->mentorship_request_id = $mentorshipRequest->id;
+        $session->meeting_link = null; // أو أي قيمة افتراضية
         $session->save();
 
         return response()->json([
-            'message' => 'Session accepted successfully!',
+            'message' => 'Request accepted and session scheduled successfully!',
             'session' => $session
         ]);
     }
@@ -98,4 +103,3 @@ class NewSessionController extends Controller
         ]);
     }
 }
-
