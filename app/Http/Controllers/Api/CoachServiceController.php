@@ -152,81 +152,95 @@ class CoachServiceController extends Controller
         ]);
     }
 
-  public function createService(Request $request, $coachId)
-    {
-        $coach = Coach::findOrFail($coachId);
+ public function createService(Request $request, $coachId)
+{
+    $coach = Coach::findOrFail($coachId);
 
-        $request->validate([
-            'service_type' => 'required|in:Mentorship,Mock_Interview,Group_Mentorship',
-            'price' => 'required|numeric',
-            //mentorship
-           'mentorship_type' => 'required_if:service_type,Mentorship|in:Mentorship plan,Mentorship session',
+    $request->validate([
+        'service_type' => 'required|in:Mentorship,Mock_Interview,Group_Mentorship',
+        'price' => 'required|numeric',
+        'mentorship_type' => 'required_if:service_type,Mentorship|in:Mentorship plan,Mentorship session',
+        'session_type' => 'required_if:mentorship_type,Mentorship session|in:CV Review,project Assessment,Linkedin Optimization',
+        'title' => [
+            'string',
+            'max:255',
+            function ($attribute, $value, $fail) use ($request) {
+                if ($request->service_type === 'Mentorship' && $request->mentorship_type === 'Mentorship plan' && empty($value)) {
+                    $fail('The title field is required when mentorship type is Mentorship plan.');
+                }
+                if ($request->service_type === 'Group_Mentorship' && empty($value)) {
+                    $fail('The title field is required when service type is Group Mentorship.');
+                }
+            },
+        ],
+        'interview_type' => 'required_if:service_type,Mock_Interview|in:Technical Interview,Soft Skills,Comprehensive Preparation',
+        'interview_level' => 'required_if:service_type,Mock_Interview|in:Junior,Mid-Level,Senior,Premium (FAANG)',
+        'description' => 'required_if:service_type,Group_Mentorship',
+        'day' => 'required_if:service_type,Group_Mentorship|in:Monday,Tuesday,Wednesday,Thursday,Friday,Saturday,Sunday',
+        'start_time' => 'required_if:service_type,Group_Mentorship|date_format:H:i',
+    ]);
 
-           //metorship session                
-          'session_type' => 'required_if:mentorship_type,Mentorship session|in:CV Review,project Assessment,Linkedin Optimization',
-            
-            //metorship plan
-            'title' => 'required_if:mentorship_type,Mentorship plan|string|max:255',
+    \Log::info('Creating new service', [
+        'coach_id' => $coachId,
+        'service_type' => $request->service_type,
+        'mentorship_type' => $request->mentorship_type,
+        'session_type' => $request->session_type,
+    ]);
 
-            //interview
-            'interview_type' => 'required_if:service_type,Mock_Interview|in:Technical Interview,Soft Skills,Comprehensive Preparation',
-            'interview_level' => 'required_if:service_type,Mock_Interview|in:Junior,Mid-Level,Senior,Premium (FAANG)',
-
-            // group mentorship
-            'title' => 'required_if:service_type,Group_Mentorship',
-            'description' => 'required_if:service_type,Group_Mentorship',
-            'day' => 'required_if:service_type,Group_Mentorship|in:Monday,Tuesday,Wednesday,Thursday,Friday,Saturday,Sunday',
-            'start_time' => 'required_if:service_type,Group_Mentorship|date_format:H:i',
-        ]);
-
+    try {
         $service = Service::create([
             'coach_id' => $coachId,
             'service_type' => $request->service_type,
             'admin_id' => '1'
         ]);
 
-       
-     if ($request->service_type === 'Mentorship') {
-    $mentorshipType = ($request->mentorship_type === 'Mentorship plan') ? 'Mentorship plan' : 'Mentorship session';
-
-    Mentorship::create([
-        'service_id' => $service->service_id,
-        'mentorship_type' => $mentorshipType,
-    ]);
-
-    \Log::info('Mentorship created', [
-        'service_id' => $service->service_id,
-        'mentorship_type' => $mentorshipType,
-    ]);
-
-    if ($request->mentorship_type === 'Mentorship plan') {
-        MentorshipPlan::create([
+        \Log::info('Service created', [
             'service_id' => $service->service_id,
-            'title' => $request->title,
         ]);
 
-        \Log::info('Mentorship Plan created', [
-            'service_id' => $service->service_id,
-            'title' => $request->title,
-        ]);
-    } elseif ($request->mentorship_type === 'Mentorship session') {
-        MentorshipSession::create([
-            'service_id' => $service->service_id,
-            'session_type' => $request->session_type, // التعديل هنا
-        ]);
+        if ($request->service_type === 'Mentorship') {
+            $mentorshipType = ($request->mentorship_type === 'Mentorship plan') ? 'Mentorship plan' : 'Mentorship session';
 
-        \Log::info('Mentorship Session created', [
-            'service_id' => $service->service_id,
-            'session_type' => $request->session_type,
-        ]);
-    
+            Mentorship::create([
+                'service_id' => $service->service_id,
+                'mentorship_type' => (string) $mentorshipType,
+            ]);
 
+            \Log::info('Mentorship created', [
+                'service_id' => $service->service_id,
+                'mentorship_type' => $mentorshipType,
+            ]);
 
+            if ($request->mentorship_type === 'Mentorship plan') {
+                MentorshipPlan::create([
+                    'service_id' => $service->service_id,
+                    'title' => $request->title,
+                ]);
+
+                \Log::info('Mentorship Plan created', [
+                    'service_id' => $service->service_id,
+                    'title' => $request->title,
+                ]);
+            } elseif ($request->mentorship_type === 'Mentorship session') {
+                MentorshipSession::create([
+                    'service_id' => $service->service_id,
+                    'session_type' => $request->session_type,
+                ]);
+
+                \Log::info('Mentorship Session created', [
+                    'service_id' => $service->service_id,
+                    'session_type' => $request->session_type,
+                ]);
+            }
         } elseif ($request->service_type === 'Mock_Interview') {
             MockInterview::create([
                 'service_id' => $service->service_id,
                 'interview_type' => $request->interview_type,
                 'interview_level' => $request->interview_level
+            ]);
+
+            \Log::info('Mock Interview created', [
+                'service_id' => $service->service_id,
             ]);
         } elseif ($request->service_type === 'Group_Mentorship') {
             GroupMentorship::create([
@@ -235,7 +249,11 @@ class CoachServiceController extends Controller
                 'description' => $request->description,
                 'day' => $request->day,
                 'start_time' => $request->start_time,
-                'trainee_ids' => json_encode([]), // تهيئة trainee_ids كـ Array فارغ
+                'trainee_ids' => json_encode([]),
+            ]);
+
+            \Log::info('Group Mentorship created', [
+                'service_id' => $service->service_id,
             ]);
         }
 
@@ -243,11 +261,25 @@ class CoachServiceController extends Controller
             'service_id' => $service->service_id,
             'price' => $request->price
         ]);
+
+        \Log::info('Price created', [
+            'service_id' => $service->service_id,
+            'price' => $request->price,
+        ]);
+
         $service->load('price');
 
         return response()->json(['message' => 'Service created successfully', 'service' => new ServiceResource($service)], 201);
+    } catch (\Exception $e) {
+        \Log::error('Error creating service', [
+            'coach_id' => $coachId,
+            'service_type' => $request->service_type,
+            'error' => $e->getMessage(),
+        ]);
+
+        return response()->json(['message' => 'Error creating service', 'error' => $e->getMessage()], 500);
     }
-    }
+}
     public function updateService(Request $request, $coachId, $serviceId)
     {
         $coach = Coach::findOrFail($coachId);
