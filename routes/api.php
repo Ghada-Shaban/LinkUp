@@ -62,5 +62,18 @@ Route::prefix('coach/{coachId}')->middleware(['auth:api', 'check.trainee'])->gro
     Route::post('group-mentorship/{groupMentorshipId}/join', [CoachServiceController::class, 'joinGroupMentorship']);
 });
 Route::middleware('auth:sanctum')->get('/upcoming-sessions', [NewSessionController::class, 'index']);
+Route::middleware('auth:sanctum')->group(function () {
+    // Trainee routes
+    Route::prefix('trainee')->group(function () {
+        Route::post('/mentorship-requests', [MentorshipRequestController::class, 'store']);
+        Route::get('/mentorship-requests', [MentorshipRequestController::class, 'traineeIndex']);
+    });
 
+    // Coach routes
+    Route::prefix('coach')->group(function () {
+        Route::get('/mentorship-requests/pending', [MentorshipRequestController::class, 'coachPendingRequests']);
+        Route::post('/mentorship-requests/{id}/accept', [MentorshipRequestController::class, 'acceptRequest']);
+        Route::post('/mentorship-requests/{id}/reject', [MentorshipRequestController::class, 'rejectRequest']);
+    });
+});
 
