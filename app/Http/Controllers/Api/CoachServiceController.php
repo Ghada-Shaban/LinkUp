@@ -227,7 +227,67 @@ class CoachServiceController extends Controller
 
     return response()->json(['message' => 'Service created successfully', 'service' => new ServiceResource($service)], 201);
 }
+  private function createMentorshipService(Request $request, Service $service)
+{
+    // إنشاء السجل في جدول mentorships
+    $mentorship = Mentorship::create([
+        'service_id' => $service->service_id,
+    ]);
 
+    \Log::info('Mentorship created', [
+        'service_id' => $service->service_id,
+    ]);
+
+    // التحقق من نوع الـ Mentorship
+    if (strtolower(trim($request->mentorship_type)) === 'mentorship plan') {
+        MentorshipPlan::create([
+            'service_id' => $service->service_id,
+            'title' => $request->title,
+        ]);
+
+        \Log::info('Mentorship Plan created', [
+            'service_id' => $service->service_id,
+            'title' => $request->title,
+        ]);
+    } else {
+        MentorshipSession::create([
+            'service_id' => $service->service_id,
+            'session_type' => $request->mentorship_type,
+        ]);
+
+        \Log::info('Mentorship Session created', [
+            'service_id' => $service->service_id,
+            'session_type' => $request->mentorship_type,
+        ]);
+    }
+}
+    private function createMockInterviewService(Request $request, Service $service)
+{
+    MockInterview::create([
+        'service_id' => $service->service_id,
+        'interview_type' => $request->interview_type,
+        'interview_level' => $request->interview_level
+    ]);
+
+    \Log::info('Mock Interview created', [
+        'service_id' => $service->service_id,
+    ]);
+}
+    private function createGroupMentorshipService(Request $request, Service $service)
+{
+    GroupMentorship::create([
+        'service_id' => $service->service_id,
+        'title' => $request->title,
+        'description' => $request->description,
+        'day' => $request->day,
+        'start_time' => $request->start_time,
+        'trainee_ids' => json_encode([]),
+    ]);
+
+    \Log::info('Group Mentorship created', [
+        'service_id' => $service->service_id,
+    ]);
+}
     public function updateService(Request $request, $coachId, $serviceId)
     {
         $coach = Coach::findOrFail($coachId);
