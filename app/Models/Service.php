@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 class Service extends Model
 {
     use HasFactory;
+    use SoftDeletes;
     protected $table = 'services';
     protected $primaryKey = 'service_id';
     public $incrementing = true;
