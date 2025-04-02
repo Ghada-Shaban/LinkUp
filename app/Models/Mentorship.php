@@ -17,6 +17,9 @@ class Mentorship extends Model
         'service_id',
         'mentorship_type'
     ];
+    protected $casts = [
+        'mentorship_type' => 'string', // التأكد إن mentorship_type معرف كـ string
+    ];
     public function service()
     {
         return $this->belongsTo(Service::class, 'service_id', 'service_id');
