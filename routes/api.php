@@ -5,6 +5,8 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\EnumController;
 use App\Http\Controllers\Api\CoachServiceController;/*
+use App\Http\Controllers\Api\NewSessionController;
+
 |--------------------------------------------------------------------------
 | API Routes
 |--------------------------------------------------------------------------
@@ -59,3 +61,6 @@ Route::prefix('coach/{coachId}')->middleware(['auth:api', 'check.coach.ownership
 Route::prefix('coach/{coachId}')->middleware(['auth:api', 'check.trainee'])->group(function () {
     Route::post('group-mentorship/{groupMentorshipId}/join', [CoachServiceController::class, 'joinGroupMentorship']);
 });
+Route::middleware('auth:sanctum')->get('/upcoming-sessions', [NewSessionController::class, 'index']);
+
+
