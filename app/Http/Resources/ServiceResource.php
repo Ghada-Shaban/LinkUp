@@ -13,28 +13,28 @@ class ServiceResource extends JsonResource
             'service_type' => $this->service_type,
             'price' => $this->price ? $this->price->price : null,
             'mentorship' => $this->when($this->service_type === 'Mentorship' && $this->mentorship, function () {
-                $mentorshipData = [];
+    $mentorshipData = [];
 
-                if ($this->mentorship->mentorshipPlan) {
-                    $mentorshipData['mentorship_type'] = 'Mentorship plan'; // إضافة mentorship_type
-                    $mentorshipData['mentorship_plan'] = [
-                        'title' => $this->mentorship->mentorshipPlan->title,
-                        'duration' => '60 minutes',
-                        'no_of_sessions' => '4 sessions',
-                    ];
-                }
+    if ($this->mentorship->mentorshipPlan) {
+        $mentorshipData['mentorship_type'] = 'Mentorship plan';
+        $mentorshipData['mentorship_plan'] = [
+            'title' => $this->mentorship->mentorshipPlan->title,
+            'duration' => '60 minutes',
+            'no_of_sessions' => '4 sessions',
+        ];
+    }
 
-                if ($this->mentorship->mentorshipSession) {
-                    $mentorshipData['mentorship_type'] = 'Mentorship session'; // إضافة mentorship_type
-                    $mentorshipData['mentorship_session'] = [
-                        'session_type' => $this->mentorship->mentorshipSession->session_type,
-                        'duration' => '60 minutes',
-                        'no_of_sessions' => '1 session',
-                    ];
-                }
+    if ($this->mentorship->mentorshipSession) {
+        $mentorshipData['mentorship_type'] = 'Mentorship session';
+        $mentorshipData['mentorship_session'] = [
+            'session_type' => $this->mentorship->mentorshipSession->session_type,
+            'duration' => '60 minutes',
+            'no_of_sessions' => '1 session',
+        ];
+    }
 
-                return $mentorshipData ?: null;
-            }),
+    return $mentorshipData ?: null;
+}),
             'group_mentorship' => $this->when($this->service_type === 'Group_Mentorship' && $this->groupMentorship, function () {
                 return [
                     'title' => $this->groupMentorship->title,
