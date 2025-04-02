@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('mentorships', function (Blueprint $table) {
             $table->unsignedBigInteger('service_id')->primary();
-            $table->enum('mentorship_type', ['Mentorship session', ' Mentorship plan']);
+            $table->enum('mentorship_type', ['Mentorship session', 'Mentorship plan']);
             $table->foreign('service_id')->references('service_id')->on('services')->onDelete('cascade');
         });
     }
