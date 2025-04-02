@@ -15,11 +15,22 @@ return new class extends Migration
             $table->id('new_session_id');
             $table->dateTime('date_time');
             $table->integer('duration');
-            $table->enum('status', ['Scheduled', 'Completed', 'Cancelled']);
-            $table->string('meeting_link')->nullable(); // تعديل هنا بإزالة after()
+            $table->enum('status', ['Pending', 'Scheduled', 'Completed', 'Cancelled'])->default('Pending');
+            $table->string('meeting_link')->nullable();
             $table->unsignedBigInteger('service_id');
-            $table->foreign('service_id')->references('service_id')->on('services')->onDelete('cascade');
+            $table->unsignedBigInteger('mentorship_request_id')->nullable(); // العمود الجديد للربط
             $table->timestamps();
+
+            // Foreign key constraints
+            $table->foreign('service_id')
+                  ->references('service_id')
+                  ->on('services')
+                  ->onDelete('cascade');
+                  
+            $table->foreign('mentorship_request_id')
+                  ->references('id')
+                  ->on('mentorship_requests')
+                  ->onDelete('set null');
         });
     }
 
@@ -28,6 +39,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('new_sessions'); // تصحيح الخطأ هنا
+        Schema::dropIfExists('new_sessions');
     }
 };
