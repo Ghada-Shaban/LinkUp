@@ -247,6 +247,7 @@ class CoachServiceController extends Controller
 
         return response()->json(['message' => 'Service created successfully', 'service' => new ServiceResource($service)], 201);
     }
+    }
     public function updateService(Request $request, $coachId, $serviceId)
     {
         $coach = Coach::findOrFail($coachId);
