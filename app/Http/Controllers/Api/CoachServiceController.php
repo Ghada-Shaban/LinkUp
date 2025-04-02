@@ -402,7 +402,7 @@ public function getServicesCount($coachId)
 
         return response()->json([
             'message' => 'Successfully joined the group mentorship.',
-            'available_slots' => $availableSlotsو
+            'available_slots' => $availableSlots,
         'is_active' => $groupMentorship->is_active,
         'current_participants' => $groupMentorship->current_participants
     ], 200);
