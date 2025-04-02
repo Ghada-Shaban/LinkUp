@@ -12,12 +12,12 @@ class EnumController extends Controller
     public function getServiceEnums(Request $request)
     {
         $enums = Cache::remember('enums', 60 * 60 * 24, function () {
-            $serviceTypes = $this->getEnumValues('services', 'service_type');
-            $interviewTypes = $this->getEnumValues('mock_interviews', 'interview_type');
-            $interviewLevels = $this->getEnumValues('mock_interviews', 'interview_level');
-            $days = $this->getEnumValues('group_mentorships', 'day');
+            $serviceType = $this->getEnumValues('services', 'service_type');
+            $interviewType = $this->getEnumValues('mock_interviews', 'interview_type');
+            $interviewLevel = $this->getEnumValues('mock_interviews', 'interview_level');
+            $day = $this->getEnumValues('group_mentorships', 'day');
 
-            $mentorshipTypes = [
+            $mentorshipType = [
                 'CV Review',
                 'project Assessment',
                 'Linkedin Optimization',
@@ -25,11 +25,11 @@ class EnumController extends Controller
             ];
 
             return [
-                'service_types' => $serviceTypes,
-                'mentorship_types' => $mentorshipTypes,
-                'interview_types' => $interviewTypes,
-                'interview_levels' => $interviewLevels,
-                'days' => $days,
+                'service_type' => $serviceType,
+                'mentorship_type' => $mentorshipType,
+                'interview_type' => $interviewType,
+                'interview_level' => $interviewLevel,
+                'day' => $day,
             ];
         });
 
