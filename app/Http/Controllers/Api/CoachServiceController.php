@@ -183,7 +183,10 @@ class CoachServiceController extends Controller
         ]);
 
        
-
+      if ($request->service_type === 'Mentorship') {
+            Mentorship::create([
+                'service_id' => $service->service_id,
+            ]);
        if ($request->mentorship_type === 'Mentorship plan') {
     MentorshipPlan::create([
         'service_id' => $service->service_id,
