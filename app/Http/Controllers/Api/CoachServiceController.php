@@ -152,7 +152,7 @@ class CoachServiceController extends Controller
         ]);
     }
 
- public function createService(Request $request, $coachId)
+public function createService(Request $request, $coachId)
 {
     $coach = Coach::findOrFail($coachId);
 
@@ -201,9 +201,10 @@ class CoachServiceController extends Controller
         if ($request->service_type === 'Mentorship') {
             $mentorshipType = ($request->mentorship_type === 'Mentorship plan') ? 'Mentorship plan' : 'Mentorship session';
 
-            Mentorship::create([
+            // استخدام DB::table بدل Mentorship::create
+            DB::table('mentorships')->insert([
                 'service_id' => $service->service_id,
-                'mentorship_type' => (string) $mentorshipType,
+                'mentorship_type' => $mentorshipType,
             ]);
 
             \Log::info('Mentorship created', [
