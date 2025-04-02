@@ -88,7 +88,7 @@ class CoachServiceController extends Controller
     ]);
 }
     
-    }
+    
     // دالة لجلب خدمات Mentorship Plans فقط - تم تعديل هذه الدالة
     private function getMentorshipPlans(Request $request, $coachId)
     {
