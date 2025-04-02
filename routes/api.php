@@ -4,7 +4,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\EnumController;
-use App\Http\Controllers\Api\CoachServiceController;
+use App\Http\Controllers\Api\CoachServiceController;/*
 use App\Http\Controllers\Api\NewSessionController;
 
 |--------------------------------------------------------------------------
