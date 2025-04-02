@@ -11,53 +11,62 @@ class ServiceResource extends JsonResource
         $data = [
             'service_id' => $this->service_id,
             'service_type' => $this->service_type,
-            'price' => $this->price ? $this->price->price : null,
-            'mentorship' => $this->when($this->service_type === 'Mentorship' && $this->mentorship, function () {
-                $mentorshipData = [];
-
-                if ($this->mentorship->mentorshipPlan) {
-                    $mentorshipData['mentorship_plan'] = [
-                        'title' => $this->mentorship->mentorshipPlan->title,
-                        'duration' => '60 minutes',
-                        'no_of_sessions' => '4 sessions',
-                    ];
-                }
-
-                if ($this->mentorship->mentorshipSession) {
-                    $mentorshipData['mentorship_session'] = [
-                        'session_type' => $this->mentorship->mentorshipSession->session_type,
-                        'duration' => '60 minutes',
-                        'no_of_sessions' => '1 session',
-                    ];
-                }
-
-                return $mentorshipData ?: null;
-            }),
-            'group_mentorship' => $this->when($this->service_type === 'Group_Mentorship' && $this->groupMentorship, function () {
-                return [
-                    'title' => $this->groupMentorship->title,
-                    'description' => $this->groupMentorship->description,
-                    'day' => $this->groupMentorship->day,
-                    'start_time' => $this->groupMentorship->start_time,
-                    'duration' => '60 minutes',
-                    'no_of_sessions' => '4 sessions',
-                    'min_participants' => $this->groupMentorship->min_participants,
-                    'max_participants' => $this->groupMentorship->max_participants,
-                    'available_slots' => $this->groupMentorship->available_slots,
-                ];
-            }),
-            'mock_interview' => $this->when($this->service_type === 'Mock_Interview' && $this->mockInterview, function () {
-                return [
-                    'interview_type' => $this->mockInterview->interview_type,
-                    'interview_level' => $this->mockInterview->interview_level,
-                    'duration' => '60 minutes',
-                    'no_of_sessions' => '1 session',
-                ];
-            }),
+            'price' => $this->when($this->price, $this->price->price),
         ];
 
-        return array_filter($data, function ($value) {
-            return !is_null($value);
-        });
+        // إضافة بيانات Mentorship إذا كان هذا هو نوع الخدمة
+        if ($this->service_type === 'Mentorship') {
+            // التحقق من وجود علاقة mentorship
+            if ($this->mentorship) {
+                // التحقق من نوع الإرشاد ووجود البيانات المرتبطة
+                if ($this->mentorship->mentorship_type === 'Mentorship plan' && $this->mentorship->mentorshipPlan) {
+                    $data['mentorship'] = [
+                        'mentorship_plan' => [
+                            'title' => $this->mentorship->mentorshipPlan->title,
+                            'duration' => '60 minutes',
+                            'no_of_sessions' => '4 sessions',
+                        ]
+                    ];
+                } else if ($this->mentorship->mentorship_type === 'Mentorship session' && $this->mentorship->mentorshipSession) {
+                    $data['mentorship'] = [
+                        'mentorship_session' => [
+                            'session_type' => $this->mentorship->mentorshipSession->session_type,
+                            'duration' => '60 minutes',
+                            'no_of_sessions' => '1 session',
+                        ]
+                    ];
+                }
+            }
+        }
+
+        // إضافة بيانات Group Mentorship إذا كان هذا هو نوع الخدمة
+        if ($this->service_type === 'Group_Mentorship' && $this->groupMentorship) {
+            $data['group_mentorship'] = [
+                'title' => $this->groupMentorship->title,
+                'description' => $this->groupMentorship->description,
+                'day' => $this->groupMentorship->day,
+                'start_time' => $this->groupMentorship->start_time,
+                'duration' => '60 minutes',
+                'no_of_sessions' => '4 sessions',
+                'min_participants' => $this->groupMentorship->min_participants ?? 2,
+                'max_participants' => $this->groupMentorship->max_participants ?? 5,
+                'available_slots' => $this->groupMentorship->available_slots ?? 
+                    (($this->groupMentorship->max_participants ?? 5) - ($this->groupMentorship->current_participants ?? 0))
+            ];
+        }
+
+        // إضافة بيانات Mock Interview إذا كان هذا هو نوع الخدمة
+        if ($this->service_type === 'Mock_Interview' && $this->mockInterview) {
+            $data['mock_interview'] = [
+                'interview_type' => $this->mockInterview->interview_type,
+                'interview_level' => $this->mockInterview->interview_level,
+                'duration' => '60 minutes',
+                'no_of_sessions' => '1 session',
+            ];
+        }
+
+        // نحن لا نقوم بفلترة البيانات الأساسية مثل service_id و service_type
+        // ولكن نقوم بفلترة البيانات المرتبطة بالعلاقات فقط
+        return $data;
     }
 }
