@@ -1,6 +1,7 @@
 <?php
 
 namespace App\Http\Controllers\Api;
+
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\NewSession;
@@ -20,11 +21,17 @@ class NewSessionController extends Controller
         if ($user->role_profile === 'Coach') {
             $sessions = NewSession::whereHas('service', function ($query) use ($user) {
                 $query->where('User_ID', $user->User_ID);
-            })->where('status', 'Scheduled')->get();
+            })
+            ->where('status', 'Scheduled')
+            ->where('date_time', '>=', now()) // لضمان عرض الجلسات المستقبلية فقط
+            ->get();
         } elseif ($user->role_profile === 'Trainee') {
             $sessions = NewSession::whereHas('books', function ($query) use ($user) {
                 $query->where('trainee_id', $user->User_ID);
-            })->where('status', 'Scheduled')->get();
+            })
+            ->where('status', 'Scheduled')
+            ->where('date_time', '>=', now()) // لضمان عرض الجلسات المستقبلية فقط
+            ->get();
         } else {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
@@ -56,13 +63,17 @@ class NewSessionController extends Controller
         $mentorshipRequest->status = 'accepted';
         $mentorshipRequest->save();
 
-        // إنشاء جلسة جديدة في new_sessions
-        $session = new NewSession();
+        // إنشاء جلسة جديدة في new_sessions (أو تحديثها لو موجودة)
+        $session = NewSession::where('mentorship_request_id', $mentorshipRequest->id)->first();
+        if (!$session) {
+            $session = new NewSession();
+            $session->mentorship_request_id = $mentorshipRequest->id;
+        }
+
         $session->date_time = $mentorshipRequest->first_session_time;
         $session->duration = $mentorshipRequest->duration_minutes;
-        $session->status = 'Scheduled';
+        $session->status = 'Scheduled'; // بما إن الطلب accepted
         $session->service_id = $mentorshipRequest->service_id;
-        $session->mentorship_request_id = $mentorshipRequest->id;
         $session->meeting_link = null; // أو أي قيمة افتراضية
         $session->save();
 
