@@ -68,17 +68,25 @@ class CoachServiceController extends Controller
     }
 
     // دالة لجلب كل الخدمات (زي قسم "all")
-    private function getAllServices(Request $request, $coachId)
-    {
-        $coach = Coach::findOrFail($coachId);
+   private function getAllServices(Request $request, $coachId)
+{
+    $coach = Coach::findOrFail($coachId);
 
-        $services = $coach->services()
-            ->with(['mentorship.mentorshipPlan', 'mentorship.mentorshipSession', 'groupMentorship', 'mockInterview', 'price'])
-            ->get();
+    $services = $coach->services()
+        ->with([
+            'price',
+            'mentorship' => function($query) {
+                $query->with(['mentorshipPlan', 'mentorshipSession']);
+            },
+            'groupMentorship',
+            'mockInterview'
+        ])
+        ->get();
 
-        return response()->json([
-            'services' => ServiceResource::collection($services)
-        ]);
+    return response()->json([
+        'services' => ServiceResource::collection($services)
+    ]);
+}
     
     }
     // دالة لجلب خدمات Mentorship Plans فقط - تم تعديل هذه الدالة
