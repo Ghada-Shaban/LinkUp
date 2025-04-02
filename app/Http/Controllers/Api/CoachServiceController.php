@@ -68,72 +68,53 @@ class CoachServiceController extends Controller
     }
 
     // دالة لجلب كل الخدمات (زي قسم "all")
-   private function getAllServices(Request $request, $coachId)
-{
-    $coach = Coach::findOrFail($coachId);
-
-    $services = $coach->services()
-        ->with([
-            'price',
-            'mentorship' => function($query) {
-                $query->with(['mentorshipPlan', 'mentorshipSession']);
-            },
-            'groupMentorship',
-            'mockInterview'
-        ])
-        ->get();
-
-    return response()->json([
-        'services' => ServiceResource::collection($services)
-    ]);
-}
-    
-    
-    // دالة لجلب خدمات Mentorship Plans فقط - تم تعديل هذه الدالة
-    private function getMentorshipPlans(Request $request, $coachId)
+    private function getAllServices(Request $request, $coachId)
     {
         $coach = Coach::findOrFail($coachId);
 
-        // سجل عدد الخدمات قبل الفلترة للتشخيص
-        Log::info('Total Mentorship services: ' . $coach->services()->where('service_type', 'Mentorship')->count());
-        
-        // تعديل الاستعلام لضمان الحصول على mentorship plans
-        $services = Service::where('coach_id', $coachId)
-            ->where('service_type', 'Mentorship')
-            ->with(['mentorship.mentorshipPlan', 'price'])
+        $services = $coach->services()
+            ->with(['mentorship.mentorshipPlan', 'mentorship.mentorshipSession', 'groupMentorship', 'mockInterview', 'price'])
             ->get();
-            
-        // فلترة الخدمات التي تحتوي على mentorship plan
-        $filteredServices = $services->filter(function ($service) {
-            // سجل معلومات عن كل خدمة للتشخيص
-            Log::info('Service ID: ' . $service->service_id . 
-                     ' Has Mentorship: ' . ($service->mentorship ? 'Yes' : 'No') . 
-                     ' Has Plan: ' . ($service->mentorship && $service->mentorship->mentorshipPlan ? 'Yes' : 'No'));
-            
-            return $service->mentorship && $service->mentorship->mentorshipPlan;
-        });
-        
-        // سجل عدد الخدمات بعد الفلترة للتشخيص
-        Log::info('Filtered Mentorship Plan services: ' . $filteredServices->count());
 
         return response()->json([
-            'services' => MentorshipPlanResource::collection($filteredServices)
+            'services' => ServiceResource::collection($services)
+        ]);
+    }
+
+    // دالة لجلب خدمات Mentorship Plans فقط
+    private function getMentorshipPlans(Request $request, $coachId)
+    {
+        // استخدام Eager Loading بشكل أكثر تحديدًا
+        $services = Service::where('coach_id', $coachId)
+            ->where('service_type', 'Mentorship')
+            ->whereHas('mentorship', function($query) {
+                $query->where('mentorship_type', 'Mentorship plan');
+            })
+            ->whereHas('mentorship.mentorshipPlan') // تأكد من وجود mentorshipPlan
+            ->with(['mentorship.mentorshipPlan', 'price'])
+            ->get();
+        
+        Log::info('Mentorship Plan services count: ' . $services->count());
+        
+        return response()->json([
+            'services' => MentorshipPlanResource::collection($services)
         ]);
     }
 
     // دالة لجلب خدمات Mentorship Sessions فقط
     private function getMentorshipSessions(Request $request, $coachId)
     {
-        $coach = Coach::findOrFail($coachId);
-
-        $services = $coach->services()
+        $services = Service::where('coach_id', $coachId)
             ->where('service_type', 'Mentorship')
+            ->whereHas('mentorship', function($query) {
+                $query->where('mentorship_type', 'Mentorship session');
+            })
+            ->whereHas('mentorship.mentorshipSession') // تأكد من وجود mentorshipSession
             ->with(['mentorship.mentorshipSession', 'price'])
-            ->get()
-            ->filter(function ($service) {
-                return $service->mentorship && $service->mentorship->mentorshipSession;
-            });
-
+            ->get();
+        
+        Log::info('Mentorship Session services count: ' . $services->count());
+        
         return response()->json([
             'services' => MentorshipSessionResource::collection($services)
         ]);
@@ -142,13 +123,14 @@ class CoachServiceController extends Controller
     // دالة لجلب خدمات Group Mentorship فقط
     private function getGroupMentorshipServices(Request $request, $coachId)
     {
-        $coach = Coach::findOrFail($coachId);
-
-        $services = $coach->services()
+        $services = Service::where('coach_id', $coachId)
             ->where('service_type', 'Group_Mentorship')
+            ->whereHas('groupMentorship') // تأكد من وجود groupMentorship
             ->with(['groupMentorship', 'price'])
             ->get();
-
+        
+        Log::info('Group Mentorship services count: ' . $services->count());
+        
         return response()->json([
             'services' => GroupMentorshipResource::collection($services)
         ]);
@@ -157,13 +139,14 @@ class CoachServiceController extends Controller
     // دالة لجلب خدمات Mock Interview فقط
     private function getMockInterviewServices(Request $request, $coachId)
     {
-        $coach = Coach::findOrFail($coachId);
-
-        $services = $coach->services()
+        $services = Service::where('coach_id', $coachId)
             ->where('service_type', 'Mock_Interview')
+            ->whereHas('mockInterview') // تأكد من وجود mockInterview
             ->with(['mockInterview', 'price'])
             ->get();
-
+        
+        Log::info('Mock Interview services count: ' . $services->count());
+        
         return response()->json([
             'services' => MockInterviewResource::collection($services)
         ]);
@@ -425,5 +408,79 @@ class CoachServiceController extends Controller
         $service->delete();
 
         return response()->json(['message' => 'Service deleted successfully']);
+    }
+
+    // دالة تشخيصية للتحقق من البيانات والعلاقات
+    public function debugMentorshipData($coachId)
+    {
+        $coach = Coach::findOrFail($coachId);
+        
+        // استعلام 1: الخدمات من نوع Mentorship
+        $mentorshipServices = Service::where('coach_id', $coachId)
+            ->where('service_type', 'Mentorship')
+            ->get();
+        
+        $result = [
+            'step1_mentorship_services_count' => $mentorshipServices->count(),
+            'mentorship_services' => $mentorshipServices->pluck('service_id')->toArray(),
+        ];
+        
+        // استعلام 2: التحقق من علاقة Mentorship
+        $servicesWithMentorship = $mentorshipServices->filter(function($service) {
+            return $service->mentorship !== null;
+        });
+        
+        $result['step2_services_with_mentorship_count'] = $servicesWithMentorship->count();
+        $result['services_missing_mentorship'] = $mentorshipServices->filter(function($service) {
+            return $service->mentorship === null;
+        })->pluck('service_id')->toArray();
+        
+        // استعلام 3: التحقق من من الخدمات التي لها MentorshipPlan
+        $servicesWithMentorshipPlan = $servicesWithMentorship->filter(function($service) {
+            return $service->mentorship->mentorshipPlan !== null;
+        });
+        
+        $result['step3_services_with_mentorship_plan_count'] = $servicesWithMentorshipPlan->count();
+        $result['services_with_mentorship_plan'] = $servicesWithMentorshipPlan->pluck('service_id')->toArray();
+        
+        // استعلام 4: التحقق من من الخدمات التي لها MentorshipSession
+        $servicesWithMentorshipSession = $servicesWithMentorship->filter(function($service) {
+            return $service->mentorship->mentorshipSession !== null;
+        });
+        
+        $result['step4_services_with_mentorship_session_count'] = $servicesWithMentorshipSession->count();
+        $result['services_with_mentorship_session'] = $servicesWithMentorshipSession->pluck('service_id')->toArray();
+        
+        // التحقق من وجود تناقض في نوع الإرشاد
+        $inconsistentTypes = $servicesWithMentorship->filter(function($service) {
+            $hasPlan = $service->mentorship->mentorshipPlan !== null;
+            $hasSession = $service->mentorship->mentorshipSession !== null;
+            $type = $service->mentorship->mentorship_type;
+            
+            $inconsistent = false;
+            
+            // يجب أن يكون لديه plan وأن يكون النوع "Mentorship plan"
+            if ($hasPlan && $type !== 'Mentorship plan') {
+                $inconsistent = true;
+            }
+            
+            // يجب أن يكون لديه session وأن يكون النوع "Mentorship session"
+            if ($hasSession && $type !== 'Mentorship session') {
+                $inconsistent = true;
+            }
+            
+            return $inconsistent;
+        });
+        
+        $result['inconsistent_mentorship_types'] = $inconsistentTypes->map(function($service) {
+            return [
+                'service_id' => $service->service_id,
+                'mentorship_type' => $service->mentorship->mentorship_type,
+                'has_plan' => $service->mentorship->mentorshipPlan !== null,
+                'has_session' => $service->mentorship->mentorshipSession !== null
+            ];
+        })->toArray();
+        
+        return response()->json($result);
     }
 }
