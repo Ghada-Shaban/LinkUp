@@ -22,10 +22,13 @@ use Illuminate\Support\Facades\Log;
 
 class CoachServiceController extends Controller
 {
-    public function getServicesCount($coachId)
-    {  
-        $coach = Coach::findOrFail($coachId);
-        $services = Service::where('coach_id', $coachId)->with('price')->get();
+public function getServicesCount($coachId)
+{  
+    $coach = Coach::findOrFail($coachId);
+    $services = Service::where('coach_id', $coachId)
+                       ->whereNull('deleted_at')
+                       ->with('price')
+                       ->get();
 
         $countData = [
             'all' => [
