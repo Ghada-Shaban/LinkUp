@@ -375,13 +375,7 @@ public function getServicesCount($coachId)
         if ($availableSlots <= 0) {
             return response()->json(['message' => 'This group mentorship is full.', 'available_slots' => 0], 400);
         }
-        // التحقق من الحد الأدنى (2 trainees)
-    if ($groupMentorship->current_participants < 2) {
-        return response()->json([
-            'message' => 'This group mentorship requires at least 2 trainees to start.',
-            'current_participants' => $groupMentorship->current_participants,
-            'required_minimum' => 2
-        ], 400);
+   
         // جلب قائمة الـ Trainees المسجلين
         $traineeIds = $groupMentorship->trainee_ids ? json_decode($groupMentorship->trainee_ids, true) : [];
 
@@ -393,11 +387,12 @@ public function getServicesCount($coachId)
         // إضافة الـ Trainee لقائمة الـ Trainees
         $traineeIds[] = $trainee->User_ID;
 
-        // تحديث الـ trainee_ids و current_participants
-        $groupMentorship->update([
-            'trainee_ids' => json_encode($traineeIds),
-            'current_participants' => $groupMentorship->current_participants + 1,
-        ]);
+     $newParticipantCount = $groupMentorship->current_participants + 1;
+    $groupMentorship->update([
+        'trainee_ids' => json_encode($traineeIds),
+        'current_participants' => $newParticipantCount,
+        'is_active' => $newParticipantCount >= 2, // لو عدد الـ trainees بقى 2 أو أكتر، الـ Group Mentorship هتبقى نشطة
+    ]);
 
         // تحديث الـ Model عشان يجيب القيم الجديدة
         $groupMentorship->refresh();
@@ -407,8 +402,10 @@ public function getServicesCount($coachId)
 
         return response()->json([
             'message' => 'Successfully joined the group mentorship.',
-            'available_slots' => $availableSlots
-        ], 200);
+            'available_slots' => $availableSlotsو
+        'is_active' => $groupMentorship->is_active,
+        'current_participants' => $groupMentorship->current_participants
+    ], 200);
     }
 
     public function deleteService(Request $request, $coachId, $serviceId)
