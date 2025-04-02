@@ -375,7 +375,13 @@ public function getServicesCount($coachId)
         if ($availableSlots <= 0) {
             return response()->json(['message' => 'This group mentorship is full.', 'available_slots' => 0], 400);
         }
-
+        // التحقق من الحد الأدنى (2 trainees)
+    if ($groupMentorship->current_participants < 2) {
+        return response()->json([
+            'message' => 'This group mentorship requires at least 2 trainees to start.',
+            'current_participants' => $groupMentorship->current_participants,
+            'required_minimum' => 2
+        ], 400);
         // جلب قائمة الـ Trainees المسجلين
         $traineeIds = $groupMentorship->trainee_ids ? json_decode($groupMentorship->trainee_ids, true) : [];
 
