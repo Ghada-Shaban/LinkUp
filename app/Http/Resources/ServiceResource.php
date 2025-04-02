@@ -16,6 +16,7 @@ class ServiceResource extends JsonResource
                 $mentorshipData = [];
 
                 if ($this->mentorship->mentorshipPlan) {
+                    $mentorshipData['mentorship_type'] = 'Mentorship plan'; // إضافة mentorship_type
                     $mentorshipData['mentorship_plan'] = [
                         'title' => $this->mentorship->mentorshipPlan->title,
                         'duration' => '60 minutes',
@@ -24,6 +25,7 @@ class ServiceResource extends JsonResource
                 }
 
                 if ($this->mentorship->mentorshipSession) {
+                    $mentorshipData['mentorship_type'] = 'Mentorship session'; // إضافة mentorship_type
                     $mentorshipData['mentorship_session'] = [
                         'session_type' => $this->mentorship->mentorshipSession->session_type,
                         'duration' => '60 minutes',
