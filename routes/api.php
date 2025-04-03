@@ -6,7 +6,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\EnumController;
 use App\Http\Controllers\Api\NewSessionController;
 use App\Http\Controllers\Api\MentorshipRequestController;
-use App\Http\Controllers\Api\CoachServiceController;/*
+use App\Http\Controllers\Api\CoachServiceController;
 
 /*
 |--------------------------------------------------------------------------
@@ -60,9 +60,11 @@ Route::prefix('coach/{coachId}')->middleware(['auth:api', 'check.trainee'])->gro
 
 // Routes الخاصة بـ NewSessionController
 Route::middleware('auth:sanctum')->group(function () {
-    Route::get('/upcoming-sessions', [NewSessionController::class, 'index']); // اللي خاص بيكي
+    Route::get('/sessions', [NewSessionController::class, 'index'])->name('sessions.index'); // تم تعديل الاسم من /upcoming-sessions لدعم كل الأنواع
     Route::post('/sessions/accept/{requestId}', [NewSessionController::class, 'acceptSession']);
     Route::post('/sessions/update-meeting-link/{sessionId}', [NewSessionController::class, 'updateMeetingLink']);
+    Route::post('/sessions/{sessionId}/complete', [NewSessionController::class, 'completeSession']);
+    Route::post('/sessions/{sessionId}/cancel', [NewSessionController::class, 'cancelSession']);
 });
 
 // Routes الخاصة بـ MentorshipRequestController (مش هتعدل حاجة هنا)
