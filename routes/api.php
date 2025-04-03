@@ -6,7 +6,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\EnumController;
 use App\Http\Controllers\Api\NewSessionController;
 use App\Http\Controllers\Api\MentorshipRequestController;
-use App\Http\Controllers\Api\CoachServiceController;
+use App\Http\Controllers\Api\CoachServiceController;/*
 
 /*
 |--------------------------------------------------------------------------
