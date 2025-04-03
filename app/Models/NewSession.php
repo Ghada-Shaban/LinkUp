@@ -10,20 +10,30 @@ class NewSession extends Model
     use HasFactory;
     
     protected $table = 'new_sessions';
+    protected $primaryKey = 'new_session_id'; // الـ primary key الصحيح
 
     protected $fillable = [
+        'new_session_id', // أضفناه عشان يتعامل مع الـ primary key
         'date_time',
         'duration',
         'status',
         'service_id',
-        'meeting_link', // عشان نقدر نحفظ اللينك
+        'meeting_link',
+        'mentorship_request_id', // أضفناه عشان الربط مع MentorshipRequest
+    ];
+
+    protected $casts = [
+        'date_time' => 'datetime',
+        'duration' => 'integer',
+        'service_id' => 'integer',
+        'mentorship_request_id' => 'integer',
     ];
 
     // تعريف الحالات الممكنة للـ status كثوابت (Constants)
     const STATUS_PENDING = 'Pending';
     const STATUS_SCHEDULED = 'Scheduled';
-    const STATUS_COMPLETED = 'Completed'; // اختياري، لو عايز تضيف حالات تانية زي "مكتملة"
-    const STATUS_CANCELLED = 'Cancelled'; // اختياري، لو عايز حالة إلغاء
+    const STATUS_COMPLETED = 'Completed';
+    const STATUS_CANCELLED = 'Cancelled';
 
     /**
      * الـ Default Attributes
@@ -38,6 +48,14 @@ class NewSession extends Model
     public function service()
     {
         return $this->belongsTo(Service::class, 'service_id');
+    }
+
+    /**
+     * علاقة مع الـ MentorshipRequest
+     */
+    public function mentorshipRequest()
+    {
+        return $this->belongsTo(MentorshipRequest::class, 'mentorship_request_id', 'id');
     }
 
     /**
