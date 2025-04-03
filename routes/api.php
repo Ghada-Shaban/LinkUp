@@ -6,8 +6,9 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\EnumController;
 use App\Http\Controllers\Api\NewSessionController;
 use App\Http\Controllers\Api\MentorshipRequestController;
-use App\Http\Controllers\Api\CoachServiceController;/*
+use App\Http\Controllers\Api\CoachServiceController;
 
+/*
 |--------------------------------------------------------------------------
 | API Routes
 |--------------------------------------------------------------------------
@@ -21,9 +22,7 @@ use App\Http\Controllers\Api\CoachServiceController;/*
 Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();
 });
-// Route::post('/coach/set-availability', [AuthController::class, 'setAvailability']);
-// Route::post('/register', [AuthController::class, 'register']);
-// Route::post('/login', [AuthController::class, 'login']);
+
 Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();
 });
@@ -34,10 +33,7 @@ Route::prefix('auth')->group(function () {
     Route::middleware('auth:sanctum')->post('/logout', [AuthController::class, 'logout']);
     Route::get('/Trainee-values', [AuthController::class, 'getTraineeRegistrationEnumValues']);
     Route::get('/Coach-values', [AuthController::class, 'getCoachRegistrationEnumValues']);
-    // Route::post('/coach/set-availability', [AuthController::class, 'setAvailability']);
 });
-
-
 
 Route::prefix('password')->group(function () {
     Route::post('/forgot', [\App\Http\Controllers\Api\PasswordResetController::class, 'sendOtp']); // إرسال OTP
@@ -46,9 +42,8 @@ Route::prefix('password')->group(function () {
 });
 
 Route::get('service/enums', [EnumController::class, 'getServiceEnums']);
+
 Route::prefix('coach/{coachId}')->middleware(['auth:api', 'check.coach.ownership'])->group(function () {
-    
-    
     // Route لجلب الخدمات بناءً على service_type
     Route::get('services', [CoachServiceController::class, 'getServices']);
 
@@ -57,12 +52,20 @@ Route::prefix('coach/{coachId}')->middleware(['auth:api', 'check.coach.ownership
     Route::post('services', [CoachServiceController::class, 'createService']);
     Route::put('services/{serviceId}', [CoachServiceController::class, 'updateService']);
     Route::delete('services/{serviceId}', [CoachServiceController::class, 'deleteService']);
-  
 });
+
 Route::prefix('coach/{coachId}')->middleware(['auth:api', 'check.trainee'])->group(function () {
     Route::post('group-mentorship/{groupMentorshipId}/join', [CoachServiceController::class, 'joinGroupMentorship']);
 });
-Route::middleware('auth:sanctum')->get('/upcoming-sessions', [NewSessionController::class, 'index']);
+
+// Routes الخاصة بـ NewSessionController
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/upcoming-sessions', [NewSessionController::class, 'index']); // اللي خاص بيكي
+    Route::post('/sessions/accept/{requestId}', [NewSessionController::class, 'acceptSession']);
+    Route::post('/sessions/update-meeting-link/{sessionId}', [NewSessionController::class, 'updateMeetingLink']);
+});
+
+// Routes الخاصة بـ MentorshipRequestController (مش هتعدل حاجة هنا)
 Route::middleware('auth:sanctum')->group(function () {
     // Trainee routes
     Route::prefix('trainee')->group(function () {
@@ -77,4 +80,3 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/mentorship-requests/{id}/reject', [MentorshipRequestController::class, 'rejectRequest']);
     });
 });
-
