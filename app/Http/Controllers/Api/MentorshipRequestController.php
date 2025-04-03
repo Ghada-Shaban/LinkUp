@@ -298,35 +298,37 @@ class MentorshipRequestController extends Controller
         ]);
     }
 
-    // Coach: Accept a request
-    public function acceptRequest($id)
-    {
-        $request = MentorshipRequest::where('coach_id', Auth::id())
-            ->findOrFail($id);
+// Coach: Accept a request
+public function acceptRequest($id)
+{
+    $request = MentorshipRequest::where('coach_id', Auth::id())
+        ->findOrFail($id);
 
-        $request->update(['status' => 'accepted']);
+    $request->status = 'accepted';
+    $request->save(); // استخدمي save() بدل update()
 
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Request accepted successfully',
-            'data' => $request->fresh(['service', 'trainee.user'])
-        ]);
-    }
+    return response()->json([
+        'status' => 'success',
+        'message' => 'Request accepted successfully',
+        'data' => $request->fresh(['service', 'trainee.user'])
+    ]);
+}
 
-    // Coach: Reject a request
-    public function rejectRequest($id)
-    {
-        $request = MentorshipRequest::where('coach_id', Auth::id())
-            ->findOrFail($id);
+// Coach: Reject a request
+public function rejectRequest($id)
+{
+    $request = MentorshipRequest::where('coach_id', Auth::id())
+        ->findOrFail($id);
 
-        $request->update(['status' => 'rejected']);
+    $request->status = 'rejected';
+    $request->save(); // استخدمي save() بدل update()
 
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Request rejected successfully',
-            'data' => $request->fresh(['service', 'trainee.user'])
-        ]);
-    }
+    return response()->json([
+        'status' => 'success',
+        'message' => 'Request rejected successfully',
+        'data' => $request->fresh(['service', 'trainee.user'])
+    ]);
+}
 
     // Generate plan schedule for Plan type requests
     private function generatePlanSchedule($firstSessionTime)
