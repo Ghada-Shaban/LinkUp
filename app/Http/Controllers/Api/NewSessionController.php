@@ -8,6 +8,7 @@ use App\Models\NewSession;
 use App\Models\Book;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 
 class NewSessionController extends Controller
 {
@@ -17,7 +18,8 @@ class NewSessionController extends Controller
     public function index()
     {
         $user = Auth::user();
-        
+        $sessions = collect(); // لتخزين الجلسات
+
         if ($user->role_profile === 'Coach') {
             $sessions = NewSession::whereHas('service', function ($query) use ($user) {
                 $query->where('User_ID', $user->User_ID);
@@ -25,6 +27,12 @@ class NewSessionController extends Controller
             ->where('status', 'Scheduled')
             ->where('date_time', '>=', now()) // لضمان عرض الجلسات المستقبلية فقط
             ->get();
+
+            Log::info('Fetching upcoming sessions for Coach', [
+                'user_id' => $user->User_ID,
+                'sessions_count' => $sessions->count(),
+                'sessions' => $sessions->toArray()
+            ]);
         } elseif ($user->role_profile === 'Trainee') {
             $sessions = NewSession::whereHas('books', function ($query) use ($user) {
                 $query->where('trainee_id', $user->User_ID);
@@ -32,7 +40,17 @@ class NewSessionController extends Controller
             ->where('status', 'Scheduled')
             ->where('date_time', '>=', now()) // لضمان عرض الجلسات المستقبلية فقط
             ->get();
+
+            Log::info('Fetching upcoming sessions for Trainee', [
+                'user_id' => $user->User_ID,
+                'sessions_count' => $sessions->count(),
+                'sessions' => $sessions->toArray()
+            ]);
         } else {
+            Log::warning('Unauthorized access to upcoming sessions', [
+                'user_id' => $user->User_ID,
+                'role' => $user->role_profile
+            ]);
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
@@ -51,11 +69,19 @@ class NewSessionController extends Controller
 
         // التأكد أن المستخدم هو الكوتش لهذا الطلب
         if ($user->role_profile !== 'Coach' || $mentorshipRequest->coach_id !== $user->User_ID) {
+            Log::warning('Unauthorized attempt to accept session', [
+                'user_id' => $user->User_ID,
+                'mentorship_request_id' => $requestId
+            ]);
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
         // التأكد أن الطلب في حالة Pending
         if ($mentorshipRequest->status !== 'pending') {
+            Log::warning('Cannot accept request - not in pending state', [
+                'mentorship_request_id' => $requestId,
+                'current_status' => $mentorshipRequest->status
+            ]);
             return response()->json(['message' => 'Request cannot be accepted'], 400);
         }
 
@@ -76,6 +102,12 @@ class NewSessionController extends Controller
         $session->service_id = $mentorshipRequest->service_id;
         $session->meeting_link = null; // أو أي قيمة افتراضية
         $session->save();
+
+        Log::info('Session created/updated after accepting mentorship request', [
+            'mentorship_request_id' => $mentorshipRequest->id,
+            'new_session_id' => $session->new_session_id,
+            'status' => $session->status
+        ]);
 
         return response()->json([
             'message' => 'Request accepted and session scheduled successfully!',
@@ -102,11 +134,20 @@ class NewSessionController extends Controller
             })->exists();
 
         if (!$isCoachSession) {
+            Log::warning('Unauthorized attempt to update meeting link', [
+                'user_id' => $user->User_ID,
+                'session_id' => $sessionId
+            ]);
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
         $session->meeting_link = $request->meeting_link;
         $session->save();
+
+        Log::info('Meeting link updated', [
+            'session_id' => $sessionId,
+            'meeting_link' => $session->meeting_link
+        ]);
 
         return response()->json([
             'message' => 'Meeting link updated successfully!',
