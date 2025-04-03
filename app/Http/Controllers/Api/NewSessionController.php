@@ -22,7 +22,7 @@ class NewSessionController extends Controller
 
         if ($user->role_profile === 'Coach') {
             $sessions = NewSession::whereHas('service', function ($query) use ($user) {
-                $query->where('User_ID', $user->User_ID);
+                $query->where('coach_id', $user->User_ID); // غيرنا User_ID لـ coach_id
             })
             ->where('status', 'Scheduled')
             ->where('date_time', '>=', now()) // لضمان عرض الجلسات المستقبلية فقط
@@ -60,62 +60,6 @@ class NewSessionController extends Controller
     }
 
     /**
-     * قبول طلب منتورشيب من الكوتش وإنشاء جلسة جديدة
-     */
-    public function acceptSession($requestId)
-    {
-        $user = Auth::user();
-        $mentorshipRequest = \App\Models\MentorshipRequest::findOrFail($requestId);
-
-        // التأكد أن المستخدم هو الكوتش لهذا الطلب
-        if ($user->role_profile !== 'Coach' || $mentorshipRequest->coach_id !== $user->User_ID) {
-            Log::warning('Unauthorized attempt to accept session', [
-                'user_id' => $user->User_ID,
-                'mentorship_request_id' => $requestId
-            ]);
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
-
-        // التأكد أن الطلب في حالة Pending
-        if ($mentorshipRequest->status !== 'pending') {
-            Log::warning('Cannot accept request - not in pending state', [
-                'mentorship_request_id' => $requestId,
-                'current_status' => $mentorshipRequest->status
-            ]);
-            return response()->json(['message' => 'Request cannot be accepted'], 400);
-        }
-
-        // تحديث حالة الطلب إلى accepted
-        $mentorshipRequest->status = 'accepted';
-        $mentorshipRequest->save();
-
-        // إنشاء جلسة جديدة في new_sessions (أو تحديثها لو موجودة)
-        $session = NewSession::where('mentorship_request_id', $mentorshipRequest->id)->first();
-        if (!$session) {
-            $session = new NewSession();
-            $session->mentorship_request_id = $mentorshipRequest->id;
-        }
-
-        $session->date_time = $mentorshipRequest->first_session_time;
-        $session->duration = $mentorshipRequest->duration_minutes;
-        $session->status = 'Scheduled'; // بما إن الطلب accepted
-        $session->service_id = $mentorshipRequest->service_id;
-        $session->meeting_link = null; // أو أي قيمة افتراضية
-        $session->save();
-
-        Log::info('Session created/updated after accepting mentorship request', [
-            'mentorship_request_id' => $mentorshipRequest->id,
-            'new_session_id' => $session->new_session_id,
-            'status' => $session->status
-        ]);
-
-        return response()->json([
-            'message' => 'Request accepted and session scheduled successfully!',
-            'session' => $session
-        ]);
-    }
-
-    /**
      * تحديث رابط الاجتماع لجلسة معينة (خاص بالكوتش فقط)
      */
     public function updateMeetingLink(Request $request, $sessionId)
@@ -130,7 +74,7 @@ class NewSessionController extends Controller
         // التأكد أن المستخدم هو الكوتش لهذه الجلسة
         $isCoachSession = NewSession::where('new_session_id', $sessionId)
             ->whereHas('service', function ($query) use ($user) {
-                $query->where('User_ID', $user->User_ID);
+                $query->where('coach_id', $user->User_ID); // غيرنا User_ID لـ coach_id
             })->exists();
 
         if (!$isCoachSession) {
