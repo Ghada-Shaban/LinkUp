@@ -291,7 +291,7 @@ public function getServicesCount($coachId)
         }
     }
     
-   public function updateService(Request $request, $coachId, $serviceId)
+  public function updateService(Request $request, $coachId, $serviceId)
 {
     $coach = Coach::findOrFail($coachId);
 
@@ -301,7 +301,7 @@ public function getServicesCount($coachId)
 
     $request->validate([
         'service_type' => 'required|in:Mentorship,Mock_Interview,Group_Mentorship',
-        'price' => 'sometimes|numeric',
+        'price' => 'required|numeric',
         'mentorship_type' => 'required_if:service_type,Mentorship|in:Mentorship plan,Mentorship session',
         'session_type' => [
             'required_if:mentorship_type,Mentorship session',
@@ -335,7 +335,7 @@ public function getServicesCount($coachId)
         'start_time' => 'required_if:service_type,Group_Mentorship|date_format:H:i',
     ]);
 
-    // تحديث الـ price لو موجود في الـ request
+    // تحديث الـ price
     if ($request->has('price')) {
         $service->price()->updateOrCreate([], ['price' => $request->price]);
     }
@@ -350,9 +350,11 @@ public function getServicesCount($coachId)
             if ($request->mentorship_type === 'Mentorship plan') {
                 $service->mentorship->mentorshipSession()->delete();
                 $service->mentorship->mentorshipPlan()->updateOrCreate([], ['title' => $request->title]);
+                $hasPlan = true;
             } else {
                 $service->mentorship->mentorshipPlan()->delete();
                 $service->mentorship->mentorshipSession()->updateOrCreate([], ['session_type' => $request->session_type]);
+                $hasPlan = false;
             }
         } else {
             $hasPlan = $service->mentorship->mentorshipPlan()->exists();
@@ -383,7 +385,6 @@ public function getServicesCount($coachId)
 
     return response()->json(['message' => 'Service updated successfully']);
 }
-
     public function joinGroupMentorship(Request $request, $coachId, $groupMentorshipId)
     {
         // التأكد من وجود الـ Coach
