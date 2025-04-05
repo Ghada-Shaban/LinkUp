@@ -300,16 +300,31 @@ public function getServicesCount($coachId)
             ->firstOrFail();
 
         $request->validate([
-            'price' => 'required|numeric',
-            'mentorship_type' => 'required_if:service_type,Mentorship|in:CV Review,project Assessment,Linkedin Optimization,Mentorship plan',
-            'title' => 'required_if:mentorship_type,Mentorship plan|string|max:255',
-            'interview_type' => 'required_if:service_type,Mock_Interview|in:Technical Interview,Soft Skills,Comprehensive Preparation',
-            'interview_level' => 'required_if:service_type,Mock_Interview|in:Junior,Mid-Level,Senior,Premium (FAANG)',
-            'title' => 'required_if:service_type,Group_Mentorship',
-            'description' => 'required_if:service_type,Group_Mentorship',
-            'day' => 'required_if:service_type,Group_Mentorship|in:Monday,Tuesday,Wednesday,Thursday,Friday,Saturday,Sunday',
-            'start_time' => 'required_if:service_type,Group_Mentorship|date_format:H:i',
-        ]);
+          'service_type' => 'sometimes|in:Mentorship,Mock_Interview,Group_Mentorship',
+        'price' => 'sometimes|numeric',
+        'mentorship_type' => 'required_if:service_type,Mentorship|in:Mentorship plan,Mentorship session',
+        'session_type' => 'required_if:mentorship_type,Mentorship session|in:CV Review,project Assessment,Linkedin Optimization',
+        'title' => [
+            'string',
+            'max:255',
+            function ($attribute, $value, $fail) use ($request, $service) {
+                $serviceType = $request->service_type ?? $service->service_type;
+                $mentorshipType = $request->mentorship_type ?? $service->mentorship->mentorship_type;
+
+                if ($serviceType === 'Mentorship' && $mentorshipType === 'Mentorship plan' && empty($value)) {
+                    $fail('The title field is required when mentorship type is Mentorship plan.');
+                }
+                if ($serviceType === 'Group_Mentorship' && empty($value)) {
+                    $fail('The title field is required when service type is Group Mentorship.');
+                }
+            },
+        ],
+        'interview_type' => 'required_if:service_type,Mock_Interview|in:Technical Interview,Soft Skills,Comprehensive Preparation',
+        'interview_level' => 'required_if:service_type,Mock_Interview|in:Junior,Mid-Level,Senior,Premium (FAANG)',
+        'description' => 'required_if:service_type,Group_Mentorship',
+        'day' => 'required_if:service_type,Group_Mentorship|in:Monday,Tuesday,Wednesday,Thursday,Friday,Saturday,Sunday',
+        'start_time' => 'required_if:service_type,Group_Mentorship|date_format:H:i',
+    ]);
 
         $service->price()->update(['price' => $request->price]);
 
@@ -325,7 +340,7 @@ public function getServicesCount($coachId)
                 Log::info('Updated MentorshipPlan for service ID: ' . $service->service_id);
             } else {
                 $service->mentorship->mentorshipSession()->update([
-                    'session_type' => $request->mentorship_type,
+                    'session_type' => $request->session_type,
                 ]);
                 Log::info('Updated MentorshipSession for service ID: ' . $service->service_id);
             }
