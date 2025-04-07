@@ -82,3 +82,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/mentorship-requests/{id}/reject', [MentorshipRequestController::class, 'rejectRequest']);
     });
 });
+
+Route::middleware('auth:sanctum')->group(function () {
+    Route::patch('/profile/update', [AuthController::class, 'updateProfile']);
+});
