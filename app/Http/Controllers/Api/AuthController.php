@@ -288,113 +288,117 @@ class AuthController extends Controller
 
 // update profile
     
-    public function updateProfile(Request $request)
-    {
-        // جلب المستخدم المصادق عليه (authenticated user)
-        $user = auth('sanctum')->user();
-        if (!$user) {
-            return response()->json(['message' => 'Unauthenticated'], 401);
-        }
-
-        // التحقق من الدور (Coach أو Trainee)
-        if (!in_array($user->Role_Profile, ['Coach', 'Trainee'])) {
-            return response()->json(['message' => 'Invalid role'], 403);
-        }
-
-        // الـ Validation: كل الحقول optional
-        $validated = $request->validate([
-            'Full_Name' => 'sometimes|string|max:255',
-            'Photo' => 'sometimes|image|mimes:jpeg,png,jpg|max:5120', // 5MB
-            'Password' => 'sometimes|string|min:8|confirmed',
-            'Bio' => 'sometimes|string', // للـ Coach
-            'Story' => 'sometimes|string', // للـ Trainee
-            'Languages' => 'sometimes|array|min:1', // للـ Coach
-            'Languages.*' => ['required', 'string', Rule::in($this->getEnumValues('coach_languages', 'Language'))],
-            'Preferred_Languages' => 'sometimes|array|min:1', // للـ Trainee
-            'Preferred_Languages.*' => ['required', 'string', Rule::in($this->getEnumValues('trainee_preferred_languages', 'Language'))],
-            // الـ Validation بتاع availability (للـ Coach بس)
-            'availability' => 'sometimes|array', // optional
-            'availability.days' => 'required_with:availability|array',
-            'availability.days.*' => 'in:Sunday,Monday,Tuesday,Wednesday,Thursday,Friday,Saturday',
-            'availability.time_slots' => 'required_with:availability|array',
-            'availability.time_slots.*' => 'array',
-            'availability.time_slots.*.*.start_time' => 'required_with:availability|date_format:H:i',
-            'availability.time_slots.*.*.end_time' => 'required_with:availability|date_format:H:i|after:availability.time_slots.*.*.start_time',
-        ]);
-
-        // تحديث البيانات في جدول users
-        if ($request->has('Full_Name')) {
-            $user->Full_Name = $validated['Full_Name'];
-        }
-
-        if ($request->hasFile('Photo')) {
-            // حذف الصورة القديمة لو موجودة
-            if ($user->Photo) {
-                Storage::disk('public')->delete($user->Photo);
-            }
-            // رفع الصورة الجديدة
-            $photoPath = $request->file('Photo')->store('photos', 'public');
-            $user->Photo = $photoPath;
-        }
-
-        if ($request->has('Password')) {
-            $user->Password = Hash::make($validated['Password']);
-        }
-
-        // حفظ التغييرات في جدول users
-        $user->save();
-
-        // تحديث البيانات بناءً على الدور
-        if ($user->Role_Profile === 'Coach') {
-            $coach = Coach::where('User_ID', $user->User_ID)->first();
-
-            if ($request->has('Bio')) {
-                $coach->Bio = $validated['Bio'];
-            }
-
-            if ($request->has('Languages')) {
-                // حذف اللغات القديمة
-                CoachLanguage::where('coach_id', $user->User_ID)->delete();
-                // إضافة اللغات الجديدة
-                foreach ($validated['Languages'] as $language) {
-                    CoachLanguage::create([
-                        'coach_id' => $user->User_ID,
-                        'Language' => $language
-                    ]);
-                }
-            }
-
-            if ($request->has('availability')) {
-                // حذف الـ availability القديمة
-                CoachAvailability::where('User_ID', $user->User_ID)->delete();
-                // إضافة الـ availability الجديدة باستخدام نفس الدالة
-                $this->setAvailability($user->User_ID, $validated['availability']);
-            }
-
-            $coach->save();
-        } else { // Trainee
-            $trainee = Trainee::where('User_ID', $user->User_ID)->first();
-
-            if ($request->has('Story')) {
-                $trainee->Story = $validated['Story'];
-            }
-
-            if ($request->has('Preferred_Languages')) {
-                // حذف اللغات القديمة
-                TraineePreferredLanguage::where('trainee_id', $user->User_ID)->delete();
-                // إضافة اللغات الجديدة
-                foreach ($validated['Preferred_Languages'] as $language) {
-                    TraineePreferredLanguage::create([
-                        'trainee_id' => $user->User_ID,
-                        'Language' => $language
-                    ]);
-                }
-            }
-
-            $trainee->save();
-        }
-
-        return response()->json(['message' => 'Profile updated successfully']);
+   
+     public function updateProfile(Request $request)
+{
+    // جلب المستخدم المصادق عليه (authenticated user)
+    $user = auth('sanctum')->user();
+    if (!$user) {
+        return response()->json(['message' => 'Unauthenticated'], 401);
     }
+
+    // ديباج للـ Role_Profile
+    \Log::info('User Role_Profile: ' . $user->Role_Profile);
+
+    // التحقق من الدور (Coach أو Trainee) بغض النظر عن الحروف
+    if (!in_array(strtolower($user->Role_Profile), ['coach', 'trainee'])) {
+        return response()->json(['message' => 'Invalid role'], 403);
+    }
+
+    // الـ Validation: كل الحقول optional
+    $validated = $request->validate([
+        'Full_Name' => 'sometimes|string|max:255',
+        'Photo' => 'sometimes|image|mimes:jpeg,png,jpg|max:5120', // 5MB
+        'Password' => 'sometimes|string|min:8|confirmed',
+        'Bio' => 'sometimes|string', // للـ Coach
+        'Story' => 'sometimes|string', // للـ Trainee
+        'Languages' => 'sometimes|array|min:1', // للـ Coach
+        'Languages.*' => ['required', 'string', Rule::in($this->getEnumValues('coach_languages', 'Language'))],
+        'Preferred_Languages' => 'sometimes|array|min:1', // للـ Trainee
+        'Preferred_Languages.*' => ['required', 'string', Rule::in($this->getEnumValues('trainee_preferred_languages', 'Language'))],
+        // الـ Validation بتاع availability (للـ Coach بس)
+        'availability' => 'sometimes|array', // optional
+        'availability.days' => 'required_with:availability|array',
+        'availability.days.*' => 'in:Sunday,Monday,Tuesday,Wednesday,Thursday,Friday,Saturday',
+        'availability.time_slots' => 'required_with:availability|array',
+        'availability.time_slots.*' => 'array',
+        'availability.time_slots.*.*.start_time' => 'required_with:availability|date_format:H:i',
+        'availability.time_slots.*.*.end_time' => 'required_with:availability|date_format:H:i|after:availability.time_slots.*.*.start_time',
+    ]);
+
+    // تحديث البيانات في جدول users
+    if ($request->has('Full_Name')) {
+        $user->Full_Name = $validated['Full_Name'];
+    }
+
+    if ($request->hasFile('Photo')) {
+        // حذف الصورة القديمة لو موجودة
+        if ($user->Photo) {
+            Storage::disk('public')->delete($user->Photo);
+        }
+        // رفع الصورة الجديدة
+        $photoPath = $request->file('Photo')->store('photos', 'public');
+        $user->Photo = $photoPath;
+    }
+
+    if ($request->has('Password')) {
+        $user->Password = Hash::make($validated['Password']);
+    }
+
+    // حفظ التغييرات في جدول users
+    $user->save();
+
+    // تحديث البيانات بناءً على الدور
+    if (strtolower($user->Role_Profile) === 'coach') {
+        $coach = Coach::where('User_ID', $user->User_ID)->first();
+
+        if ($request->has('Bio')) {
+            $coach->Bio = $validated['Bio'];
+        }
+
+        if ($request->has('Languages')) {
+            // حذف اللغات القديمة
+            CoachLanguage::where('coach_id', $user->User_ID)->delete();
+            // إضافة اللغات الجديدة
+            foreach ($validated['Languages'] as $language) {
+                CoachLanguage::create([
+                    'coach_id' => $user->User_ID,
+                    'Language' => $language
+                ]);
+            }
+        }
+
+        if ($request->has('availability')) {
+            // حذف الـ availability القديمة
+            CoachAvailability::where('User_ID', $user->User_ID)->delete();
+            // إضافة الـ availability الجديدة باستخدام نفس الدالة
+            $this->setAvailability($user->User_ID, $validated['availability']);
+        }
+
+        $coach->save();
+    } else { // Trainee
+        $trainee = Trainee::where('User_ID', $user->User_ID)->first();
+
+        if ($request->has('Story')) {
+            $trainee->Story = $validated['Story'];
+        }
+
+        if ($request->has('Preferred_Languages')) {
+            // حذف اللغات القديمة
+            TraineePreferredLanguage::where('trainee_id', $user->User_ID)->delete();
+            // إضافة اللغات الجديدة
+            foreach ($validated['Preferred_Languages'] as $language) {
+                TraineePreferredLanguage::create([
+                    'trainee_id' => $user->User_ID,
+                    'Language' => $language
+                ]);
+            }
+        }
+
+        $trainee->save();
+    }
+
+    return response()->json(['message' => 'Profile updated successfully']);
+}
 }
  
