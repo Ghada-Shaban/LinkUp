@@ -289,35 +289,34 @@ class AuthController extends Controller
 // update profile
     
    
-     public function updateProfile(Request $request)
+    public function updateProfile(Request $request)
 {
-    // جلب المستخدم المصادق عليه (authenticated user)
+    // Get authenticated user
     $user = auth('sanctum')->user();
     if (!$user) {
         return response()->json(['message' => 'Unauthenticated'], 401);
     }
 
-    // ديباج للـ Role_Profile
+    // Debug role
     \Log::info('User Role_Profile: ' . $user->Role_Profile);
 
-    // التحقق من الدور (Coach أو Trainee) بغض النظر عن الحروف
-   if (!in_array(strtolower(trim($user->Role_Profile)), ['Coach', 'Trainee'])) {
-
+    // Validate role (Coach or Trainee)
+    if (!in_array(strtolower(trim($user->Role_Profile)), ['coach', 'trainee'])) {
         return response()->json(['message' => 'Invalid role'], 403);
     }
 
-    // الـ Validation: كل الحقول optional
+    // Validation: all fields are optional
     $validated = $request->validate([
         'Full_Name' => 'sometimes|string|max:255',
-        'Photo' => 'sometimes|image|mimes:jpeg,png,jpg|max:5120', // 5MB
+        'Photo' => 'sometimes|nullable|image|mimes:jpeg,png,jpg|max:5120', // 5MB
         'Password' => 'sometimes|string|min:8|confirmed',
-        'Bio' => 'sometimes|string', // للـ Coach
-        'Story' => 'sometimes|string', // للـ Trainee
-        'Languages' => 'sometimes|array|min:1', // للـ Coach
+        'Bio' => 'sometimes|string', // For Coach
+        'Story' => 'sometimes|string', // For Trainee
+        'Languages' => 'sometimes|array|min:1', // For Coach
         'Languages.*' => ['required', 'string', Rule::in($this->getEnumValues('coach_languages', 'Language'))],
-        'Preferred_Languages' => 'sometimes|array|min:1', // للـ Trainee
+        'Preferred_Languages' => 'sometimes|array|min:1', // For Trainee
         'Preferred_Languages.*' => ['required', 'string', Rule::in($this->getEnumValues('trainee_preferred_languages', 'Language'))],
-        // الـ Validation بتاع availability (للـ Coach بس)
+        // Validation for availability (Coach only)
         'availability' => 'sometimes|array', // optional
         'availability.days' => 'required_with:availability|array',
         'availability.days.*' => 'in:Sunday,Monday,Tuesday,Wednesday,Thursday,Friday,Saturday',
@@ -327,40 +326,55 @@ class AuthController extends Controller
         'availability.time_slots.*.*.end_time' => 'required_with:availability|date_format:H:i|after:availability.time_slots.*.*.start_time',
     ]);
 
-    // تحديث البيانات في جدول users
+    // Update data in users table
     if ($request->has('Full_Name')) {
         $user->Full_Name = $validated['Full_Name'];
     }
 
-    if ($request->hasFile('Photo')) {
-        // حذف الصورة القديمة لو موجودة
-        if ($user->Photo) {
-            Storage::disk('public')->delete($user->Photo);
+    if ($request->has('Photo')) {
+        // Handle photo update
+        if ($request->Photo === null) {
+            // If null, remove existing photo
+            if ($user->Photo) {
+                Storage::disk('public')->delete($user->Photo);
+                $user->Photo = null;
+            }
+        } else if ($request->hasFile('Photo')) {
+            // Delete old photo if exists
+            if ($user->Photo) {
+                Storage::disk('public')->delete($user->Photo);
+            }
+            // Upload new photo
+            $photoPath = $request->file('Photo')->store('photos', 'public');
+            $user->Photo = $photoPath;
         }
-        // رفع الصورة الجديدة
-        $photoPath = $request->file('Photo')->store('photos', 'public');
-        $user->Photo = $photoPath;
     }
 
     if ($request->has('Password')) {
-        $user->Password = Hash::make($validated['Password']);
+        $user->password = Hash::make($validated['Password']); // Note: lowercase 'password'
     }
 
-    // حفظ التغييرات في جدول users
+    // Save changes to users table
     $user->save();
 
-    // تحديث البيانات بناءً على الدور
-    if (strtolower($user->Role_Profile) === 'coach') {
+    // Update data based on role
+    $userRole = strtolower(trim($user->Role_Profile));
+    
+    if ($userRole === 'coach') {
         $coach = Coach::where('User_ID', $user->User_ID)->first();
+        
+        if (!$coach) {
+            return response()->json(['message' => 'Coach profile not found'], 404);
+        }
 
         if ($request->has('Bio')) {
             $coach->Bio = $validated['Bio'];
         }
 
         if ($request->has('Languages')) {
-            // حذف اللغات القديمة
+            // Delete old languages
             CoachLanguage::where('coach_id', $user->User_ID)->delete();
-            // إضافة اللغات الجديدة
+            // Add new languages
             foreach ($validated['Languages'] as $language) {
                 CoachLanguage::create([
                     'coach_id' => $user->User_ID,
@@ -370,24 +384,28 @@ class AuthController extends Controller
         }
 
         if ($request->has('availability')) {
-            // حذف الـ availability القديمة
+            // Delete old availability
             CoachAvailability::where('User_ID', $user->User_ID)->delete();
-            // إضافة الـ availability الجديدة باستخدام نفس الدالة
+            // Add new availability using the same function
             $this->setAvailability($user->User_ID, $validated['availability']);
         }
 
         $coach->save();
     } else { // Trainee
         $trainee = Trainee::where('User_ID', $user->User_ID)->first();
+        
+        if (!$trainee) {
+            return response()->json(['message' => 'Trainee profile not found'], 404);
+        }
 
         if ($request->has('Story')) {
             $trainee->Story = $validated['Story'];
         }
 
         if ($request->has('Preferred_Languages')) {
-            // حذف اللغات القديمة
+            // Delete old languages
             TraineePreferredLanguage::where('trainee_id', $user->User_ID)->delete();
-            // إضافة اللغات الجديدة
+            // Add new languages
             foreach ($validated['Preferred_Languages'] as $language) {
                 TraineePreferredLanguage::create([
                     'trainee_id' => $user->User_ID,
