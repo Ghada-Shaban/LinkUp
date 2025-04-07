@@ -288,8 +288,7 @@ class AuthController extends Controller
 
 // update profile
     
-  <?php
-
+ 
 public function updateProfile(Request $request)
 {
     // Get authenticated user
