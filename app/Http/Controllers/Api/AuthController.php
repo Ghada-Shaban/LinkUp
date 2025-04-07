@@ -301,7 +301,8 @@ class AuthController extends Controller
     \Log::info('User Role_Profile: ' . $user->Role_Profile);
 
     // التحقق من الدور (Coach أو Trainee) بغض النظر عن الحروف
-    if (!in_array(strtolower($user->Role_Profile), ['coach', 'trainee'])) {
+   if (!in_array(strtolower(trim($user->Role_Profile)), ['Coach', 'Trainee'])) {
+
         return response()->json(['message' => 'Invalid role'], 403);
     }
 
