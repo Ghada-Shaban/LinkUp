@@ -22,14 +22,7 @@ class CoachResource extends JsonResource
             'months_of_experience' => $this->Months_Of_Experience,
             'skills' => $this->skills->pluck('Skill'),
             'languages' => $this->languages->pluck('Language'),
-            'availability' => $this->availabilities->map(function ($availability) {
-                return [
-                    'day_of_week' => $availability->Day_Of_Week,
-                    'start_time' => $availability->Start_Time,
-                    'end_time' => $availability->End_Time,
-                ];
-            }),
-            'reviews' => ReviewResource::collection($this->reviews),
+            'reviews' => ReviewResource::collection($this->reviews)
         ];
     }
 }
