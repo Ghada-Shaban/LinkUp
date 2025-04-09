@@ -7,6 +7,7 @@ use App\Http\Resources\CoachResource;
 use App\Http\Resources\TraineeResource;
 use App\Http\Resources\UserResource;
 use App\Models\Coach;
+use App\Models\User;
 use App\Models\CoachAvailability;
 use App\Models\CoachLanguage;
 use App\Models\CoachSkill;
