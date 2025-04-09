@@ -95,6 +95,6 @@ Route::middleware('auth:sanctum')->group(function () {
 
 
 Route::middleware('auth:sanctum')->group(function () {
-    Route::get('/coach/profile/{coach_id}', [ProfileController::class, 'getCoachProfile']);
-    Route::get('/trainee/profile/{trainee_id}', [ProfileController::class, 'getTraineeProfile']);
+    Route::get('/coach/profile/{user_id}', [ProfileController::class, 'getCoachProfile']);
+    Route::get('/trainee/profile/{user_id}', [ProfileController::class, 'getTraineeProfile']);
 });
