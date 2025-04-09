@@ -12,6 +12,8 @@ class TraineeResource extends JsonResource
         return [
             'full_name' => $this->trainee->user->full_name,
             'photo' => $this->trainee->user->photo,
+            'email' => $this->Email,
+            'linkedin_link' => $this->trainee->user->Linkedin_Link ,
             'education_level' => $this->Education_Level,
             'institution_or_school' => $this->Institution_Or_School,
             'field_of_study' => $this->Field_Of_Study,
