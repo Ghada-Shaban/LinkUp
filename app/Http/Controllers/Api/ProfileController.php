@@ -21,10 +21,8 @@ class ProfileController extends Controller
             return response()->json(['message' => 'Unauthorized: You can only view your own dashboard'], 403);
         }
 
-        // التحقق إن المستخدم هو Coach
-        if ($currentUser->Role_Profile !== 'Coach') {
-            return response()->json(['message' => 'You are not a coach'], 403);
-        }
+     
+     
 
         // جلب بيانات الكوتش بناءً على user_id
         $coach = Coach::with([
@@ -48,10 +46,7 @@ class ProfileController extends Controller
             return response()->json(['message' => 'Unauthorized: You can only view your own dashboard'], 403);
         }
 
-        // التحقق إن المستخدم هو Trainee
-        if ($currentUser->Role_Profile !== 'Trainee') {
-            return response()->json(['message' => 'You are not a trainee'], 403);
-        }
+        
 
         // جلب بيانات التريني بناءً على user_id
         $trainee = Trainee::with([
