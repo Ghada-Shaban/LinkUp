@@ -288,273 +288,201 @@ class AuthController extends Controller
 
 // update profile
     
- 
-public function updateProfile(Request $request)
+ public function updateProfile(Request $request)
 {
-    // Get authenticated user
+    // جلب المستخدم المصادق عليه
     $user = auth('sanctum')->user();
     if (!$user) {
         return response()->json(['message' => 'Unauthenticated'], 401);
     }
 
-    // Get user role and convert to lowercase for consistent comparison
-    $userRole = strtolower($user->Role_Profile);
-    
-    // Check if role is valid
-    if (!in_array($userRole, ['coach', 'trainee'])) {
-        return response()->json(['message' => 'Invalid user role'], 403);
+    // ديباج للتحقق من القيمة
+    \Log::info('User ID: ' . $user->User_ID . ', Role_Profile: ' . $user->Role_Profile);
+
+    // التحقق من الدور باستخدام مقارنة مباشرة (case-insensitive)
+    $roleProfile = $user->Role_Profile;
+    $isCoach = strcasecmp($roleProfile, 'Coach') === 0;
+    $isTrainee = strcasecmp($roleProfile, 'Trainee') === 0;
+
+    if (!$isCoach && !$isTrainee) {
+        return response()->json(['message' => 'Invalid role'], 403);
     }
 
-    // Start database transaction
-    return DB::transaction(function () use ($request, $user, $userRole) {
-        // Common user fields validation
-        $commonRules = [
-            'Full_Name' => 'sometimes|string|max:255',
-            'Photo' => 'sometimes|nullable|image|mimes:jpeg,png,jpg|max:5120', // Max 5MB
-            'Password' => 'sometimes|string|min:8|confirmed',
-            'Linkedin_Link' => 'sometimes|nullable|url',
-        ];
-        
-        // Role-specific validation rules
-        $roleSpecificRules = [];
-        
-        if ($userRole === 'coach') {
-            $roleSpecificRules = [
-                'Title' => 'sometimes|string|max:100',
-                'Company_or_School' => 'sometimes|string|max:255',
-                'Bio' => 'sometimes|string',
-                'Years_Of_Experience' => 'sometimes|integer|min:0',
-                'Months_Of_Experience' => 'sometimes|integer|between:0,11',
-                'Skills' => 'sometimes|array|min:1',
-                'Skills.*' => ['string', Rule::in($this->getEnumValues('coach_skills', 'Skill'))],
-                'Languages' => 'sometimes|array|min:1',
-                'Languages.*' => ['string', Rule::in($this->getEnumValues('coach_languages', 'Language'))],
-                'availability' => 'sometimes|array',
-                'availability.days' => 'required_with:availability|array',
-                'availability.days.*' => 'in:Sunday,Monday,Tuesday,Wednesday,Thursday,Friday,Saturday',
-                'availability.time_slots' => 'required_with:availability|array',
-                'availability.time_slots.*' => 'array',
-                'availability.time_slots.*.*.start_time' => 'required_with:availability|date_format:H:i',
-                'availability.time_slots.*.*.end_time' => 'required_with:availability|date_format:H:i|after:availability.time_slots.*.*.start_time',
-            ];
-        } else { // trainee
-            $roleSpecificRules = [
-                'Education_Level' => ['sometimes', 'string', Rule::in($this->getEnumValues('trainees', 'Education_Level'))],
-                'Institution_Or_School' => 'sometimes|string|max:255',
-                'Field_Of_Study' => 'sometimes|string|max:255',
-                'Current_Role' => 'sometimes|nullable|string|max:255',
-                'Story' => 'sometimes|nullable|string',
-                'Years_Of_Professional_Experience' => 'sometimes|nullable|integer|min:0',
-                'Preferred_Languages' => 'sometimes|array|min:1',
-                'Preferred_Languages.*' => ['string', Rule::in($this->getEnumValues('trainee_preferred_languages', 'Language'))],
-                'Areas_Of_Interest' => 'sometimes|array|min:1',
-                'Areas_Of_Interest.*' => ['string', Rule::in($this->getEnumValues('trainee_areas_of_interest', 'Area_Of_Interest'))],
-            ];
-        }
-        
-        // Merge validation rules and validate
-        $validated = $request->validate(array_merge($commonRules, $roleSpecificRules));
-        
-        // Update common user fields
+    // الـ Validation: كل الحقول optional
+    $validSkills = $this->getEnumValues('coach_skills', 'Skill');
+    $validLanguages = $this->getEnumValues('coach_languages', 'Language');
+    $validTraineeLanguages = $this->getEnumValues('trainee_preferred_languages', 'Language');
+    $validEducationLevels = $this->getEnumValues('trainees', 'Education_Level');
+
+    $validated = $request->validate([
+        // حقول مشتركة في جدول users
+        'Full_Name' => 'sometimes|string|max:255',
+        'Photo' => 'sometimes|image|mimes:jpeg,png,jpg|max:2048',
+        'Password' => 'sometimes|string|min:8|confirmed',
+        'Linkedin_Link' => 'sometimes|url|nullable',
+
+        // حقول خاصة بـ Coach
+        'Title' => 'sometimes|string|max:100',
+        'Company_or_School' => 'sometimes|string|max:255',
+        'Bio' => 'sometimes|string',
+        'Years_Of_Experience' => 'sometimes|integer|min:0',
+        'Months_Of_Experience' => 'sometimes|integer|between:0,11',
+        'Skills' => 'sometimes|array|min:1',
+        'Skills.*' => ['required', 'string', Rule::in($validSkills)],
+        'Languages' => 'sometimes|array|min:1',
+        'Languages.*' => ['required', 'string', Rule::in($validLanguages)],
+        'availability' => 'sometimes|array',
+        'availability.days' => 'required_with:availability|array',
+        'availability.days.*' => 'in:Sunday,Monday,Tuesday,Wednesday,Thursday,Friday,Saturday',
+        'availability.time_slots' => 'required_with:availability|array',
+        'availability.time_slots.*' => 'array',
+        'availability.time_slots.*.*.start_time' => 'required_with:availability|date_format:H:i',
+        'availability.time_slots.*.*.end_time' => 'required_with:availability|date_format:H:i|after:availability.time_slots.*.*.start_time',
+
+        // حقول خاصة بـ Trainee
+        'Education_Level' => ['sometimes', 'string', Rule::in($validEducationLevels)],
+        'Institution_Or_School' => 'sometimes|string',
+        'Story' => 'sometimes|string|nullable',
+        'Field_Of_Study' => 'sometimes|string',
+        'Years_Of_Professional_Experience' => 'sometimes|integer|min:0|nullable',
+        'Current_Role' => 'sometimes|string|nullable',
+        'Preferred_Languages' => 'sometimes|array|min:1',
+        'Preferred_Languages.*' => ['required', 'string', Rule::in($validTraineeLanguages)],
+    ]);
+
+    return DB::transaction(function () use ($request, $validated, $user, $isCoach, $isTrainee) {
+        // تحديث البيانات في جدول users
         if ($request->has('Full_Name')) {
             $user->Full_Name = $validated['Full_Name'];
         }
-        
+
+        if ($request->hasFile('Photo')) {
+            // حذف الصورة القديمة لو موجودة
+            if ($user->Photo) {
+                Storage::disk('public')->delete($user->Photo);
+            }
+            // رفع الصورة الجديدة
+            $photoPath = $request->file('Photo')->store('photos', 'public');
+            $user->Photo = $photoPath;
+        }
+
+        if ($request->has('Password')) {
+            $user->Password = Hash::make($validated['Password']);
+        }
+
         if ($request->has('Linkedin_Link')) {
             $user->Linkedin_Link = $validated['Linkedin_Link'];
         }
-        
-        // Handle photo update
-        if ($request->has('Photo')) {
-            if ($request->Photo === null) {
-                // Remove existing photo
-                if ($user->Photo) {
-                    Storage::disk('public')->delete($user->Photo);
-                    $user->Photo = null;
-                }
-            } else if ($request->hasFile('Photo')) {
-                // Delete old photo if exists
-                if ($user->Photo) {
-                    Storage::disk('public')->delete($user->Photo);
-                }
-                // Upload new photo
-                $photoPath = $request->file('Photo')->store('photos', 'public');
-                $user->Photo = $photoPath;
-            }
-        }
-        
-        // Update password if provided
-        if ($request->has('Password')) {
-            $user->password = Hash::make($validated['Password']);
-        }
-        
-        // Save user changes
+
+        // حفظ التغييرات في جدول users
         $user->save();
-        
-        // Update role-specific information
-        if ($userRole === 'coach') {
-            $this->updateCoachProfile($user->User_ID, $validated);
-        } else {
-            $this->updateTraineeProfile($user->User_ID, $validated);
+
+        // تحديث البيانات بناءً على الدور
+        if ($isCoach) {
+            $coach = Coach::where('User_ID', $user->User_ID)->first();
+
+            if ($request->has('Title')) {
+                $coach->Title = $validated['Title'];
+            }
+
+            if ($request->has('Company_or_School')) {
+                $coach->Company_or_School = $validated['Company_or_School'];
+            }
+
+            if ($request->has('Bio')) {
+                $coach->Bio = $validated['Bio'];
+            }
+
+            if ($request->has('Years_Of_Experience')) {
+                $coach->Years_Of_Experience = $validated['Years_Of_Experience'];
+            }
+
+            if ($request->has('Months_Of_Experience')) {
+                $coach->Months_Of_Experience = $validated['Months_Of_Experience'];
+            }
+
+            if ($request->has('Skills')) {
+                // حذف المهارات القديمة
+                CoachSkill::where('coach_id', $user->User_ID)->delete();
+                // إضافة المهارات الجديدة
+                foreach ($validated['Skills'] as $skill) {
+                    CoachSkill::create([
+                        'coach_id' => $user->User_ID,
+                        'Skill' => $skill
+                    ]);
+                }
+            }
+
+            if ($request->has('Languages')) {
+                // حذف اللغات القديمة
+                CoachLanguage::where('coach_id', $user->User_ID)->delete();
+                // إضافة اللغات الجديدة
+                foreach ($validated['Languages'] as $language) {
+                    CoachLanguage::create([
+                        'coach_id' => $user->User_ID,
+                        'Language' => $language
+                    ]);
+                }
+            }
+
+            if ($request->has('availability')) {
+                // حذف الـ availability القديمة
+                CoachAvailability::where('User_ID', $user->User_ID)->delete();
+                // إضافة الـ availability الجديدة
+                $this->setAvailability($user->User_ID, $validated['availability']);
+            }
+
+            $coach->save();
+        } elseif ($isTrainee) {
+            $trainee = Trainee::where('User_ID', $user->User_ID)->first();
+
+            if ($request->has('Education_Level')) {
+                $trainee->Education_Level = $validated['Education_Level'];
+            }
+
+            if ($request->has('Institution_Or_School')) {
+                $trainee->Institution_Or_School = $validated['Institution_Or_School'];
+            }
+
+            if ($request->has('Story')) {
+                $trainee->Story = $validated['Story'];
+            }
+
+            if ($request->has('Field_Of_Study')) {
+                $trainee->Field_Of_Study = $validated['Field_Of_Study'];
+            }
+
+            if ($request->has('Years_Of_Professional_Experience')) {
+                $trainee->Years_Of_Professional_Experience = $validated['Years_Of_Professional_Experience'];
+            }
+
+            if ($request->has('Current_Role')) {
+                $trainee->Current_Role = $validated['Current_Role'];
+            }
+
+            if ($request->has('Preferred_Languages')) {
+                // حذف اللغات القديمة
+                TraineePreferredLanguage::where('trainee_id', $user->User_ID)->delete();
+                // إضافة اللغات الجديدة
+                foreach ($validated['Preferred_Languages'] as $language) {
+                    TraineePreferredLanguage::create([
+                        'trainee_id' => $user->User_ID,
+                        'Language' => $language
+                    ]);
+                }
+            }
+
+            $trainee->save();
         }
-        
+
         return response()->json([
             'message' => 'Profile updated successfully',
-            'user' => User::with($userRole === 'coach' ? 
-                ['coach', 'coachLanguages', 'coachSkills', 'coachAvailability'] : 
-                ['trainee', 'traineePreferredLanguages', 'traineeAreasOfInterest']
-            )->find($user->User_ID)
+            'user' => $user,
         ]);
     });
 }
-
-/**
- * Update coach-specific profile information
- * 
- * @param int $userId User ID
- * @param array $validated Validated data
- * @return void
- */
-private function updateCoachProfile($userId, array $validated)
-{
-    // Get coach record
-    $coach = Coach::where('User_ID', $userId)->first();
     
-    if (!$coach) {
-        throw new \Exception('Coach profile not found');
-    }
-    
-    // Update coach details
-    if (isset($validated['Title'])) {
-        $coach->Title = $validated['Title'];
-    }
-    
-    if (isset($validated['Company_or_School'])) {
-        $coach->Company_or_School = $validated['Company_or_School'];
-    }
-    
-    if (isset($validated['Bio'])) {
-        $coach->Bio = $validated['Bio'];
-    }
-    
-    if (isset($validated['Years_Of_Experience'])) {
-        $coach->Years_Of_Experience = $validated['Years_Of_Experience'];
-    }
-    
-    if (isset($validated['Months_Of_Experience'])) {
-        $coach->Months_Of_Experience = $validated['Months_Of_Experience'];
-    }
-    
-    $coach->save();
-    
-    // Update skills if provided
-    if (isset($validated['Skills'])) {
-        // Delete existing skills
-        CoachSkill::where('coach_id', $userId)->delete();
         
-        // Add new skills
-        foreach ($validated['Skills'] as $skill) {
-            CoachSkill::create([
-                'coach_id' => $userId,
-                'Skill' => $skill
-            ]);
-        }
-    }
-    
-    // Update languages if provided
-    if (isset($validated['Languages'])) {
-        // Delete existing languages
-        CoachLanguage::where('coach_id', $userId)->delete();
-        
-        // Add new languages
-        foreach ($validated['Languages'] as $language) {
-            CoachLanguage::create([
-                'coach_id' => $userId,
-                'Language' => $language
-            ]);
-        }
-    }
-    
-    // Update availability if provided
-    if (isset($validated['availability'])) {
-        // Delete existing availability
-        CoachAvailability::where('User_ID', $userId)->delete();
-        
-        // Add new availability
-        $this->setAvailability($userId, $validated['availability']);
-    }
-}
-
-/**
- * Update trainee-specific profile information
- * 
- * @param int $userId User ID
- * @param array $validated Validated data
- * @return void
- */
-private function updateTraineeProfile($userId, array $validated)
-{
-    // Get trainee record
-    $trainee = Trainee::where('User_ID', $userId)->first();
-    
-    if (!$trainee) {
-        throw new \Exception('Trainee profile not found');
-    }
-    
-    // Update trainee details
-    if (isset($validated['Education_Level'])) {
-        $trainee->Education_Level = $validated['Education_Level'];
-    }
-    
-    if (isset($validated['Institution_Or_School'])) {
-        $trainee->Institution_Or_School = $validated['Institution_Or_School'];
-    }
-    
-    if (isset($validated['Field_Of_Study'])) {
-        $trainee->Field_Of_Study = $validated['Field_Of_Study'];
-    }
-    
-    if (isset($validated['Current_Role'])) {
-        $trainee->Current_Role = $validated['Current_Role'];
-    }
-    
-    if (isset($validated['Story'])) {
-        $trainee->Story = $validated['Story'];
-    }
-    
-    if (isset($validated['Years_Of_Professional_Experience'])) {
-        $trainee->Years_Of_Professional_Experience = $validated['Years_Of_Professional_Experience'];
-    }
-    
-    $trainee->save();
-    
-    // Update preferred languages if provided
-    if (isset($validated['Preferred_Languages'])) {
-        // Delete existing preferred languages
-        TraineePreferredLanguage::where('trainee_id', $userId)->delete();
-        
-        // Add new preferred languages
-        foreach ($validated['Preferred_Languages'] as $language) {
-            TraineePreferredLanguage::create([
-                'trainee_id' => $userId,
-                'Language' => $language
-            ]);
-        }
-    }
-    
-    // Update areas of interest if provided
-    if (isset($validated['Areas_Of_Interest'])) {
-        // Delete existing areas of interest
-        TraineeAreaOfInterest::where('trainee_id', $userId)->delete();
-        
-        // Add new areas of interest
-        foreach ($validated['Areas_Of_Interest'] as $interest) {
-            TraineeAreaOfInterest::create([
-                'trainee_id' => $userId,
-                'Area_Of_Interest' => $interest
-            ]);
-        }
-    }
-}
+       
 }
  
