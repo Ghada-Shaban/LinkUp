@@ -10,7 +10,7 @@ class TraineeResource extends JsonResource
     public function toArray($request)
     {
         return [
-            'user' => $this->user,
+            'user' => new UserResource($this->user),
             'full_name' => $this->user->Full_Name,
             'email' => $this->user->Email,
             'photo' => $this->user->Photo,
