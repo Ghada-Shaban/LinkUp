@@ -8,7 +8,7 @@ class UserResource extends JsonResource
     public function toArray($request)
     {
         return [
-            
+            'user_id' => $this->User_ID,
             'full_name' => $this->Full_Name,
             'email' => $this->Email,
             'photo' => $this->Photo ? url("storage/{$this->Photo}/{$this->User_ID}") : null,
