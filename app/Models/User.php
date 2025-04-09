@@ -101,4 +101,8 @@ class User extends Authenticatable
             }
         });
     }
+    public function getRoleProfileAttribute($value)
+    {
+        return $value; // أو احذف الـ accessor ده لو مش محتاجاه
+    }
 }
