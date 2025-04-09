@@ -11,7 +11,7 @@ use Illuminate\Http\Request;
 
 class ProfileController extends Controller
 {
-    public function getCoachDashboard(Request $request, $user_id)
+    public function getCoachProfile(Request $request, $user_id)
     {
         // جلب المستخدم المسجل حاليًا
         $currentUser = auth()->user();
@@ -38,7 +38,7 @@ class ProfileController extends Controller
         return new CoachResource($coach);
     }
 
-    public function getTraineeDashboard(Request $request, $user_id)
+    public function getTraineeProfile(Request $request, $user_id)
     {
         // جلب المستخدم المسجل حاليًا
         $currentUser = auth()->user();
