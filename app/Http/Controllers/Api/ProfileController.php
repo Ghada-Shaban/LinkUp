@@ -6,6 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\CoachResource;
 use App\Http\Resources\TraineeResource;
 use App\Models\Coach;
+use App\Models\CoachAvailability;
+use App\Models\CoachLanguage;
+use App\Models\CoachSkill;
 use App\Models\Trainee;
 use Illuminate\Http\Request;
 
