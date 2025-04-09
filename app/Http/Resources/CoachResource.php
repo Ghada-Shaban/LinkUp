@@ -10,7 +10,11 @@ class CoachResource extends JsonResource
     public function toArray($request)
     {
         return [
-            'user' => new UserResource($this->user),
+            
+            'full_name' => $this->user->Full_Name,
+            'email' => $this->user->Email,
+            'photo' => $this->user->Photo,
+            'linkedin_link' => $this->user->Linkedin_Link,
             'title' => $this->Title,
             'company_or_school' => $this->Company_or_School,
             'bio' => $this->Bio,
@@ -18,7 +22,7 @@ class CoachResource extends JsonResource
             'months_of_experience' => $this->Months_Of_Experience,
             'skills' => $this->skills->pluck('Skill'),
             'languages' => $this->languages->pluck('Language'),
-            'reviews' => ReviewResource::collection($this->reviews)
+            'reviews' => ReviewResource::collection($this->reviews),
         ];
     }
 }
