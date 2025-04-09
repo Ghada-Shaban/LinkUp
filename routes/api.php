@@ -52,6 +52,8 @@ Route::prefix('coach/{coachId}')->middleware(['auth:api', 'check.coach.ownership
     Route::post('services', [CoachServiceController::class, 'createService']);
     Route::put('services/{serviceId}', [CoachServiceController::class, 'updateService']);
     Route::delete('services/{serviceId}', [CoachServiceController::class, 'deleteService']);
+    // reviews
+    Route::get('/reviews', [ReviewController::class, 'show']);
 });
 
 Route::prefix('coach/{coachId}')->middleware(['auth:api', 'check.trainee'])->group(function () {
@@ -73,6 +75,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('trainee')->group(function () {
         Route::post('/mentorship-requests', [MentorshipRequestController::class, 'store']);
         Route::get('/mentorship-requests', [MentorshipRequestController::class, 'traineeIndex']);
+
+        // make review
+        Route::post('/reviews', [ReviewController::class, 'store']);
     });
 
     // Coach routes
