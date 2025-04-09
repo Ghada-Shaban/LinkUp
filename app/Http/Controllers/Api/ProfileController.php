@@ -32,11 +32,13 @@ class ProfileController extends Controller
 
         // جلب بيانات الكوتش بناءً على user_id
         $coach = Coach::with([
-            'user',
-            'skills',
-            'languages',
-            'reviews.trainee.user'
-        ])->findOrFail($user_id);
+        'user' => function ($query) {
+            $query->select('Full_Name', 'Email', 'Photo', 'Linkedin_Link');
+        },
+        'skills',
+        'languages',
+        'reviews.trainee.user'
+    ])->findOrFail($user_id);
 
         return new CoachResource($coach);
     }
@@ -55,10 +57,12 @@ class ProfileController extends Controller
 
         // جلب بيانات التريني بناءً على user_id
         $trainee = Trainee::with([
-            'user',
-            'preferredLanguages',
-            'areasOfInterest'
-        ])->findOrFail($user_id);
+        'user' => function ($query) {
+            $query->select('Full_Name', 'Email', 'Photo', 'Linkedin_Link');
+        },
+        'preferredLanguages',
+        'areasOfInterest'
+    ])->findOrFail($user_id);
 
         return new TraineeResource($trainee);
     }
