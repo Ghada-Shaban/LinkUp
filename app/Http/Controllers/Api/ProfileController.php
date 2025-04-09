@@ -34,7 +34,6 @@ class ProfileController extends Controller
             'user',
             'skills',
             'languages',
-            'availabilities',
             'reviews.trainee.user'
         ])->findOrFail($user_id);
 
@@ -57,8 +56,7 @@ class ProfileController extends Controller
         $trainee = Trainee::with([
             'user',
             'preferredLanguages',
-            'areasOfInterest',
-            'reviews.coach.user'
+            'areasOfInterest'
         ])->findOrFail($user_id);
 
         return new TraineeResource($trainee);
