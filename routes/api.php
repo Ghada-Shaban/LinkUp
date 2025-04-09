@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\NewSessionController;
 use App\Http\Controllers\Api\MentorshipRequestController;
 use App\Http\Controllers\Api\CoachServiceController;
 use App\Http\Controllers\Api\ReviewController;
+use App\Http\Controllers\Api\ProfileController;
 
 /*
 |--------------------------------------------------------------------------
@@ -89,6 +90,11 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 });
 
+
+// profiles
+
+
 Route::middleware('auth:sanctum')->group(function () {
-    Route::patch('/profile/update', [AuthController::class, 'updateProfile']);
+    Route::get('/coach/profile/{coach_id}', [ProfileController::class, 'getCoachProfile']);
+    Route::get('/trainee/profile/{trainee_id}', [ProfileController::class, 'getTraineeProfile']);
 });
