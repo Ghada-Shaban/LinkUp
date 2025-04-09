@@ -10,6 +10,8 @@ use App\Models\CoachAvailability;
 use App\Models\CoachLanguage;
 use App\Models\CoachSkill;
 use App\Models\Trainee;
+use App\Models\TraineeAreaOfInterest;
+use App\Models\TraineePreferredLanguage;
 use Illuminate\Http\Request;
 
 class ProfileController extends Controller
