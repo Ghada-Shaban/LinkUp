@@ -24,7 +24,5 @@ class Review extends Model
         return $this->belongsTo(Coach::class, 'coach_id', 'User_ID');
     }
 
-    protected $casts = [
-        'rating' => 'integer'
-    ];
+   
 }
