@@ -91,6 +91,18 @@ class User extends Authenticatable
                     ->count();
     }
 
+    // إضافة العلاقة مع جدول services
+    public function services()
+    {
+        return $this->hasMany(Service::class, 'coach_id', 'User_ID');
+    }
+
+    // إضافة العلاقة مع جدول coach_skills
+    public function skills()
+    {
+        return $this->hasMany(CoachSkill::class, 'coach_id', 'User_ID');
+    }
+
     protected static function boot()
     {
         parent::boot();
@@ -101,5 +113,4 @@ class User extends Authenticatable
             }
         });
     }
-
 }
