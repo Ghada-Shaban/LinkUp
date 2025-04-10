@@ -26,7 +26,7 @@ class CoachController extends Controller
         $search = $request->query('search', ''); // Search query for multiple fields
         $perPage = $request->query('per_page', 10); // Pagination: number of coaches per page
 
-        $coachesQuery = User::with(['coach', 'services.prices', 'services.sessions', 'skills', 'reviewsAsCoach'])
+        $coachesQuery = User::with(['coach', 'services.price', 'services.sessions', 'skills', 'reviewsAsCoach'])
             ->where('role_profile', 'Coach') // Only fetch users with role 'Coach'
             ->when($search, function ($query, $search) {
                 $query->where(function ($q) use ($search) {
