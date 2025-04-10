@@ -5,10 +5,12 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Laravel\Sanctum\HasApiTokens;
+
 class Coach extends Model
 {
     use HasFactory;
     use HasApiTokens;
+
     protected $primaryKey = 'User_ID';
     public $incrementing = false;
 
@@ -19,12 +21,12 @@ class Coach extends Model
 
     public function skills()
     {
-        return $this->hasMany(CoachSkill::class,'coach_id', 'User_ID');
+        return $this->hasMany(CoachSkill::class, 'coach_id', 'User_ID');
     }
 
     public function languages()
     {
-        return $this->hasMany(CoachLanguage::class,'coach_id', 'User_ID');
+        return $this->hasMany(CoachLanguage::class, 'coach_id', 'User_ID');
     }
 
     public function admin()
@@ -34,13 +36,20 @@ class Coach extends Model
 
     public function user()
     {
-        return $this->belongsTo(User::class , 'User_ID');
+        return $this->belongsTo(User::class, 'User_ID');
     }
-public function services()
-{
-    return $this->belongsToMany(Service::class, 'chooses', 'coach_id', 'service_id')
-                ->withPivot('coach_id', 'service_id');
-}
+
+    public function services()
+    {
+        return $this->belongsToMany(Service::class, 'chooses', 'coach_id', 'service_id')
+                    ->withPivot('coach_id', 'service_id');
+    }
+
+    // إضافة علاقة hasMany مع جدول services
+    public function servicesDirect()
+    {
+        return $this->hasMany(Service::class, 'coach_id', 'User_ID');
+    }
 
     public function reviews()
     {
@@ -51,14 +60,16 @@ public function services()
     {
         return $this->hasMany(NewSession::class, 'coach_id', 'User_ID'); 
     }
+
     public function availableTimes()
- {
-    return $this->hasMany(CoachAvailability::class, 'coach_id', 'User_ID');
- }
+    {
+        return $this->hasMany(CoachAvailability::class, 'coach_id', 'User_ID');
+    }
+
     public function getAverageRatingAttribute()
     {
-    return round($this->reviews()->avg('Rating'), 2);}
+        return round($this->reviews()->avg('Rating'), 2);
+    }
 
     protected $appends = ['average_rating'];
-
 }
