@@ -1,3 +1,4 @@
+
 <?php
 
 namespace App\Http\Controllers\Api;
@@ -26,14 +27,14 @@ class CoachController extends Controller
         $search = $request->query('search', ''); // Search query for multiple fields
         $perPage = $request->query('per_page', 10); // Pagination: number of coaches per page
 
-        $coachesQuery = User::with(['coachProfile', 'services.prices', 'services.sessions', 'skills', 'reviews'])
+        $coachesQuery = User::with(['coach', 'services.prices', 'services.sessions', 'skills', 'reviewsAsCoach'])
             ->where('role_profile', 'Coach') // Only fetch users with role 'Coach'
             ->when($search, function ($query, $search) {
                 $query->where(function ($q) use ($search) {
                     // السيرش في full_name (من جدول users)
-                    $q->where('full_name', 'like', "%{$search}%")
+                    $q->where('Full_Name', 'like', "%{$search}%")
                       // السيرش في Title (من جدول coaches)
-                      ->orWhereHas('coachProfile', function ($q) use ($search) {
+                      ->orWhereHas('coach', function ($q) use ($search) {
                           $q->where('Title', 'like', "%{$search}%");
                       })
                       // السيرش في service_type (من جدول services)
