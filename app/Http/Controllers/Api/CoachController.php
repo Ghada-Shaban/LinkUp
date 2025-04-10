@@ -31,7 +31,7 @@ class CoachController extends Controller
             ->when($search, function ($query, $search) {
                 $query->where(function ($q) use ($search) {
                     // السيرش في full_name (من جدول users)
-                    $q->where('full_Name', 'like', "%{$search}%")
+                    $q->where('full_name', 'like', "%{$search}%")
                       // السيرش في Title (من جدول coaches)
                       ->orWhereHas('coach', function ($q) use ($search) {
                           $q->where('Title', 'like', "%{$search}%");
