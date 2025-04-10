@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\MentorshipRequestController;
 use App\Http\Controllers\Api\CoachServiceController;
 use App\Http\Controllers\Api\ReviewController;
 use App\Http\Controllers\Api\ProfileController;
+use App\Http\Controllers\Api\CoachController; // إضافة الـ CoachController
 
 /*
 |--------------------------------------------------------------------------
@@ -90,11 +91,13 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 });
 
-
 // profiles
-
-
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/coach/profile/{user_id}', [ProfileController::class, 'getCoachProfile']);
     Route::get('/trainee/profile/{user_id}', [ProfileController::class, 'getTraineeProfile']);
+});
+
+// Route الخاصة بـ Explore Coaches (الإضافة الجديدة)
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/coaches/explore', [CoachController::class, 'exploreCoaches']);
 });
