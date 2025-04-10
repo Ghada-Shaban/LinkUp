@@ -14,7 +14,7 @@ class CoachResource extends JsonResource
 
         // جلب السعر من أول خدمة
         $service = $this->services->first();
-        $price = $service && $service->prices->first() ? $service->prices->first()->price : 'N/A';
+        $price = $service && $service->price->first() ? $service->price->first()->price : 'N/A';
 
         // جلب المهارات
         $skills = $this->skills->pluck('skill')->toArray();
