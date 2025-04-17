@@ -328,7 +328,7 @@ class ProfileController extends Controller
             'profile' => [
                 'Full_Name' => $user->full_name,
                 'Email' => $user->email,
-                'Photo' => $user->profile_photo_url: null,
+                'Photo' => $user->profile_photo_url?? null,
                 'Bio' => $coach->Bio ?? null,
                 'Languages' => $languages,
                 'Company_or_School' => $coach->Company_or_School ?? null,
@@ -364,7 +364,7 @@ class ProfileController extends Controller
             'profile' => [
                 'Full_Name' => $user->full_name,
                 'Email' => $user->email,
-                'Photo' => $user->profile_photo_url : null,
+                'Photo' => $user->profile_photo_url ?? null,
                 'Story' => $trainee->Story ?? null,
                 'Preferred_Languages' => $languages,
                 'Institution_Or_School' => $trainee->Institution_Or_School ?? null,
