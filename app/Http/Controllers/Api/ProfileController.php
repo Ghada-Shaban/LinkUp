@@ -326,9 +326,9 @@ class ProfileController extends Controller
         return response()->json([
             'message' => 'Coach profile retrieved successfully',
             'profile' => [
-                'Full_Name' => $user->Full_Name,
-                'Email' => $user->Email,
-                'Photo' => $user->Photo ? Storage::url($user->Photo) : null,
+                'Full_Name' => $user->full_name,
+                'Email' => $user->email,
+                'Photo' => $user->photo ? Storage::url($user->Photo) : null,
                 'Bio' => $coach->Bio ?? null,
                 'Languages' => $languages,
                 'Company_or_School' => $coach->Company_or_School ?? null,
@@ -336,7 +336,7 @@ class ProfileController extends Controller
                 'Title' => $coach->Title ?? null,
                 'Years_Of_Experience' => $coach->Years_Of_Experience ?? 0,
                 'Months_Of_Experience' => $coach->Months_Of_Experience ?? 0,
-                'Linkedin_Link' => $user->Linkedin_Link ?? null,
+                'Linkedin_Link' => $user->linkedin_link ?? null,
                 'availability' => $availability,
             ],
         ], 200);
@@ -362,16 +362,16 @@ class ProfileController extends Controller
         return response()->json([
             'message' => 'Trainee profile retrieved successfully',
             'profile' => [
-                'Full_Name' => $user->Full_Name,
-                'Email' => $user->Email,
-                'Photo' => $user->Photo ? Storage::url($user->Photo) : null,
+                'Full_Name' => $user->full_name,
+                'Email' => $user->email,
+                'Photo' => $user->photo ? Storage::url($user->Photo) : null,
                 'Story' => $trainee->Story ?? null,
                 'Preferred_Languages' => $languages,
                 'Institution_Or_School' => $trainee->Institution_Or_School ?? null,
                 'Areas_Of_Interest' => $interests,
                 'Current_Role' => $trainee->Current_Role ?? null,
                 'Education_Level' => $trainee->Education_Level ?? null,
-                'Linkedin_Link' => $user->Linkedin_Link ?? null,
+                'Linkedin_Link' => $user->linkedin_link ?? null,
             ],
         ], 200);
     }
