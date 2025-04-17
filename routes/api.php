@@ -101,3 +101,18 @@ Route::middleware('auth:sanctum')->group(function () {
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/coaches/explore', [CoachController::class, 'exploreCoaches']);
 });
+
+
+
+
+
+Route::middleware('auth:sanctum')->group(function () {
+    // Update profile (Coach or Trainee)
+    Route::post('/profile/update', [ProfileController::class, 'updateProfile']);
+
+    // Get Coach profile
+    Route::get('/coach/profile/{user_id}', [ProfileController::class, 'getCoachProfile']);
+
+    // Get Trainee profile
+    Route::get('/trainee/profile/{user_id}', [ProfileController::class, 'getTraineeProfile']);
+});
