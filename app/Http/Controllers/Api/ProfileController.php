@@ -11,6 +11,7 @@ use App\Models\Trainee;
 use App\Models\TraineeAreaOfInterest;
 use App\Models\TraineePreferredLanguage;
 use App\Models\User;
+use App\Models\Review;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
