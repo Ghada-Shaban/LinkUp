@@ -312,6 +312,10 @@ class ProfileController extends Controller
         $coach = Coach::where('User_ID', $user_id)->first();
         $languages = CoachLanguage::where('coach_id', $user_id)->pluck('Language');
         $skills = CoachSkill::where('coach_id', $user_id)->pluck('Skill');
+        $reviews = Review::with(['trainee.user'])
+    ->where('coach_id', $coach->User_ID)
+    ->orderBy('created_at', 'desc')
+    ->get();
         $availability = CoachAvailability::where('User_ID', $user_id)
             ->get()
             ->groupBy('Day_Of_Week')
