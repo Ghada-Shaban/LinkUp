@@ -14,8 +14,14 @@ class CoachResource extends JsonResource
 
         // جلب السعر من أول خدمة
         $service = $this->services->first();
-        $price = $service && $service->price->first() ? $service->price->first()->price : 'N/A';
+        // جلب كل الأسعار من كل الخدمات وتحديد أقل سعر مع إضافة العملة
+         $prices = $this->services->flatMap(function ($service) {
+          return $service->price->pluck('price');
+         })->filter()->map(function ($price) {
+      return (int) $price; // تحويل السعر لـ integer عشان min يشتغل
+         })->toArray();
 
+        $price = !empty($prices) ? min($prices) . ' EGP' : 'N/A';
         // جلب المهارات
         $skills = $this->skills->pluck('skill')->toArray();
         $displaySkills = array_slice($skills, 0, 6); // أول 6 مهارات
