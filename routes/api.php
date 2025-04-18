@@ -95,8 +95,7 @@ Route::middleware('auth:sanctum')->group(function () {
        // Get Coach profile for all
     Route::get('/coachprofile/{user_id}', [ProfileController::class, 'getCoachProfile2']);
 
-    // Get Trainee profile for all
-    Route::get('/traineeprofile/{user_id}', [ProfileController::class, 'getTraineeProfile2']);
+  
 
 
 // Route الخاصة بـ Explore Coaches (الإضافة الجديدة)
