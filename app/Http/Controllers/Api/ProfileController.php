@@ -103,31 +103,36 @@ public function updateCoachProfile(Request $request, int $user_id): \Illuminate\
     // Update user table (users)
     $updateData = [];
     if (isset($validated['Full_Name'])) {
-        $updateData['full_name'] = $validated['Full_Name'];
-        \Log::info('Preparing to update full_name', ['User_ID' => $user->User_ID, 'full_name' => $validated['Full_Name']]);
+        $updateData['Full_Name'] = $validated['Full_Name']; // تصحيح: استخدام حروف كبيرة للاسم
+        \Log::info('Preparing to update Full_Name', ['User_ID' => $user->User_ID, 'Full_Name' => $validated['Full_Name']]);
     }
     if (isset($validated['Email'])) {
-        $updateData['email'] = $validated['Email'];
-        \Log::info('Preparing to update email', ['User_ID' => $user->User_ID, 'email' => $validated['Email']]);
+        $updateData['Email'] = $validated['Email']; // تصحيح: استخدام حروف كبيرة للبريد الإلكتروني
+        \Log::info('Preparing to update Email', ['User_ID' => $user->User_ID, 'Email' => $validated['Email']]);
     }
     if (isset($validated['Password'])) {
-        $updateData['password'] = Hash::make($validated['Password']);
+        $updateData['Password'] = Hash::make($validated['Password']); // قد تحتاج لتغيير هذا أيضًا إذا كان العمود يستخدم حروف كبيرة
     }
     if (isset($validated['Linkedin_Link'])) {
-        $updateData['linkedin_link'] = $validated['Linkedin_Link'];
+        $updateData['Linkedin_Link'] = $validated['Linkedin_Link']; // قد تحتاج لتغيير هذا أيضًا
     }
 
     if ($request->hasFile('Photo')) {
-        if ($user->photo) {
-            Storage::disk('public')->delete($user->photo);
+        if ($user->Photo) { // تصحيح: استخدام حروف كبيرة
+            Storage::disk('public')->delete($user->Photo);
         }
-        $updateData['photo'] = $request->file('Photo')->store('photos', 'public');
+        $updateData['Photo'] = $request->file('Photo')->store('photos', 'public'); // تصحيح: استخدام حروف كبيرة
     }
 
     if (!empty($updateData)) {
         \Log::info('Updating user table', ['User_ID' => $user->User_ID, 'updateData' => $updateData]);
-        $user->update($updateData);
-        \Log::info('User table updated', ['User_ID' => $user->User_ID, 'new_full_name' => $user->fresh()->full_name]);
+        try {
+            $user->update($updateData);
+            \Log::info('User table updated', ['User_ID' => $user->User_ID, 'new_Full_Name' => $user->fresh()->Full_Name]);
+        } catch (\Exception $e) {
+            \Log::error('Error updating user', ['User_ID' => $user->User_ID, 'error' => $e->getMessage()]);
+            return response()->json(['message' => 'Failed to update profile', 'error' => $e->getMessage()], 500);
+        }
     } else {
         \Log::info('No data to update in user table', ['User_ID' => $user->User_ID]);
     }
@@ -153,44 +158,64 @@ public function updateCoachProfile(Request $request, int $user_id): \Illuminate\
         }
 
         if (!empty($coachUpdateData)) {
-            $coach->update($coachUpdateData);
+            try {
+                $coach->update($coachUpdateData);
+            } catch (\Exception $e) {
+                \Log::error('Error updating coach', ['User_ID' => $user->User_ID, 'error' => $e->getMessage()]);
+                return response()->json(['message' => 'Failed to update coach profile', 'error' => $e->getMessage()], 500);
+            }
         }
     }
 
     // Update skills
     if (isset($validated['Skills'])) {
-        CoachSkill::where('coach_id', $user->User_ID)->delete();
-        foreach ($validated['Skills'] as $skill) {
-            CoachSkill::create([
-                'coach_id' => $user->User_ID,
-                'Skill' => $skill,
-            ]);
+        try {
+            CoachSkill::where('coach_id', $user->User_ID)->delete();
+            foreach ($validated['Skills'] as $skill) {
+                CoachSkill::create([
+                    'coach_id' => $user->User_ID,
+                    'Skill' => $skill,
+                ]);
+            }
+        } catch (\Exception $e) {
+            \Log::error('Error updating skills', ['User_ID' => $user->User_ID, 'error' => $e->getMessage()]);
+            return response()->json(['message' => 'Failed to update skills', 'error' => $e->getMessage()], 500);
         }
     }
 
     // Update languages
     if (isset($validated['Languages'])) {
-        CoachLanguage::where('coach_id', $user->User_ID)->delete();
-        foreach ($validated['Languages'] as $language) {
-            CoachLanguage::create([
-                'coach_id' => $user->User_ID,
-                'Language' => $language,
-            ]);
+        try {
+            CoachLanguage::where('coach_id', $user->User_ID)->delete();
+            foreach ($validated['Languages'] as $language) {
+                CoachLanguage::create([
+                    'coach_id' => $user->User_ID,
+                    'Language' => $language,
+                ]);
+            }
+        } catch (\Exception $e) {
+            \Log::error('Error updating languages', ['User_ID' => $user->User_ID, 'error' => $e->getMessage()]);
+            return response()->json(['message' => 'Failed to update languages', 'error' => $e->getMessage()], 500);
         }
     }
 
     // Update availability
     if (isset($validated['availability'])) {
-        CoachAvailability::where('User_ID', $user->User_ID)->delete();
-        $this->setAvailability($user->User_ID, $validated['availability']);
+        try {
+            CoachAvailability::where('User_ID', $user->User_ID)->delete();
+            $this->setAvailability($user->User_ID, $validated['availability']);
+        } catch (\Exception $e) {
+            \Log::error('Error updating availability', ['User_ID' => $user->User_ID, 'error' => $e->getMessage()]);
+            return response()->json(['message' => 'Failed to update availability', 'error' => $e->getMessage()], 500);
+        }
     }
 
     // Fetch updated data for response
-    $user = $user->fresh(); // جيب البيانات المحدّثة من الداتابيز
-    $coach = Coach::where('User_ID', $user->User_ID)->first();
-    $languages = CoachLanguage::where('coach_id', $user->User_ID)->pluck('Language');
-    $skills = CoachSkill::where('coach_id', $user->User_ID)->pluck('Skill');
-    $availability = CoachAvailability::where('User_ID', $user->User_ID)
+    $updatedUser = $user->fresh(); // تخزين البيانات المحدّثة في متغير جديد
+    $coach = Coach::where('User_ID', $updatedUser->User_ID)->first();
+    $languages = CoachLanguage::where('coach_id', $updatedUser->User_ID)->pluck('Language');
+    $skills = CoachSkill::where('coach_id', $updatedUser->User_ID)->pluck('Skill');
+    $availability = CoachAvailability::where('User_ID', $updatedUser->User_ID)
         ->get()
         ->groupBy('Day_Of_Week')
         ->map(function ($slots) {
@@ -205,10 +230,10 @@ public function updateCoachProfile(Request $request, int $user_id): \Illuminate\
     return response()->json([
         'message' => 'Coach profile updated successfully',
         'profile' => [
-            'User_ID' => $user->User_ID,
-            'Full_Name' => $user->full_name,
-            'Email' => $user->email,
-            'Photo' => $user->photo ? Storage::url($user->photo) : null,
+            'User_ID' => $updatedUser->User_ID,
+            'Full_Name' => $updatedUser->full_name,
+            'Email' => $updatedUser->email, 
+            'Photo' => $updatedUser->photo ? Storage::url($updatedUser->Photo) : null, 
             'Bio' => $coach->Bio ?? null,
             'Languages' => $languages,
             'Company_or_School' => $coach->Company_or_School ?? null,
@@ -216,7 +241,7 @@ public function updateCoachProfile(Request $request, int $user_id): \Illuminate\
             'Title' => $coach->Title ?? null,
             'Years_Of_Experience' => $coach->Years_Of_Experience ?? 0,
             'Months_Of_Experience' => $coach->Months_Of_Experience ?? 0,
-            'Linkedin_Link' => $user->linkedin_link ?? null,
+            'Linkedin_Link' => $updatedUser->linkedin_link ?? null, 
             'availability' => $availability,
         ],
     ], 200);
