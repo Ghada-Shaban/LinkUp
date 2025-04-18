@@ -87,11 +87,11 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/mentorship-requests/pending', [MentorshipRequestController::class, 'coachPendingRequests']);
         Route::post('/mentorship-requests/{id}/accept', [MentorshipRequestController::class, 'acceptRequest']);
         Route::post('/mentorship-requests/{id}/reject', [MentorshipRequestController::class, 'rejectRequest']);
-          // Route لجلب الخدمات بناءً على service_type
-    Route::get('/{coachId}/services', [CoachServiceController::class, 'getServices']);
+         
     });
 });
-
+ // Route لجلب الخدمات بناءً على service_type
+    Route::get('coach/{coachId}/services', [CoachServiceController::class, 'getServices']);
 
 
 // Route الخاصة بـ Explore Coaches (الإضافة الجديدة)
