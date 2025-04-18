@@ -41,7 +41,7 @@ class ProfileController extends Controller
      * @param Request $request
      * @return \Illuminate\Http\JsonResponse
      */
-  public function updateProfile(Request $request, int $user_id): \Illuminate\Http\JsonResponse
+ public function updateProfile(Request $request, int $user_id): \Illuminate\Http\JsonResponse
 {
     // Check if the authenticated user has permission
     $authUser = auth('sanctum')->user();
@@ -49,8 +49,8 @@ class ProfileController extends Controller
         return response()->json(['message' => 'Unauthorized'], 401);
     }
 
-    // Restrict updates to the authenticated user or admins
-    if ($authUser->User_ID !== $user_id ) {
+    // Restrict updates to the authenticated user
+    if ($authUser->User_ID !== $user_id) {
         return response()->json(['message' => 'You can only update your own profile'], 403);
     }
 
@@ -60,16 +60,16 @@ class ProfileController extends Controller
         return response()->json(['message' => 'User not found'], 404);
     }
 
-   $role = strtolower($user->Role_Profile);
+    // Convert Role_Profile to lowercase for comparison
+    $role = strtolower($user->Role_Profile ?? '');
 
-if ($role === 'coach') {
-    return $this->updateCoachProfile($user, $request);
-} elseif ($role === 'trainee') {
-    return $this->updateTraineeProfile($user, $request);
-} else {
-    return response()->json(['message' => 'Invalid user role'], 400);
-}
-
+    if ($role === 'coach') {
+        return $this->updateCoachProfile($user, $request);
+    } elseif ($role === 'trainee') {
+        return $this->updateTraineeProfile($user, $request);
+    } else {
+        return response()->json(['message' => 'Invalid user role: ' . $user->Role_Profile], 400);
+    }
 }
 
     /**
