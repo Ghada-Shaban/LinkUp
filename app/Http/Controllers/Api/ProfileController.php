@@ -60,9 +60,16 @@ class ProfileController extends Controller
         return response()->json(['message' => 'User not found'], 404);
     }
 
-    return $user->Role_Profile === 'Coach'
-        ? $this->updateCoachProfile($user, $request)
-        : $this->updateTraineeProfile($user, $request);
+   $role = strtolower($user->Role_Profile);
+
+if ($role === 'coach') {
+    return $this->updateCoachProfile($user, $request);
+} elseif ($role === 'trainee') {
+    return $this->updateTraineeProfile($user, $request);
+} else {
+    return response()->json(['message' => 'Invalid user role'], 400);
+}
+
 }
 
     /**
