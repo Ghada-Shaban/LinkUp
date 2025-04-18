@@ -60,7 +60,7 @@ class ProfileController extends Controller
         return response()->json(['message' => 'User not found'], 404);
     }
 
-    return $user->Role_Profile === 'Coach'
+    return $user->Role_Profile === 'coach'
         ? $this->updateCoachProfile($user, $request)
         : $this->updateTraineeProfile($user, $request);
 }
