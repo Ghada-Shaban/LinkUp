@@ -35,13 +35,7 @@ class ProfileController extends Controller
         return $matches[1] ?? [];
     }
 
-/**
- * Update Coach profile details.
- *
- * @param Request $request
- * @param int $user_id
- * @return \Illuminate\Http\JsonResponse
- */
+
 /**
  * Update Coach profile details.
  *
@@ -254,73 +248,80 @@ public function updateCoachProfile(Request $request, int $user_id): \Illuminate\
      * @param int $user_id
      * @return \Illuminate\Http\JsonResponse
      */
-    public function updateTraineeProfile(Request $request, int $user_id): \Illuminate\Http\JsonResponse
-    {
-        // Check if the authenticated user has permission
-        $authUser = auth('sanctum')->user();
-        if (!$authUser) {
-            return response()->json(['message' => 'Unauthorized'], 401);
-        }
+   public function updateTraineeProfile(Request $request, int $user_id): \Illuminate\Http\JsonResponse
+{
+    // Check if the authenticated user has permission
+    $authUser = auth('sanctum')->user();
+    if (!$authUser) {
+        return response()->json(['message' => 'Unauthorized'], 401);
+    }
 
-        // Restrict updates to the authenticated user
-        if ($authUser->User_ID !== $user_id) {
-            return response()->json(['message' => 'You can only update your own profile'], 403);
-        }
+    // Restrict updates to the authenticated user
+    if ($authUser->User_ID !== $user_id) {
+        return response()->json(['message' => 'You can only update your own profile'], 403);
+    }
 
-        // Find the user by User_ID and ensure they are a Trainee
-        $user = User::where('User_ID', $user_id)->where('Role_Profile', 'Trainee')->first();
-        if (!$user) {
-            return response()->json(['message' => 'Trainee not found or user is not a Trainee'], 404);
-        }
+    // Find the user by User_ID and ensure they are a Trainee
+    $user = User::where('User_ID', $user_id)->where('Role_Profile', 'Trainee')->first();
+    if (!$user) {
+        return response()->json(['message' => 'Trainee not found or user is not a Trainee'], 404);
+    }
 
-        $validLanguages = $this->getEnumValues('trainee_preferred_languages', 'Language');
-        $validInterests = $this->getEnumValues('trainee_areas_of_interest', 'Area_Of_Interest');
-        $validEducationLevels = $this->getEnumValues('trainees', 'Education_Level');
+    $validLanguages = $this->getEnumValues('trainee_preferred_languages', 'Language');
+    $validInterests = $this->getEnumValues('trainee_areas_of_interest', 'Area_Of_Interest');
+    $validEducationLevels = $this->getEnumValues('trainees', 'Education_Level');
 
-        $validated = $request->validate([
-            // Trainee Profile
-            'Full_Name' => ['sometimes', 'string', 'max:255'],
-            'Email' => ['sometimes', 'email', Rule::unique('users', 'Email')->ignore($user->User_ID, 'User_ID')],
-            'Password' => ['sometimes', 'string', 'min:8'],
-            'Photo' => ['sometimes', 'image', 'mimes:jpeg,png,jpg', 'max:5120'],
-            'Story' => ['sometimes', 'string'],
-            'Preferred_Languages' => ['sometimes', 'array', 'min:1'],
-            'Preferred_Languages.*' => ['required', 'string', Rule::in($validLanguages)],
+    $validated = $request->validate([
+        // Trainee Profile
+        'Full_Name' => ['sometimes', 'string', 'max:255'],
+        'Email' => ['sometimes', 'email', Rule::unique('users', 'Email')->ignore($user->User_ID, 'User_ID')],
+        'Password' => ['sometimes', 'string', 'min:8'],
+        'Photo' => ['sometimes', 'image', 'mimes:jpeg,png,jpg', 'max:5120'],
+        'Story' => ['sometimes', 'string'],
+        'Preferred_Languages' => ['sometimes', 'array', 'min:1'],
+        'Preferred_Languages.*' => ['required', 'string', Rule::in($validLanguages)],
 
-            // Personal Info
-            'Institution_Or_School' => ['sometimes', 'string', 'max:255'],
-            'Areas_Of_Interest' => ['sometimes', 'array', 'min:1'],
-            'Areas_Of_Interest.*' => ['required', 'string', Rule::in($validInterests)],
-            'Current_Role' => ['sometimes', 'string'],
-            'Education_Level' => ['sometimes', 'string', Rule::in($validEducationLevels)],
-            'Linkedin_Link' => ['sometimes', 'url'],
-        ]);
+        // Personal Info
+        'Institution_Or_School' => ['sometimes', 'string', 'max:255'],
+        'Areas_Of_Interest' => ['sometimes', 'array', 'min:1'],
+        'Areas_Of_Interest.*' => ['required', 'string', Rule::in($validInterests)],
+        'Current_Role' => ['sometimes', 'string'],
+        'Education_Level' => ['sometimes', 'string', Rule::in($validEducationLevels)],
+        'Linkedin_Link' => ['sometimes', 'url'],
+    ]);
 
-        return DB::transaction(function () use ($user, $validated, $request) {
+    return DB::transaction(function () use ($user, $validated, $request) {
+        try {
             // Update user table (users)
             $updateData = [];
             if (isset($validated['Full_Name'])) {
-                $updateData['full_name'] = $validated['Full_Name'];
+                $updateData['Full_Name'] = $validated['Full_Name']; // تصحيح: استخدام حروف كبيرة
+                \Log::info('Preparing to update Full_Name', ['User_ID' => $user->User_ID, 'Full_Name' => $validated['Full_Name']]);
             }
             if (isset($validated['Email'])) {
-                $updateData['email'] = $validated['Email'];
+                $updateData['Email'] = $validated['Email']; // تصحيح: استخدام حروف كبيرة
+                \Log::info('Preparing to update Email', ['User_ID' => $user->User_ID, 'Email' => $validated['Email']]);
             }
             if (isset($validated['Password'])) {
-                $updateData['password'] = Hash::make($validated['Password']);
+                $updateData['Password'] = Hash::make($validated['Password']); // تصحيح: استخدام حروف كبيرة
             }
             if (isset($validated['Linkedin_Link'])) {
-                $updateData['linkedin_link'] = $validated['Linkedin_Link'];
+                $updateData['Linkedin_Link'] = $validated['Linkedin_Link']; // تصحيح: استخدام حروف كبيرة
             }
 
             if ($request->hasFile('Photo')) {
-                if ($user->photo) {
-                    Storage::disk('public')->delete($user->photo);
+                if ($user->Photo) { // تصحيح: استخدام حروف كبيرة
+                    Storage::disk('public')->delete($user->Photo);
                 }
-                $updateData['photo'] = $request->file('Photo')->store('photos', 'public');
+                $updateData['Photo'] = $request->file('Photo')->store('photos', 'public'); // تصحيح: استخدام حروف كبيرة
             }
 
             if (!empty($updateData)) {
+                \Log::info('Updating user table', ['User_ID' => $user->User_ID, 'updateData' => $updateData]);
                 $user->update($updateData);
+                \Log::info('User table updated', ['User_ID' => $user->User_ID, 'new_Full_Name' => $user->fresh()->Full_Name]);
+            } else {
+                \Log::info('No data to update in user table', ['User_ID' => $user->User_ID]);
             }
 
             // Update trainee table (trainees)
@@ -342,6 +343,7 @@ public function updateCoachProfile(Request $request, int $user_id): \Illuminate\
 
                 if (!empty($traineeUpdateData)) {
                     $trainee->update($traineeUpdateData);
+                    \Log::info('Trainee table updated', ['User_ID' => $user->User_ID]);
                 }
             }
 
@@ -354,6 +356,7 @@ public function updateCoachProfile(Request $request, int $user_id): \Illuminate\
                         'Language' => $lang,
                     ]);
                 }
+                \Log::info('Trainee languages updated', ['User_ID' => $user->User_ID]);
             }
 
             // Update areas of interest
@@ -365,30 +368,48 @@ public function updateCoachProfile(Request $request, int $user_id): \Illuminate\
                         'Area_Of_Interest' => $interest,
                     ]);
                 }
+                \Log::info('Trainee interests updated', ['User_ID' => $user->User_ID]);
             }
 
             // Fetch updated data for response
-            $languages = TraineePreferredLanguage::where('trainee_id', $user->User_ID)->pluck('Language');
-            $interests = TraineeAreaOfInterest::where('trainee_id', $user->User_ID)->pluck('Area_Of_Interest');
+            $updatedUser = $user->fresh(); // تخزين البيانات المحدّثة في متغير جديد
+            $trainee = Trainee::where('User_ID', $updatedUser->User_ID)->first();
+            $languages = TraineePreferredLanguage::where('trainee_id', $updatedUser->User_ID)->pluck('Language');
+            $interests = TraineeAreaOfInterest::where('trainee_id', $updatedUser->User_ID)->pluck('Area_Of_Interest');
 
             return response()->json([
                 'message' => 'Trainee profile updated successfully',
                 'profile' => [
-                    'User_ID' => $user->User_ID,
-                    'Full_Name' => $user->full_name,
-                    'Email' => $user->email,
-                    'Photo' => $user->photo ? Storage::url($user->photo) : null,
+                    'User_ID' => $updatedUser->User_ID,
+                    'Full_Name' => $updatedUser->Full_Name, // تصحيح: استخدام حروف كبيرة
+                    'Email' => $updatedUser->Email, // تصحيح: استخدام حروف كبيرة
+                    'Photo' => $updatedUser->Photo ? Storage::url($updatedUser->Photo) : null, // تصحيح: استخدام حروف كبيرة
                     'Story' => $trainee->Story ?? null,
                     'Preferred_Languages' => $languages,
                     'Institution_Or_School' => $trainee->Institution_Or_School ?? null,
                     'Areas_Of_Interest' => $interests,
                     'Current_Role' => $trainee->Current_Role ?? null,
                     'Education_Level' => $trainee->Education_Level ?? null,
-                    'Linkedin_Link' => $user->linkedin_link ?? null,
+                    'Linkedin_Link' => $updatedUser->Linkedin_Link ?? null, // تصحيح: استخدام حروف كبيرة
                 ],
             ], 200);
-        });
-    }
+        } catch (\Exception $e) {
+            \Log::error('Failed to update trainee profile', [
+                'User_ID' => $user->User_ID,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            // يلغي المعاملة في حالة وجود أي خطأ
+            DB::rollBack();
+            
+            return response()->json([
+                'message' => 'Failed to update trainee profile',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    });
+}
     /**
      * Get Coach profile data.
      *
