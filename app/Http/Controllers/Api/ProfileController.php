@@ -41,17 +41,29 @@ class ProfileController extends Controller
      * @param Request $request
      * @return \Illuminate\Http\JsonResponse
      */
-    public function updateProfile(Request $request): \Illuminate\Http\JsonResponse
-    {
-        $user = auth('sanctum')->user();
-        if (!$user) {
-            return response()->json(['message' => 'Unauthorized'], 401);
-        }
-
-        return $user->Role_Profile === 'Coach'
-            ? $this->updateCoachProfile($user, $request)
-            : $this->updateTraineeProfile($user, $request);
+  public function updateProfile(Request $request, int $user_id): \Illuminate\Http\JsonResponse
+{
+    // Check if the authenticated user has permission
+    $authUser = auth('sanctum')->user();
+    if (!$authUser) {
+        return response()->json(['message' => 'Unauthorized'], 401);
     }
+
+    // Restrict updates to the authenticated user or admins
+    if ($authUser->User_ID !== $user_id ) {
+        return response()->json(['message' => 'You can only update your own profile'], 403);
+    }
+
+    // Find the user by User_ID
+    $user = User::where('User_ID', $user_id)->first();
+    if (!$user) {
+        return response()->json(['message' => 'User not found'], 404);
+    }
+
+    return $user->Role_Profile === 'Coach'
+        ? $this->updateCoachProfile($user, $request)
+        : $this->updateTraineeProfile($user, $request);
+}
 
     /**
      * Update Coach profile details.
