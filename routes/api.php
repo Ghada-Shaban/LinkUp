@@ -47,8 +47,7 @@ Route::prefix('password')->group(function () {
 Route::get('service/enums', [EnumController::class, 'getServiceEnums']);
 
 Route::prefix('coach/{coachId}')->middleware(['auth:api', 'check.coach.ownership'])->group(function () {
-    // Route لجلب الخدمات بناءً على service_type
-    Route::get('services', [CoachServiceController::class, 'getServices']);
+  
 
     // باقي الـ Routes
     Route::get('services/count', [CoachServiceController::class, 'getServicesCount']);
@@ -88,14 +87,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/mentorship-requests/pending', [MentorshipRequestController::class, 'coachPendingRequests']);
         Route::post('/mentorship-requests/{id}/accept', [MentorshipRequestController::class, 'acceptRequest']);
         Route::post('/mentorship-requests/{id}/reject', [MentorshipRequestController::class, 'rejectRequest']);
+          // Route لجلب الخدمات بناءً على service_type
+    Route::get('/{coachId}/services', [CoachServiceController::class, 'getServices']);
     });
 });
 
-// profiles
-Route::middleware('auth:sanctum')->group(function () {
-    Route::get('/coach/profile/{user_id}', [ProfileController::class, 'getCoachProfile']);
-    Route::get('/trainee/profile/{user_id}', [ProfileController::class, 'getTraineeProfile']);
-});
+
 
 // Route الخاصة بـ Explore Coaches (الإضافة الجديدة)
 Route::middleware('auth:sanctum')->group(function () {
