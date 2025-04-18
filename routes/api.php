@@ -92,6 +92,11 @@ Route::middleware('auth:sanctum')->group(function () {
 });
  // Route لجلب الخدمات بناءً على service_type
     Route::get('coach/{coachId}/services', [CoachServiceController::class, 'getServices']);
+       // Get Coach profile for all
+    Route::get('/profile/{user_id}', [ProfileController::class, 'getCoachProfile2']);
+
+    // Get Trainee profile for all
+    Route::get('/profile/{user_id}', [ProfileController::class, 'getTraineeProfile2']);
 
 
 // Route الخاصة بـ Explore Coaches (الإضافة الجديدة)
