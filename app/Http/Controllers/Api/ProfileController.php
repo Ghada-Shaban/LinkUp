@@ -35,52 +35,32 @@ class ProfileController extends Controller
         return $matches[1] ?? [];
     }
 
-    /**
-     * Update the authenticated user's profile (Coach or Trainee).
-     *
-     * @param Request $request
-     * @return \Illuminate\Http\JsonResponse
-     */
- public function updateProfile(Request $request, int $user_id): \Illuminate\Http\JsonResponse
-{
-    // Check if the authenticated user has permission
-    $authUser = auth('sanctum')->user();
-    if (!$authUser) {
-        return response()->json(['message' => 'Unauthorized'], 401);
-    }
-
-    // Restrict updates to the authenticated user
-    if ($authUser->User_ID !== $user_id) {
-        return response()->json(['message' => 'You can only update your own profile'], 403);
-    }
-
-    // Find the user by User_ID
-    $user = User::where('User_ID', $user_id)->first();
-    if (!$user) {
-        return response()->json(['message' => 'User not found'], 404);
-    }
-
-    // Convert Role_Profile to lowercase for comparison
-    $role = strtolower($user->Role_Profile ?? '');
-
-    if ($role === 'coach') {
-        return $this->updateCoachProfile($user, $request);
-    } elseif ($role === 'trainee') {
-        return $this->updateTraineeProfile($user, $request);
-    } else {
-        return response()->json(['message' => 'Invalid user role: ' . $user->Role_Profile], 400);
-    }
-}
-
-    /**
+  /**
      * Update Coach profile details.
      *
-     * @param User $user
      * @param Request $request
+     * @param int $user_id
      * @return \Illuminate\Http\JsonResponse
      */
-    private function updateCoachProfile(User $user, Request $request): \Illuminate\Http\JsonResponse
+    public function updateCoachProfile(Request $request, int $user_id): \Illuminate\Http\JsonResponse
     {
+        // Check if the authenticated user has permission
+        $authUser = auth('sanctum')->user();
+        if (!$authUser) {
+            return response()->json(['message' => 'Unauthorized'], 401);
+        }
+
+        // Restrict updates to the authenticated user
+        if ($authUser->User_ID !== $user_id) {
+            return response()->json(['message' => 'You can only update your own profile'], 403);
+        }
+
+        // Find the user by User_ID and ensure they are a Coach
+        $user = User::where('User_ID', $user_id)->where('Role_Profile', 'Coach')->first();
+        if (!$user) {
+            return response()->json(['message' => 'Coach not found or user is not a Coach'], 404);
+        }
+
         $validSkills = $this->getEnumValues('coach_skills', 'Skill');
         $validLanguages = $this->getEnumValues('coach_languages', 'Language');
 
@@ -193,25 +173,38 @@ class ProfileController extends Controller
                 $this->setAvailability($user->User_ID, $validated['availability']);
             }
 
-            $updatedFields = array_keys($validated);
+            // Fetch updated data for response
+            $languages = CoachLanguage::where('coach_id', $user->User_ID)->pluck('Language');
+            $skills = CoachSkill::where('coach_id', $user->User_ID)->pluck('Skill');
+            $availability = CoachAvailability::where('User_ID', $user->User_ID)
+                ->get()
+                ->groupBy('Day_Of_Week')
+                ->map(function ($slots) {
+                    return $slots->map(function ($slot) {
+                        return [
+                            'start_time' => $slot->Start_Time,
+                            'end_time' => $slot->End_Time,
+                        ];
+                    });
+                });
+
             return response()->json([
                 'message' => 'Coach profile updated successfully',
-                 'profile' => [
-                'User_ID' => $user->User_ID,
-                'Full_Name' => $user->full_name,
-                'Email' => $user->email,
-                'Photo' => $user->photo ? Storage::url($user->photo) : null,
-                'Bio' => $coach->Bio ?? null,
-                'Languages' => $languages,
-                'Company_or_School' => $coach->Company_or_School ?? null,
-                'Skills' => $skills,
-                'Title' => $coach->Title ?? null,
-                'Years_Of_Experience' => $coach->Years_Of_Experience ?? 0,
-                'Months_Of_Experience' => $coach->Months_Of_Experience ?? 0,
-                'Linkedin_Link' => $user->linkedin_link ?? null,
-                'availability' => $availability,
+                'profile' => [
+                    'User_ID' => $user->User_ID,
+                    'Full_Name' => $user->full_name,
+                    'Email' => $user->email,
+                    'Photo' => $user->photo ? Storage::url($user->photo) : null,
+                    'Bio' => $coach->Bio ?? null,
+                    'Languages' => $languages,
+                    'Company_or_School' => $coach->Company_or_School ?? null,
+                    'Skills' => $skills,
+                    'Title' => $coach->Title ?? null,
+                    'Years_Of_Experience' => $coach->Years_Of_Experience ?? 0,
+                    'Months_Of_Experience' => $coach->Months_Of_Experience ?? 0,
+                    'Linkedin_Link' => $user->linkedin_link ?? null,
+                    'availability' => $availability,
                 ],
-                
             ], 200);
         });
     }
@@ -219,12 +212,29 @@ class ProfileController extends Controller
     /**
      * Update Trainee profile details.
      *
-     * @param User $user
      * @param Request $request
+     * @param int $user_id
      * @return \Illuminate\Http\JsonResponse
      */
-    private function updateTraineeProfile(User $user, Request $request): \Illuminate\Http\JsonResponse
+    public function updateTraineeProfile(Request $request, int $user_id): \Illuminate\Http\JsonResponse
     {
+        // Check if the authenticated user has permission
+        $authUser = auth('sanctum')->user();
+        if (!$authUser) {
+            return response()->json(['message' => 'Unauthorized'], 401);
+        }
+
+        // Restrict updates to the authenticated user
+        if ($authUser->User_ID !== $user_id) {
+            return response()->json(['message' => 'You can only update your own profile'], 403);
+        }
+
+        // Find the user by User_ID and ensure they are a Trainee
+        $user = User::where('User_ID', $user_id)->where('Role_Profile', 'Trainee')->first();
+        if (!$user) {
+            return response()->json(['message' => 'Trainee not found or user is not a Trainee'], 404);
+        }
+
         $validLanguages = $this->getEnumValues('trainee_preferred_languages', 'Language');
         $validInterests = $this->getEnumValues('trainee_areas_of_interest', 'Area_Of_Interest');
         $validEducationLevels = $this->getEnumValues('trainees', 'Education_Level');
@@ -319,16 +329,28 @@ class ProfileController extends Controller
                 }
             }
 
-            $updatedFields = array_keys($validated);
+            // Fetch updated data for response
+            $languages = TraineePreferredLanguage::where('trainee_id', $user->User_ID)->pluck('Language');
+            $interests = TraineeAreaOfInterest::where('trainee_id', $user->User_ID)->pluck('Area_Of_Interest');
+
             return response()->json([
                 'message' => 'Trainee profile updated successfully',
-                'updated_fields' => $updatedFields,
-                'user' => $user->fresh(),
-                'photo_path' => $user->photo ? Storage::url($user->photo) : null,
+                'profile' => [
+                    'User_ID' => $user->User_ID,
+                    'Full_Name' => $user->full_name,
+                    'Email' => $user->email,
+                    'Photo' => $user->photo ? Storage::url($user->photo) : null,
+                    'Story' => $trainee->Story ?? null,
+                    'Preferred_Languages' => $languages,
+                    'Institution_Or_School' => $trainee->Institution_Or_School ?? null,
+                    'Areas_Of_Interest' => $interests,
+                    'Current_Role' => $trainee->Current_Role ?? null,
+                    'Education_Level' => $trainee->Education_Level ?? null,
+                    'Linkedin_Link' => $user->linkedin_link ?? null,
+                ],
             ], 200);
         });
     }
-
     /**
      * Get Coach profile data.
      *
