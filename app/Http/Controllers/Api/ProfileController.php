@@ -227,7 +227,7 @@ public function updateCoachProfile(Request $request, int $user_id): \Illuminate\
             'User_ID' => $updatedUser->User_ID,
             'Full_Name' => $updatedUser->full_name,
             'Email' => $updatedUser->email, 
-          'Photo' => $updatedUser->photo && !empty($updatedUser->Photo) ? Storage::url($updatedUser->Photo) : null,
+          'Photo' => $updatedUser->photo && !empty($updatedUser->photo) ? Storage::url($updatedUser->photo) : null,
             'Bio' => $coach->Bio ?? null,
             'Languages' => $languages,
             'Company_or_School' => $coach->Company_or_School ?? null,
@@ -383,7 +383,7 @@ public function updateCoachProfile(Request $request, int $user_id): \Illuminate\
                     'User_ID' => $updatedUser->User_ID,
                     'Full_Name' => $updatedUser->full_name, // تصحيح: استخدام حروف كبيرة
                     'Email' => $updatedUser->email, // تصحيح: استخدام حروف كبيرة
-                    'Photo' => $updatedUser->photo ? Storage::url($updatedUser->Photo) : null, // تصحيح: استخدام حروف كبيرة
+                     'Photo' => $updatedUser->photo && !empty($updatedUser->photo) ? Storage::url($updatedUser->photo) : null,
                     'Story' => $trainee->Story ?? null,
                     'Preferred_Languages' => $languages,
                     'Institution_Or_School' => $trainee->Institution_Or_School ?? null,
