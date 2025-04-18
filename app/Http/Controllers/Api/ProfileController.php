@@ -177,9 +177,21 @@ class ProfileController extends Controller
             $updatedFields = array_keys($validated);
             return response()->json([
                 'message' => 'Coach profile updated successfully',
-                'updated_fields' => $updatedFields,
-                'user' => $user->fresh(),
-                'photo_path' => $user->photo ? Storage::url($user->photo) : null,
+                 'profile' => [
+                'User_ID' => $user->User_ID,
+                'Full_Name' => $user->full_name,
+                'Email' => $user->email,
+                'Photo' => $user->photo ? Storage::url($user->photo) : null,
+                'Bio' => $coach->Bio ?? null,
+                'Languages' => $languages,
+                'Company_or_School' => $coach->Company_or_School ?? null,
+                'Skills' => $skills,
+                'Title' => $coach->Title ?? null,
+                'Years_Of_Experience' => $coach->Years_Of_Experience ?? 0,
+                'Months_Of_Experience' => $coach->Months_Of_Experience ?? 0,
+                'Linkedin_Link' => $user->linkedin_link ?? null,
+                'availability' => $availability,
+                
             ], 200);
         });
     }
