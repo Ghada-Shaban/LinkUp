@@ -42,6 +42,13 @@ class ProfileController extends Controller
  * @param int $user_id
  * @return \Illuminate\Http\JsonResponse
  */
+/**
+ * Update Coach profile details.
+ *
+ * @param Request $request
+ * @param int $user_id
+ * @return \Illuminate\Http\JsonResponse
+ */
 public function updateCoachProfile(Request $request, int $user_id): \Illuminate\Http\JsonResponse
 {
     // Check if the authenticated user has permission
@@ -93,128 +100,126 @@ public function updateCoachProfile(Request $request, int $user_id): \Illuminate\
         'availability.time_slots.*.*.end_time' => ['required_with:availability', 'date_format:H:i', 'after:availability.time_slots.*.*.start_time'],
     ]);
 
-    return DB::transaction(function () use ($user, $validated, $request) {
-        // Update user table (users)
-        $updateData = [];
-        if (isset($validated['Full_Name'])) {
-            $updateData['full_name'] = $validated['Full_Name'];
-            \Log::info('Preparing to update full_name', ['User_ID' => $user->User_ID, 'full_name' => $validated['Full_Name']]);
+    // Update user table (users)
+    $updateData = [];
+    if (isset($validated['Full_Name'])) {
+        $updateData['full_name'] = $validated['Full_Name'];
+        \Log::info('Preparing to update full_name', ['User_ID' => $user->User_ID, 'full_name' => $validated['Full_Name']]);
+    }
+    if (isset($validated['Email'])) {
+        $updateData['email'] = $validated['Email'];
+        \Log::info('Preparing to update email', ['User_ID' => $user->User_ID, 'email' => $validated['Email']]);
+    }
+    if (isset($validated['Password'])) {
+        $updateData['password'] = Hash::make($validated['Password']);
+    }
+    if (isset($validated['Linkedin_Link'])) {
+        $updateData['linkedin_link'] = $validated['Linkedin_Link'];
+    }
+
+    if ($request->hasFile('Photo')) {
+        if ($user->photo) {
+            Storage::disk('public')->delete($user->photo);
         }
-        if (isset($validated['Email'])) {
-            $updateData['email'] = $validated['Email'];
-            \Log::info('Preparing to update email', ['User_ID' => $user->User_ID, 'email' => $validated['Email']]);
+        $updateData['photo'] = $request->file('Photo')->store('photos', 'public');
+    }
+
+    if (!empty($updateData)) {
+        \Log::info('Updating user table', ['User_ID' => $user->User_ID, 'updateData' => $updateData]);
+        $user->update($updateData);
+        \Log::info('User table updated', ['User_ID' => $user->User_ID, 'new_full_name' => $user->fresh()->full_name]);
+    } else {
+        \Log::info('No data to update in user table', ['User_ID' => $user->User_ID]);
+    }
+
+    // Update coach table (coaches)
+    $coach = Coach::where('User_ID', $user->User_ID)->first();
+    if ($coach) {
+        $coachUpdateData = [];
+        if (isset($validated['Bio'])) {
+            $coachUpdateData['Bio'] = $validated['Bio'];
         }
-        if (isset($validated['Password'])) {
-            $updateData['password'] = Hash::make($validated['Password']);
+        if (isset($validated['Company_or_School'])) {
+            $coachUpdateData['Company_or_School'] = $validated['Company_or_School'];
         }
-        if (isset($validated['Linkedin_Link'])) {
-            $updateData['linkedin_link'] = $validated['Linkedin_Link'];
+        if (isset($validated['Title'])) {
+            $coachUpdateData['Title'] = $validated['Title'];
+        }
+        if (isset($validated['Years_Of_Experience'])) {
+            $coachUpdateData['Years_Of_Experience'] = $validated['Years_Of_Experience'];
+        }
+        if (isset($validated['Months_Of_Experience'])) {
+            $coachUpdateData['Months_Of_Experience'] = $validated['Months_Of_Experience'];
         }
 
-        if ($request->hasFile('Photo')) {
-            if ($user->photo) {
-                Storage::disk('public')->delete($user->photo);
-            }
-            $updateData['photo'] = $request->file('Photo')->store('photos', 'public');
+        if (!empty($coachUpdateData)) {
+            $coach->update($coachUpdateData);
         }
+    }
 
-        if (!empty($updateData)) {
-            \Log::info('Updating user table', ['User_ID' => $user->User_ID, 'updateData' => $updateData]);
-            $user->update($updateData);
-            \Log::info('User table updated', ['User_ID' => $user->User_ID, 'new_full_name' => $user->fresh()->full_name]);
-        } else {
-            \Log::info('No data to update in user table', ['User_ID' => $user->User_ID]);
+    // Update skills
+    if (isset($validated['Skills'])) {
+        CoachSkill::where('coach_id', $user->User_ID)->delete();
+        foreach ($validated['Skills'] as $skill) {
+            CoachSkill::create([
+                'coach_id' => $user->User_ID,
+                'Skill' => $skill,
+            ]);
         }
+    }
 
-        // Update coach table (coaches)
-        $coach = Coach::where('User_ID', $user->User_ID)->first();
-        if ($coach) {
-            $coachUpdateData = [];
-            if (isset($validated['Bio'])) {
-                $coachUpdateData['Bio'] = $validated['Bio'];
-            }
-            if (isset($validated['Company_or_School'])) {
-                $coachUpdateData['Company_or_School'] = $validated['Company_or_School'];
-            }
-            if (isset($validated['Title'])) {
-                $coachUpdateData['Title'] = $validated['Title'];
-            }
-            if (isset($validated['Years_Of_Experience'])) {
-                $coachUpdateData['Years_Of_Experience'] = $validated['Years_Of_Experience'];
-            }
-            if (isset($validated['Months_Of_Experience'])) {
-                $coachUpdateData['Months_Of_Experience'] = $validated['Months_Of_Experience'];
-            }
-
-            if (!empty($coachUpdateData)) {
-                $coach->update($coachUpdateData);
-            }
+    // Update languages
+    if (isset($validated['Languages'])) {
+        CoachLanguage::where('coach_id', $user->User_ID)->delete();
+        foreach ($validated['Languages'] as $language) {
+            CoachLanguage::create([
+                'coach_id' => $user->User_ID,
+                'Language' => $language,
+            ]);
         }
+    }
 
-        // Update skills
-        if (isset($validated['Skills'])) {
-            CoachSkill::where('coach_id', $user->User_ID)->delete();
-            foreach ($validated['Skills'] as $skill) {
-                CoachSkill::create([
-                    'coach_id' => $user->User_ID,
-                    'Skill' => $skill,
-                ]);
-            }
-        }
+    // Update availability
+    if (isset($validated['availability'])) {
+        CoachAvailability::where('User_ID', $user->User_ID)->delete();
+        $this->setAvailability($user->User_ID, $validated['availability']);
+    }
 
-        // Update languages
-        if (isset($validated['Languages'])) {
-            CoachLanguage::where('coach_id', $user->User_ID)->delete();
-            foreach ($validated['Languages'] as $language) {
-                CoachLanguage::create([
-                    'coach_id' => $user->User_ID,
-                    'Language' => $language,
-                ]);
-            }
-        }
-
-        // Update availability
-        if (isset($validated['availability'])) {
-            CoachAvailability::where('User_ID', $user->User_ID)->delete();
-            $this->setAvailability($user->User_ID, $validated['availability']);
-        }
-
-        // Fetch updated data for response
-        $user = $user->fresh(); // جيب البيانات المحدّثة من الداتابيز
-        $coach = Coach::where('User_ID', $user->User_ID)->first();
-        $languages = CoachLanguage::where('coach_id', $user->User_ID)->pluck('Language');
-        $skills = CoachSkill::where('coach_id', $user->User_ID)->pluck('Skill');
-        $availability = CoachAvailability::where('User_ID', $user->User_ID)
-            ->get()
-            ->groupBy('Day_Of_Week')
-            ->map(function ($slots) {
-                return $slots->map(function ($slot) {
-                    return [
-                        'start_time' => $slot->Start_Time,
-                        'end_time' => $slot->End_Time,
-                    ];
-                });
+    // Fetch updated data for response
+    $user = $user->fresh(); // جيب البيانات المحدّثة من الداتابيز
+    $coach = Coach::where('User_ID', $user->User_ID)->first();
+    $languages = CoachLanguage::where('coach_id', $user->User_ID)->pluck('Language');
+    $skills = CoachSkill::where('coach_id', $user->User_ID)->pluck('Skill');
+    $availability = CoachAvailability::where('User_ID', $user->User_ID)
+        ->get()
+        ->groupBy('Day_Of_Week')
+        ->map(function ($slots) {
+            return $slots->map(function ($slot) {
+                return [
+                    'start_time' => $slot->Start_Time,
+                    'end_time' => $slot->End_Time,
+                ];
             });
+        });
 
-        return response()->json([
-            'message' => 'Coach profile updated successfully',
-            'profile' => [
-                'User_ID' => $user->User_ID,
-                'Full_Name' => $user->full_name,
-                'Email' => $user->email,
-                'Photo' => $user->photo ? Storage::url($user->photo) : null,
-                'Bio' => $coach->Bio ?? null,
-                'Languages' => $languages,
-                'Company_or_School' => $coach->Company_or_School ?? null,
-                'Skills' => $skills,
-                'Title' => $coach->Title ?? null,
-                'Years_Of_Experience' => $coach->Years_Of_Experience ?? 0,
-                'Months_Of_Experience' => $coach->Months_Of_Experience ?? 0,
-                'Linkedin_Link' => $user->linkedin_link ?? null,
-                'availability' => $availability,
-            ],
-        ], 200);
-    });
+    return response()->json([
+        'message' => 'Coach profile updated successfully',
+        'profile' => [
+            'User_ID' => $user->User_ID,
+            'Full_Name' => $user->full_name,
+            'Email' => $user->email,
+            'Photo' => $user->photo ? Storage::url($user->photo) : null,
+            'Bio' => $coach->Bio ?? null,
+            'Languages' => $languages,
+            'Company_or_School' => $coach->Company_or_School ?? null,
+            'Skills' => $skills,
+            'Title' => $coach->Title ?? null,
+            'Years_Of_Experience' => $coach->Years_Of_Experience ?? 0,
+            'Months_Of_Experience' => $coach->Months_Of_Experience ?? 0,
+            'Linkedin_Link' => $user->linkedin_link ?? null,
+            'availability' => $availability,
+        ],
+    ], 200);
 }
 
     /**
