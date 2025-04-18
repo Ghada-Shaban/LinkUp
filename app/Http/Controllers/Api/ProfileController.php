@@ -227,7 +227,7 @@ public function updateCoachProfile(Request $request, int $user_id): \Illuminate\
             'User_ID' => $updatedUser->User_ID,
             'Full_Name' => $updatedUser->full_name,
             'Email' => $updatedUser->email, 
-          'Photo' => $updatedUser->Photo && !empty($updatedUser->Photo) ? Storage::url($updatedUser->Photo) : null,
+          'Photo' => $updatedUser->photo && !empty($updatedUser->Photo) ? Storage::url($updatedUser->Photo) : null,
             'Bio' => $coach->Bio ?? null,
             'Languages' => $languages,
             'Company_or_School' => $coach->Company_or_School ?? null,
