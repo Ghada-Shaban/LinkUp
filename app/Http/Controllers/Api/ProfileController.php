@@ -204,6 +204,11 @@ public function updateCoachProfile(Request $request, int $user_id): \Illuminate\
         }
     }
 
+    $message = 'Coach profile updated successfully';
+    if (!empty($updatedFields)) {
+        $message = 'Updated ' . implode(', ', $updatedFields);
+    }
+
     // Fetch updated data for response
     $updatedUser = $user->fresh(); // تخزين البيانات المحدّثة في متغير جديد
     $coach = Coach::where('User_ID', $updatedUser->User_ID)->first();
@@ -222,22 +227,8 @@ public function updateCoachProfile(Request $request, int $user_id): \Illuminate\
         });
 
     return response()->json([
-        'message' => 'Coach profile updated successfully',
-        'profile' => [
-            'User_ID' => $updatedUser->User_ID,
-            'Full_Name' => $updatedUser->full_name,
-            'Email' => $updatedUser->email, 
-          'Photo' => $updatedUser->photo && !empty($updatedUser->photo) ? Storage::url($updatedUser->photo) : null,
-            'Bio' => $coach->Bio ?? null,
-            'Languages' => $languages,
-            'Company_or_School' => $coach->Company_or_School ?? null,
-            'Skills' => $skills,
-            'Title' => $coach->Title ?? null,
-            'Years_Of_Experience' => $coach->Years_Of_Experience ?? 0,
-            'Months_Of_Experience' => $coach->Months_Of_Experience ?? 0,
-            'Linkedin_Link' => $updatedUser->linkedin_link ?? null, 
-            'availability' => $availability,
-        ],
+        'message' => $message,
+    
     ], 200);
 }
 
