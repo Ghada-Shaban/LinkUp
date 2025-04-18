@@ -482,17 +482,10 @@ class ProfileController extends Controller
         $coach = Coach::where('User_ID', $user_id)->first();
         $languages = CoachLanguage::where('coach_id', $user_id)->pluck('Language');
         $skills = CoachSkill::where('coach_id', $user_id)->pluck('Skill');
-        $availability = CoachAvailability::where('User_ID', $user_id)
-            ->get()
-            ->groupBy('Day_Of_Week')
-            ->map(function ($slots) {
-                return $slots->map(function ($slot) {
-                    return [
-                        'start_time' => $slot->Start_Time,
-                        'end_time' => $slot->End_Time,
-                    ];
-                });
-            });
+       $reviews = Review::with(['trainee.user'])
+    ->where('coach_id', $coach->User_ID)
+    ->orderBy('created_at', 'desc')
+    ->get();
 
         return response()->json([
             'message' => 'Coach profile retrieved successfully',
@@ -509,7 +502,8 @@ class ProfileController extends Controller
                 'Years_Of_Experience' => $coach->Years_Of_Experience ?? 0,
                 'Months_Of_Experience' => $coach->Months_Of_Experience ?? 0,
                 'Linkedin_Link' => $user->linkedin_link ?? null,
-                'availability' => $availability,
+                'reviews' => ReviewResource::collection($reviews),
+                
                 
             ],
         ], 200);
