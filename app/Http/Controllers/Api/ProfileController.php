@@ -204,10 +204,8 @@ public function updateCoachProfile(Request $request, int $user_id): \Illuminate\
         }
     }
 
-    $message = 'Coach profile updated successfully';
-    if (!empty($updatedFields)) {
-        $message = 'Updated ' . implode(', ', $updatedFields);
-    }
+   
+ 
 
     // Fetch updated data for response
     $updatedUser = $user->fresh(); // تخزين البيانات المحدّثة في متغير جديد
@@ -227,7 +225,7 @@ public function updateCoachProfile(Request $request, int $user_id): \Illuminate\
         });
 
     return response()->json([
-        'message' => $message,
+        'message' => 'Coach profile updated successfully',
     
     ], 200);
 }
@@ -370,19 +368,7 @@ public function updateCoachProfile(Request $request, int $user_id): \Illuminate\
 
             return response()->json([
                 'message' => 'Trainee profile updated successfully',
-                'profile' => [
-                    'User_ID' => $updatedUser->User_ID,
-                    'Full_Name' => $updatedUser->full_name, // تصحيح: استخدام حروف كبيرة
-                    'Email' => $updatedUser->email, // تصحيح: استخدام حروف كبيرة
-                     'Photo' => $updatedUser->photo && !empty($updatedUser->photo) ? Storage::url($updatedUser->photo) : null,
-                    'Story' => $trainee->Story ?? null,
-                    'Preferred_Languages' => $languages,
-                    'Institution_Or_School' => $trainee->Institution_Or_School ?? null,
-                    'Areas_Of_Interest' => $interests,
-                    'Current_Role' => $trainee->Current_Role ?? null,
-                    'Education_Level' => $trainee->Education_Level ?? null,
-                    'Linkedin_Link' => $updatedUser->linkedin_link ?? null, // تصحيح: استخدام حروف كبيرة
-                ],
+              
             ], 200);
         } catch (\Exception $e) {
             \Log::error('Failed to update trainee profile', [
