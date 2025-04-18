@@ -381,16 +381,16 @@ public function updateCoachProfile(Request $request, int $user_id): \Illuminate\
                 'message' => 'Trainee profile updated successfully',
                 'profile' => [
                     'User_ID' => $updatedUser->User_ID,
-                    'Full_Name' => $updatedUser->Full_Name, // تصحيح: استخدام حروف كبيرة
-                    'Email' => $updatedUser->Email, // تصحيح: استخدام حروف كبيرة
-                    'Photo' => $updatedUser->Photo ? Storage::url($updatedUser->Photo) : null, // تصحيح: استخدام حروف كبيرة
+                    'Full_Name' => $updatedUser->full_name, // تصحيح: استخدام حروف كبيرة
+                    'Email' => $updatedUser->email, // تصحيح: استخدام حروف كبيرة
+                    'Photo' => $updatedUser->photo ? Storage::url($updatedUser->Photo) : null, // تصحيح: استخدام حروف كبيرة
                     'Story' => $trainee->Story ?? null,
                     'Preferred_Languages' => $languages,
                     'Institution_Or_School' => $trainee->Institution_Or_School ?? null,
                     'Areas_Of_Interest' => $interests,
                     'Current_Role' => $trainee->Current_Role ?? null,
                     'Education_Level' => $trainee->Education_Level ?? null,
-                    'Linkedin_Link' => $updatedUser->Linkedin_Link ?? null, // تصحيح: استخدام حروف كبيرة
+                    'Linkedin_Link' => $updatedUser->linkedin_link ?? null, // تصحيح: استخدام حروف كبيرة
                 ],
             ], 200);
         } catch (\Exception $e) {
