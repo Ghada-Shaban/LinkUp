@@ -191,6 +191,7 @@ class ProfileController extends Controller
                 'Months_Of_Experience' => $coach->Months_Of_Experience ?? 0,
                 'Linkedin_Link' => $user->linkedin_link ?? null,
                 'availability' => $availability,
+                ],
                 
             ], 200);
         });
