@@ -38,7 +38,13 @@ class User extends Authenticatable
 
     protected $appends = [
         'profile_photo_url',
+     'photo_url',
     ];
+    // أضف هذه الدالة داخل class User مباشرة
+public function getPhotoUrlAttribute()
+{
+    return $this->Photo ? Storage::url($this->Photo) : null;
+}
 
     public function coach() { 
         return $this->hasOne(Coach::class, 'User_ID'); 
