@@ -421,7 +421,7 @@ public function updateCoachProfile(Request $request, int $user_id): \Illuminate\
                 'User_ID' => $user->User_ID,
                 'Full_Name' => $user->full_name,
                 'Email' => $user->email,
-               'Photo' => $user->photo ? Storage::url($user->photo) : null,
+               'Photo' => $user->photo_url, // استبدل السطر السابق بهذا
                 'Bio' => $coach->Bio ?? null,
                 'Languages' => $languages,
                 'Company_or_School' => $coach->Company_or_School ?? null,
@@ -459,7 +459,7 @@ public function updateCoachProfile(Request $request, int $user_id): \Illuminate\
                 'User_ID' => $user->User_ID,
                 'Full_Name' => $user->full_name,
                 'Email' => $user->email,
-                'Photo' => $user->photo ? Storage::url($user->photo) : null,
+                'Photo' => $user->photo_url, // استبدل السطر السابق بهذا
                 'Story' => $trainee->Story ?? null,
                 'Preferred_Languages' => $languages,
                 'Institution_Or_School' => $trainee->Institution_Or_School ?? null,
@@ -551,7 +551,7 @@ public function updateCoachProfile(Request $request, int $user_id): \Illuminate\
                 'User_ID' => $user->User_ID,
                 'Full_Name' => $user->full_name,
                 'Email' => $user->email,
-                'Photo' => $user->photo ? Storage::url($user->photo) : null,
+                'Photo' => $user->photo_url, // استبدل السطر السابق بهذا
                 'Bio' => $coach->Bio ?? null,
                 'Languages' => $languages,
                 'Company_or_School' => $coach->Company_or_School ?? null,
@@ -567,39 +567,6 @@ public function updateCoachProfile(Request $request, int $user_id): \Illuminate\
         ], 200);
     }
 
-    /**
-     * Get Trainee profile data.
-     *
-     * @param int $user_id
-     * @return \Illuminate\Http\JsonResponse
-     */
-    public function getTraineeProfile2(int $user_id): \Illuminate\Http\JsonResponse
-    {
-        $user = User::where('User_ID', $user_id)->where('Role_Profile', 'Trainee')->first();
-        if (!$user) {
-            return response()->json(['message' => 'Trainee not found'], 404);
-        }
-
-        $trainee = Trainee::where('User_ID', $user_id)->first();
-        $languages = TraineePreferredLanguage::where('trainee_id', $user_id)->pluck('Language');
-        $interests = TraineeAreaOfInterest::where('trainee_id', $user_id)->pluck('Area_Of_Interest');
-
-        return response()->json([
-            'message' => 'Trainee profile retrieved successfully',
-            'profile' => [
-                'User_ID' => $user->User_ID,
-                'Full_Name' => $user->full_name,
-                'Email' => $user->email,
-                'Photo' => $user->photo ? Storage::url($user->photo) : null,
-                'Story' => $trainee->Story ?? null,
-                'Preferred_Languages' => $languages,
-                'Institution_Or_School' => $trainee->Institution_Or_School ?? null,
-                'Areas_Of_Interest' => $interests,
-                'Current_Role' => $trainee->Current_Role ?? null,
-                'Education_Level' => $trainee->Education_Level ?? null,
-                'Linkedin_Link' => $user->linkedin_link ?? null,
-            ],
-        ], 200);
-    }
+ 
 
 }
