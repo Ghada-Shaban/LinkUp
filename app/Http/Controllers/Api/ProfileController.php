@@ -42,219 +42,189 @@ class ProfileController extends Controller
      * @param int $user_id
      * @return \Illuminate\Http\JsonResponse
      */
-    public function updateCoachProfile(Request $request, int $user_id): \Illuminate\Http\JsonResponse
-    {
-        // Check if the authenticated user has permission
-        $authUser = auth('sanctum')->user();
-        if (!$authUser) {
-            return response()->json(['message' => 'Unauthorized'], 401);
-        }
-
-        // Restrict updates to the authenticated user
-        if ($authUser->User_ID !== $user_id) {
-            return response()->json(['message' => 'You can only update your own profile'], 403);
-        }
-
-        // Find the user by User_ID and ensure they are a Coach
-        $user = User::where('User_ID', $user_id)->where('Role_Profile', 'Coach')->first();
-        if (!$user) {
-            return response()->json(['message' => 'Coach not found or user is not a Coach'], 404);
-        }
-
-        $validSkills = $this->getEnumValues('coach_skills', 'Skill');
-        $validLanguages = $this->getEnumValues('coach_languages', 'Language');
-
-        $validated = $request->validate([
-            // Coach Profile
-            'Full_Name' => ['sometimes', 'string', 'max:255'],
-            'Email' => ['sometimes', 'email', Rule::unique('users', 'Email')->ignore($user->User_ID, 'User_ID')],
-            'Password' => ['sometimes', 'string', 'min:8'],
-            'Photo' => ['sometimes', 'image', 'mimes:jpeg,png,jpg', 'max:5120'],
-            'Bio' => ['sometimes', 'string'],
-            'Languages' => ['sometimes', 'array', 'min:1'],
-            'Languages.*' => ['required', 'string', Rule::in($validLanguages)],
-
-            // Personal Info
-            'Company_or_School' => ['sometimes', 'string', 'max:255'],
-            'Skills' => ['sometimes', 'array', 'min:1'],
-            'Skills.*' => ['required', 'string', Rule::in($validSkills)],
-            'Title' => ['sometimes', 'string', 'max:100'],
-            'Years_Of_Experience' => ['sometimes', 'integer', 'min:0'],
-            'Months_Of_Experience' => ['sometimes', 'integer', 'between:0,11'],
-            'Linkedin_Link' => ['sometimes', 'url'],
-
-            // Availability
-            'availability' => ['sometimes', 'array'],
-            'availability.days' => ['required_with:availability', 'array'],
-            'availability.days.*' => ['in:Sunday,Monday,Tuesday,Wednesday,Thursday,Friday,Saturday'],
-            'availability.time_slots' => ['required_with:availability', 'array'],
-            'availability.time_slots.*' => ['array'],
-            'availability.time_slots.*.*.start_time' => ['required_with:availability', 'date_format:H:i'],
-            'availability.time_slots.*.*.end_time' => ['required_with:availability', 'date_format:H:i', 'after:availability.time_slots.*.*.start_time'],
-        ]);
-
-        // Track updated fields for the message
-        $updatedFields = [];
-
-        // Update user table (users)
-        $updateData = [];
-        if (isset($validated['Full_Name'])) {
-            $updateData['full_name'] = $validated['Full_Name'];
-            $updatedFields[] = 'Full Name';
-            \Log::info('Preparing to update full_name', ['User_ID' => $user->User_ID, 'full_name' => $validated['Full_Name']]);
-        }
-        if (isset($validated['Email'])) {
-            $updateData['email'] = $validated['Email'];
-            $updatedFields[] = 'Email';
-            \Log::info('Preparing to update email', ['User_ID' => $user->User_ID, 'email' => $validated['Email']]);
-        }
-        if (isset($validated['Password'])) {
-            $updateData['password'] = Hash::make($validated['Password']);
-            $updatedFields[] = 'Password';
-        }
-        if (isset($validated['Linkedin_Link'])) {
-            $updateData['linkedin_link'] = $validated['Linkedin_Link'];
-            $updatedFields[] = 'Linkedin Link';
-        }
-
-        if ($request->hasFile('Photo')) {
-            \Log::info('Photo file detected in request', ['User_ID' => $user->User_ID, 'file_name' => $request->file('Photo')->getClientOriginalName()]);
-            if ($user->photo) {
-                \Log::info('Deleting existing photo', ['User_ID' => $user->User_ID, 'old_photo' => $user->photo]);
-                Storage::disk('public')->delete($user->photo);
-            }
-            try {
-                // Ensure the photos directory exists
-                Storage::disk('public')->makeDirectory('photos');
-                $photoPath = $request->file('Photo')->store('photos', 'public');
-                \Log::info('New photo uploaded', ['User_ID' => $user->User_ID, 'photo_path' => $photoPath]);
-                $updateData['photo'] = $photoPath;
-                $updatedFields[] = 'Photo';
-            } catch (\Exception $e) {
-                \Log::error('Error uploading photo', ['User_ID' => $user->User_ID, 'error' => $e->getMessage()]);
-                return response()->json(['message' => 'Failed to upload photo', 'error' => $e->getMessage()], 500);
-            }
-        } else {
-            \Log::info('No photo file in request', ['User_ID' => $user->User_ID]);
-        }
-
-        if (!empty($updateData)) {
-            \Log::info('Updating user table', ['User_ID' => $user->User_ID, 'updateData' => $updateData]);
-            try {
-                $user->update($updateData);
-                \Log::info('User table updated', ['User_ID' => $user->User_ID, 'new_full_name' => $user->fresh()->full_name, 'new_photo' => $user->fresh()->photo]);
-            } catch (\Exception $e) {
-                \Log::error('Error updating user', ['User_ID' => $user->User_ID, 'error' => $e->getMessage()]);
-                return response()->json(['message' => 'Failed to update profile', 'error' => $e->getMessage()], 500);
-            }
-        } else {
-            \Log::info('No data to update in user table', ['User_ID' => $user->User_ID]);
-        }
-
-        // Update coach table (coaches)
-        $coach = Coach::where('User_ID', $user->User_ID)->first();
-        if ($coach) {
-            $coachUpdateData = [];
-            if (isset($validated['Bio'])) {
-                $coachUpdateData['Bio'] = $validated['Bio'];
-                $updatedFields[] = 'Bio';
-            }
-            if (isset($validated['Company_or_School'])) {
-                $coachUpdateData['Company_or_School'] = $validated['Company_or_School'];
-                $updatedFields[] = 'Company or School';
-            }
-            if (isset($validated['Title'])) {
-                $coachUpdateData['Title'] = $validated['Title'];
-                $updatedFields[] = 'Title';
-            }
-            if (isset($validated['Years_Of_Experience'])) {
-                $coachUpdateData['Years_Of_Experience'] = $validated['Years_Of_Experience'];
-                $updatedFields[] = 'Years Of Experience';
-            }
-            if (isset($validated['Months_Of_Experience'])) {
-                $coachUpdateData['Months_Of_Experience'] = $validated['Months_Of_Experience'];
-                $updatedFields[] = 'Months Of Experience';
-            }
-
-            if (!empty($coachUpdateData)) {
-                try {
-                    $coach->update($coachUpdateData);
-                } catch (\Exception $e) {
-                    \Log::error('Error updating coach', ['User_ID' => $user->User_ID, 'error' => $e->getMessage()]);
-                    return response()->json(['message' => 'Failed to update coach profile', 'error' => $e->getMessage()], 500);
-                }
-            }
-        }
-
-        // Update skills
-        if (isset($validated['Skills'])) {
-            try {
-                CoachSkill::where('coach_id', $user->User_ID)->delete();
-                foreach ($validated['Skills'] as $skill) {
-                    CoachSkill::create([
-                        'coach_id' => $user->User_ID,
-                        'Skill' => $skill,
-                    ]);
-                }
-                $updatedFields[] = 'Skills';
-            } catch (\Exception $e) {
-                \Log::error('Error updating skills', ['User_ID' => $user->User_ID, 'error' => $e->getMessage()]);
-                return response()->json(['message' => 'Failed to update skills', 'error' => $e->getMessage()], 500);
-            }
-        }
-
-        // Update languages
-        if (isset($validated['Languages'])) {
-            try {
-                CoachLanguage::where('coach_id', $user->User_ID)->delete();
-                foreach ($validated['Languages'] as $language) {
-                    CoachLanguage::create([
-                        'coach_id' => $user->User_ID,
-                        'Language' => $language,
-                    ]);
-                }
-                $updatedFields[] = 'Languages';
-            } catch (\Exception $e) {
-                \Log::error('Error updating languages', ['User_ID' => $user->User_ID, 'error' => $e->getMessage()]);
-                return response()->json(['message' => 'Failed to update languages', 'error' => $e->getMessage()], 500);
-            }
-        }
-
-        // Update availability
-        if (isset($validated['availability'])) {
-            try {
-                CoachAvailability::where('User_ID', $user->User_ID)->delete();
-                $this->setAvailability($user->User_ID, $validated['availability']);
-                $updatedFields[] = 'Availability';
-            } catch (\Exception $e) {
-                \Log::error('Error updating availability', ['User_ID' => $user->User_ID, 'error' => $e->getMessage()]);
-                return response()->json(['message' => 'Failed to update availability', 'error' => $e->getMessage()], 500);
-            }
-        }
-
-     
-
-        // Fetch updated data for response
-        $updatedUser = $user->fresh();
-        $coach = Coach::where('User_ID', $updatedUser->User_ID)->first();
-        $languages = CoachLanguage::where('coach_id', $updatedUser->User_ID)->pluck('Language');
-        $skills = CoachSkill::where('coach_id', $updatedUser->User_ID)->pluck('Skill');
-        $availability = CoachAvailability::where('User_ID', $updatedUser->User_ID)
-            ->get()
-            ->groupBy('Day_Of_Week')
-            ->map(function ($slots) {
-                return $slots->map(function ($slot) {
-                    return [
-                        'start_time' => $slot->Start_Time,
-                        'end_time' => $slot->End_Time,
-                    ];
-                });
-            });
-
-        return response()->json([
-          'message' => 'Coach profile updated successfully',
-        ], 200);
+   public function updateCoachProfile(Request $request, int $user_id): \Illuminate\Http\JsonResponse
+{
+    // Check if the authenticated user has permission
+    $authUser = auth('sanctum')->user();
+    if (!$authUser) {
+        return response()->json(['message' => 'Unauthorized'], 401);
     }
+
+    // Restrict updates to the authenticated user
+    if ($authUser->User_ID !== $user_id) {
+        return response()->json(['message' => 'You can only update your own profile'], 403);
+    }
+
+    // Find the user by User_ID and ensure they are a Coach
+    $user = User::where('User_ID', $user_id)->where('Role_Profile', 'Coach')->first();
+    if (!$user) {
+        return response()->json(['message' => 'Coach not found or user is not a Coach'], 404);
+    }
+
+    $validSkills = $this->getEnumValues('coach_skills', 'Skill');
+    $validLanguages = $this->getEnumValues('coach_languages', 'Language');
+
+    $validated = $request->validate([
+        // Coach Profile
+        'Full_Name' => ['sometimes', 'string', 'max:255'],
+        'Email' => ['sometimes', 'email', Rule::unique('users', 'Email')->ignore($user->User_ID, 'User_ID')],
+        'Password' => ['sometimes', 'string', 'min:8'],
+        'Photo' => ['sometimes', 'image', 'mimes:jpeg,png,jpg', 'max:5120'],
+        'Bio' => ['sometimes', 'string'],
+        'Languages' => ['sometimes', 'array', 'min:1'],
+        'Languages.*' => ['required', 'string', Rule::in($validLanguages)],
+
+        // Personal Info
+        'Company_or_School' => ['sometimes', 'string', 'max:255'],
+        'Skills' => ['sometimes', 'array', 'min:1'],
+        'Skills.*' => ['required', 'string', Rule::in($validSkills)],
+        'Title' => ['sometimes', 'string', 'max:100'],
+        'Years_Of_Experience' => ['sometimes', 'integer', 'min:0'],
+        'Months_Of_Experience' => ['sometimes', 'integer', 'between:0,11'],
+        'Linkedin_Link' => ['sometimes', 'url'],
+
+        // Availability
+        'availability' => ['sometimes', 'array'],
+        'availability.days' => ['required_with:availability', 'array'],
+        'availability.days.*' => ['in:Sunday,Monday,Tuesday,Wednesday,Thursday,Friday,Saturday'],
+        'availability.time_slots' => ['required_with:availability', 'array'],
+        'availability.time_slots.*' => ['array'],
+        'availability.time_slots.*.*.start_time' => ['required_with:availability', 'date_format:H:i'],
+        'availability.time_slots.*.*.end_time' => ['required_with:availability', 'date_format:H:i', 'after:availability.time_slots.*.*.start_time'],
+    ]);
+
+    // Update user table (users)
+    $updateData = [];
+    if (isset($validated['Full_Name'])) {
+        $updateData['Full_Name'] = $validated['Full_Name']; // تصحيح: استخدام حروف كبيرة للاسم
+        \Log::info('Preparing to update Full_Name', ['User_ID' => $user->User_ID, 'Full_Name' => $validated['Full_Name']]);
+    }
+    if (isset($validated['Email'])) {
+        $updateData['Email'] = $validated['Email']; // تصحيح: استخدام حروف كبيرة للبريد الإلكتروني
+        \Log::info('Preparing to update Email', ['User_ID' => $user->User_ID, 'Email' => $validated['Email']]);
+    }
+    if (isset($validated['Password'])) {
+        $updateData['Password'] = Hash::make($validated['Password']); // قد تحتاج لتغيير هذا أيضًا إذا كان العمود يستخدم حروف كبيرة
+    }
+    if (isset($validated['Linkedin_Link'])) {
+        $updateData['Linkedin_Link'] = $validated['Linkedin_Link']; // قد تحتاج لتغيير هذا أيضًا
+    }
+
+    if ($request->hasFile('Photo')) {
+        if ($user->Photo) { // تصحيح: استخدام حروف كبيرة
+            Storage::disk('public')->delete($user->Photo);
+        }
+        $updateData['Photo'] = $request->file('Photo')->store('photos', 'public'); // تصحيح: استخدام حروف كبيرة
+    }
+
+    if (!empty($updateData)) {
+        \Log::info('Updating user table', ['User_ID' => $user->User_ID, 'updateData' => $updateData]);
+        try {
+            $user->update($updateData);
+            \Log::info('User table updated', ['User_ID' => $user->User_ID, 'new_Full_Name' => $user->fresh()->Full_Name]);
+        } catch (\Exception $e) {
+            \Log::error('Error updating user', ['User_ID' => $user->User_ID, 'error' => $e->getMessage()]);
+            return response()->json(['message' => 'Failed to update profile', 'error' => $e->getMessage()], 500);
+        }
+    } else {
+        \Log::info('No data to update in user table', ['User_ID' => $user->User_ID]);
+    }
+
+    // Update coach table (coaches)
+    $coach = Coach::where('User_ID', $user->User_ID)->first();
+    if ($coach) {
+        $coachUpdateData = [];
+        if (isset($validated['Bio'])) {
+            $coachUpdateData['Bio'] = $validated['Bio'];
+        }
+        if (isset($validated['Company_or_School'])) {
+            $coachUpdateData['Company_or_School'] = $validated['Company_or_School'];
+        }
+        if (isset($validated['Title'])) {
+            $coachUpdateData['Title'] = $validated['Title'];
+        }
+        if (isset($validated['Years_Of_Experience'])) {
+            $coachUpdateData['Years_Of_Experience'] = $validated['Years_Of_Experience'];
+        }
+        if (isset($validated['Months_Of_Experience'])) {
+            $coachUpdateData['Months_Of_Experience'] = $validated['Months_Of_Experience'];
+        }
+
+        if (!empty($coachUpdateData)) {
+            try {
+                $coach->update($coachUpdateData);
+            } catch (\Exception $e) {
+                \Log::error('Error updating coach', ['User_ID' => $user->User_ID, 'error' => $e->getMessage()]);
+                return response()->json(['message' => 'Failed to update coach profile', 'error' => $e->getMessage()], 500);
+            }
+        }
+    }
+
+    // Update skills
+    if (isset($validated['Skills'])) {
+        try {
+            CoachSkill::where('coach_id', $user->User_ID)->delete();
+            foreach ($validated['Skills'] as $skill) {
+                CoachSkill::create([
+                    'coach_id' => $user->User_ID,
+                    'Skill' => $skill,
+                ]);
+            }
+        } catch (\Exception $e) {
+            \Log::error('Error updating skills', ['User_ID' => $user->User_ID, 'error' => $e->getMessage()]);
+            return response()->json(['message' => 'Failed to update skills', 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    // Update languages
+    if (isset($validated['Languages'])) {
+        try {
+            CoachLanguage::where('coach_id', $user->User_ID)->delete();
+            foreach ($validated['Languages'] as $language) {
+                CoachLanguage::create([
+                    'coach_id' => $user->User_ID,
+                    'Language' => $language,
+                ]);
+            }
+        } catch (\Exception $e) {
+            \Log::error('Error updating languages', ['User_ID' => $user->User_ID, 'error' => $e->getMessage()]);
+            return response()->json(['message' => 'Failed to update languages', 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    // Update availability
+    if (isset($validated['availability'])) {
+        try {
+            CoachAvailability::where('User_ID', $user->User_ID)->delete();
+            $this->setAvailability($user->User_ID, $validated['availability']);
+        } catch (\Exception $e) {
+            \Log::error('Error updating availability', ['User_ID' => $user->User_ID, 'error' => $e->getMessage()]);
+            return response()->json(['message' => 'Failed to update availability', 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    // Fetch updated data for response
+    $updatedUser = $user->fresh(); // تخزين البيانات المحدّثة في متغير جديد
+    $coach = Coach::where('User_ID', $updatedUser->User_ID)->first();
+    $languages = CoachLanguage::where('coach_id', $updatedUser->User_ID)->pluck('Language');
+    $skills = CoachSkill::where('coach_id', $updatedUser->User_ID)->pluck('Skill');
+    $availability = CoachAvailability::where('User_ID', $updatedUser->User_ID)
+        ->get()
+        ->groupBy('Day_Of_Week')
+        ->map(function ($slots) {
+            return $slots->map(function ($slot) {
+                return [
+                    'start_time' => $slot->Start_Time,
+                    'end_time' => $slot->End_Time,
+                ];
+            });
+        });
+
+    return response()->json([
+        'message' => 'Coach profile updated successfully',
+       
+    ], 200);
+}
 
     /**
      * Update Trainee profile details.
@@ -263,186 +233,156 @@ class ProfileController extends Controller
      * @param int $user_id
      * @return \Illuminate\Http\JsonResponse
      */
-    public function updateTraineeProfile(Request $request, int $user_id): \Illuminate\Http\JsonResponse
-    {
-        // Check if the authenticated user has permission
-        $authUser = auth('sanctum')->user();
-        if (!$authUser) {
-            return response()->json(['message' => 'Unauthorized'], 401);
-        }
-
-        // Restrict updates to the authenticated user
-        if ($authUser->User_ID !== $user_id) {
-            return response()->json(['message' => 'You can only update your own profile'], 403);
-        }
-
-        // Find the user by User_ID and ensure they are a Trainee
-        $user = User::where('User_ID', $user_id)->where('Role_Profile', 'Trainee')->first();
-        if (!$user) {
-            return response()->json(['message' => 'Trainee not found or user is not a Trainee'], 404);
-        }
-
-        $validLanguages = $this->getEnumValues('trainee_preferred_languages', 'Language');
-        $validInterests = $this->getEnumValues('trainee_areas_of_interest', 'Area_Of_Interest');
-        $validEducationLevels = $this->getEnumValues('trainees', 'Education_Level');
-
-        $validated = $request->validate([
-            // Trainee Profile
-            'Full_Name' => ['sometimes', 'string', 'max:255'],
-            'Email' => ['sometimes', 'email', Rule::unique('users', 'Email')->ignore($user->User_ID, 'User_ID')],
-            'Password' => ['sometimes', 'string', 'min:8'],
-            'Photo' => ['sometimes', 'image', 'mimes:jpeg,png,jpg', 'max:5120'],
-            'Story' => ['sometimes', 'string'],
-            'Preferred_Languages' => ['sometimes', 'array', 'min:1'],
-            'Preferred_Languages.*' => ['required', 'string', Rule::in($validLanguages)],
-
-            // Personal Info
-            'Institution_Or_School' => ['sometimes', 'string', 'max:255'],
-            'Areas_Of_Interest' => ['sometimes', 'array', 'min:1'],
-            'Areas_Of_Interest.*' => ['required', 'string', Rule::in($validInterests)],
-            'Current_Role' => ['sometimes', 'string'],
-            'Education_Level' => ['sometimes', 'string', Rule::in($validEducationLevels)],
-            'Linkedin_Link' => ['sometimes', 'url'],
-        ]);
-
-        return DB::transaction(function () use ($user, $validated, $request) {
-            try {
-                // Track updated fields for the message
-                $updatedFields = [];
-
-                // Update user table (users)
-                $updateData = [];
-                if (isset($validated['Full_Name'])) {
-                    $updateData['full_name'] = $validated['Full_Name'];
-                    $updatedFields[] = 'Full Name';
-                    \Log::info('Preparing to update full_name', ['User_ID' => $user->User_ID, 'full_name' => $validated['Full_Name']]);
-                }
-                if (isset($validated['Email'])) {
-                    $updateData['email'] = $validated['Email'];
-                    $updatedFields[] = 'Email';
-                    \Log::info('Preparing to update email', ['User_ID' => $user->User_ID, 'email' => $validated['Email']]);
-                }
-                if (isset($validated['Password'])) {
-                    $updateData['password'] = Hash::make($validated['Password']);
-                    $updatedFields[] = 'Password';
-                }
-                if (isset($validated['Linkedin_Link'])) {
-                    $updateData['linkedin_link'] = $validated['Linkedin_Link'];
-                    $updatedFields[] = 'Linkedin Link';
-                }
-
-                if ($request->hasFile('Photo')) {
-                    \Log::info('Photo file detected in request', ['User_ID' => $user->User_ID, 'file_name' => $request->file('Photo')->getClientOriginalName()]);
-                    if ($user->photo) {
-                        \Log::info('Deleting existing photo', ['User_ID' => $user->User_ID, 'old_photo' => $user->photo]);
-                        Storage::disk('public')->delete($user->photo);
-                    }
-                    try {
-                        // Ensure the photos directory exists
-                        Storage::disk('public')->makeDirectory('photos');
-                        $photoPath = $request->file('Photo')->store('photos', 'public');
-                        \Log::info('New photo uploaded', ['User_ID' => $user->User_ID, 'photo_path' => $photoPath]);
-                        $updateData['photo'] = $photoPath;
-                        $updatedFields[] = 'Photo';
-                    } catch (\Exception $e) {
-                        \Log::error('Error uploading photo', ['User_ID' => $user->User_ID, 'error' => $e->getMessage()]);
-                        throw new \Exception('Failed to upload photo: ' . $e->getMessage());
-                    }
-                } else {
-                    \Log::info('No photo file in request', ['User_ID' => $user->User_ID]);
-                }
-
-                if (!empty($updateData)) {
-                    \Log::info('Updating user table', ['User_ID' => $user->User_ID, 'updateData' => $updateData]);
-                    $user->update($updateData);
-                    \Log::info('User table updated', ['User_ID' => $user->User_ID, 'new_full_name' => $user->fresh()->full_name, 'new_photo' => $user->fresh()->photo]);
-                } else {
-                    \Log::info('No data to update in user table', ['User_ID' => $user->User_ID]);
-                }
-
-                // Update trainee table (trainees)
-                $trainee = Trainee::where('User_ID', $user->User_ID)->first();
-                if ($trainee) {
-                    $traineeUpdateData = [];
-                    if (isset($validated['Story'])) {
-                        $traineeUpdateData['Story'] = $validated['Story'];
-                        $updatedFields[] = 'Story';
-                    }
-                    if (isset($validated['Institution_Or_School'])) {
-                        $traineeUpdateData['Institution_Or_School'] = $validated['Institution_Or_School'];
-                        $updatedFields[] = 'Institution or School';
-                    }
-                    if (isset($validated['Current_Role'])) {
-                        $traineeUpdateData['Current_Role'] = $validated['Current_Role'];
-                        $updatedFields[] = 'Current Role';
-                    }
-                    if (isset($validated['Education_Level'])) {
-                        $traineeUpdateData['Education_Level'] = $validated['Education_Level'];
-                        $updatedFields[] = 'Education Level';
-                    }
-
-                    if (!empty($traineeUpdateData)) {
-                        $trainee->update($traineeUpdateData);
-                        \Log::info('Trainee table updated', ['User_ID' => $user->User_ID]);
-                    }
-                }
-
-                // Update preferred languages
-                if (isset($validated['Preferred_Languages'])) {
-                    TraineePreferredLanguage::where('trainee_id', $user->User_ID)->delete();
-                    foreach ($validated['Preferred_Languages'] as $lang) {
-                        TraineePreferredLanguage::create([
-                            'trainee_id' => $user->User_ID,
-                            'Language' => $lang,
-                        ]);
-                    }
-                    $updatedFields[] = 'Preferred Languages';
-                    \Log::info('Trainee languages updated', ['User_ID' => $user->User_ID]);
-                }
-
-                // Update areas of interest
-                if (isset($validated['Areas_Of_Interest'])) {
-                    TraineeAreaOfInterest::where('trainee_id', $user->User_ID)->delete();
-                    foreach ($validated['Areas_Of_Interest'] as $interest) {
-                        TraineeAreaOfInterest::create([
-                            'trainee_id' => $user->User_ID,
-                            'Area_Of_Interest' => $interest,
-                        ]);
-                    }
-                    $updatedFields[] = 'Areas of Interest';
-                    \Log::info('Trainee interests updated', ['User_ID' => $user->User_ID]);
-                }
-
-          
-
-                // Fetch updated data for response
-                $updatedUser = $user->fresh();
-                $trainee = Trainee::where('User_ID', $updatedUser->User_ID)->first();
-                $languages = TraineePreferredLanguage::where('trainee_id', $updatedUser->User_ID)->pluck('Language');
-                $interests = TraineeAreaOfInterest::where('trainee_id', $updatedUser->User_ID)->pluck('Area_Of_Interest');
-
-                return response()->json([
-                   'message' => 'Trainee profile updated successfully',
-                 
-                ], 200);
-            } catch (\Exception $e) {
-                \Log::error('Failed to update trainee profile', [
-                    'User_ID' => $user->User_ID,
-                    'error' => $e->getMessage(),
-                    'trace' => $e->getTraceAsString()
-                ]);
-
-                // Rollback the transaction in case of any error
-                DB::rollBack();
-
-                return response()->json([
-                    'message' => 'Failed to update trainee profile',
-                    'error' => $e->getMessage()
-                ], 500);
-            }
-        });
+   public function updateTraineeProfile(Request $request, int $user_id): \Illuminate\Http\JsonResponse
+{
+    // Check if the authenticated user has permission
+    $authUser = auth('sanctum')->user();
+    if (!$authUser) {
+        return response()->json(['message' => 'Unauthorized'], 401);
     }
 
+    // Restrict updates to the authenticated user
+    if ($authUser->User_ID !== $user_id) {
+        return response()->json(['message' => 'You can only update your own profile'], 403);
+    }
+
+    // Find the user by User_ID and ensure they are a Trainee
+    $user = User::where('User_ID', $user_id)->where('Role_Profile', 'Trainee')->first();
+    if (!$user) {
+        return response()->json(['message' => 'Trainee not found or user is not a Trainee'], 404);
+    }
+
+    $validLanguages = $this->getEnumValues('trainee_preferred_languages', 'Language');
+    $validInterests = $this->getEnumValues('trainee_areas_of_interest', 'Area_Of_Interest');
+    $validEducationLevels = $this->getEnumValues('trainees', 'Education_Level');
+
+    $validated = $request->validate([
+        // Trainee Profile
+        'Full_Name' => ['sometimes', 'string', 'max:255'],
+        'Email' => ['sometimes', 'email', Rule::unique('users', 'Email')->ignore($user->User_ID, 'User_ID')],
+        'Password' => ['sometimes', 'string', 'min:8'],
+        'Photo' => ['sometimes', 'image', 'mimes:jpeg,png,jpg', 'max:5120'],
+        'Story' => ['sometimes', 'string'],
+        'Preferred_Languages' => ['sometimes', 'array', 'min:1'],
+        'Preferred_Languages.*' => ['required', 'string', Rule::in($validLanguages)],
+
+        // Personal Info
+        'Institution_Or_School' => ['sometimes', 'string', 'max:255'],
+        'Areas_Of_Interest' => ['sometimes', 'array', 'min:1'],
+        'Areas_Of_Interest.*' => ['required', 'string', Rule::in($validInterests)],
+        'Current_Role' => ['sometimes', 'string'],
+        'Education_Level' => ['sometimes', 'string', Rule::in($validEducationLevels)],
+        'Linkedin_Link' => ['sometimes', 'url'],
+    ]);
+
+    return DB::transaction(function () use ($user, $validated, $request) {
+        try {
+            // Update user table (users)
+            $updateData = [];
+            if (isset($validated['Full_Name'])) {
+                $updateData['Full_Name'] = $validated['Full_Name']; // تصحيح: استخدام حروف كبيرة
+                \Log::info('Preparing to update Full_Name', ['User_ID' => $user->User_ID, 'Full_Name' => $validated['Full_Name']]);
+            }
+            if (isset($validated['Email'])) {
+                $updateData['Email'] = $validated['Email']; // تصحيح: استخدام حروف كبيرة
+                \Log::info('Preparing to update Email', ['User_ID' => $user->User_ID, 'Email' => $validated['Email']]);
+            }
+            if (isset($validated['Password'])) {
+                $updateData['Password'] = Hash::make($validated['Password']); // تصحيح: استخدام حروف كبيرة
+            }
+            if (isset($validated['Linkedin_Link'])) {
+                $updateData['Linkedin_Link'] = $validated['Linkedin_Link']; // تصحيح: استخدام حروف كبيرة
+            }
+
+            if ($request->hasFile('Photo')) {
+                if ($user->Photo) { // تصحيح: استخدام حروف كبيرة
+                    Storage::disk('public')->delete($user->Photo);
+                }
+                $updateData['Photo'] = $request->file('Photo')->store('photos', 'public'); // تصحيح: استخدام حروف كبيرة
+            }
+
+            if (!empty($updateData)) {
+                \Log::info('Updating user table', ['User_ID' => $user->User_ID, 'updateData' => $updateData]);
+                $user->update($updateData);
+                \Log::info('User table updated', ['User_ID' => $user->User_ID, 'new_Full_Name' => $user->fresh()->Full_Name]);
+            } else {
+                \Log::info('No data to update in user table', ['User_ID' => $user->User_ID]);
+            }
+
+            // Update trainee table (trainees)
+            $trainee = Trainee::where('User_ID', $user->User_ID)->first();
+            if ($trainee) {
+                $traineeUpdateData = [];
+                if (isset($validated['Story'])) {
+                    $traineeUpdateData['Story'] = $validated['Story'];
+                }
+                if (isset($validated['Institution_Or_School'])) {
+                    $traineeUpdateData['Institution_Or_School'] = $validated['Institution_Or_School'];
+                }
+                if (isset($validated['Current_Role'])) {
+                    $traineeUpdateData['Current_Role'] = $validated['Current_Role'];
+                }
+                if (isset($validated['Education_Level'])) {
+                    $traineeUpdateData['Education_Level'] = $validated['Education_Level'];
+                }
+
+                if (!empty($traineeUpdateData)) {
+                    $trainee->update($traineeUpdateData);
+                    \Log::info('Trainee table updated', ['User_ID' => $user->User_ID]);
+                }
+            }
+
+            // Update preferred languages
+            if (isset($validated['Preferred_Languages'])) {
+                TraineePreferredLanguage::where('trainee_id', $user->User_ID)->delete();
+                foreach ($validated['Preferred_Languages'] as $lang) {
+                    TraineePreferredLanguage::create([
+                        'trainee_id' => $user->User_ID,
+                        'Language' => $lang,
+                    ]);
+                }
+                \Log::info('Trainee languages updated', ['User_ID' => $user->User_ID]);
+            }
+
+            // Update areas of interest
+            if (isset($validated['Areas_Of_Interest'])) {
+                TraineeAreaOfInterest::where('trainee_id', $user->User_ID)->delete();
+                foreach ($validated['Areas_Of_Interest'] as $interest) {
+                    TraineeAreaOfInterest::create([
+                        'trainee_id' => $user->User_ID,
+                        'Area_Of_Interest' => $interest,
+                    ]);
+                }
+                \Log::info('Trainee interests updated', ['User_ID' => $user->User_ID]);
+            }
+
+            // Fetch updated data for response
+            $updatedUser = $user->fresh(); // تخزين البيانات المحدّثة في متغير جديد
+            $trainee = Trainee::where('User_ID', $updatedUser->User_ID)->first();
+            $languages = TraineePreferredLanguage::where('trainee_id', $updatedUser->User_ID)->pluck('Language');
+            $interests = TraineeAreaOfInterest::where('trainee_id', $updatedUser->User_ID)->pluck('Area_Of_Interest');
+
+            return response()->json([
+                'message' => 'Trainee profile updated successfully',
+             
+            ], 200);
+        } catch (\Exception $e) {
+            \Log::error('Failed to update trainee profile', [
+                'User_ID' => $user->User_ID,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            // يلغي المعاملة في حالة وجود أي خطأ
+            DB::rollBack();
+            
+            return response()->json([
+                'message' => 'Failed to update trainee profile',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    });
+}
     /**
      * Get Coach profile data.
      *
