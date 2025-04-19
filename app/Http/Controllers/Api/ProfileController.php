@@ -223,21 +223,7 @@ public function updateCoachProfile(Request $request, int $user_id): \Illuminate\
 
     return response()->json([
         'message' => 'Coach profile updated successfully',
-        'profile' => [
-            'User_ID' => $updatedUser->User_ID,
-            'Full_Name' => $updatedUser->full_name,
-            'Email' => $updatedUser->email, 
-            'Photo' => $updatedUser->photo ? Storage::url($updatedUser->Photo) : null, 
-            'Bio' => $coach->Bio ?? null,
-            'Languages' => $languages,
-            'Company_or_School' => $coach->Company_or_School ?? null,
-            'Skills' => $skills,
-            'Title' => $coach->Title ?? null,
-            'Years_Of_Experience' => $coach->Years_Of_Experience ?? 0,
-            'Months_Of_Experience' => $coach->Months_Of_Experience ?? 0,
-            'Linkedin_Link' => $updatedUser->linkedin_link ?? null, 
-            'availability' => $availability,
-        ],
+      
     ], 200);
 }
 
@@ -379,19 +365,7 @@ public function updateCoachProfile(Request $request, int $user_id): \Illuminate\
 
             return response()->json([
                 'message' => 'Trainee profile updated successfully',
-                'profile' => [
-                    'User_ID' => $updatedUser->User_ID,
-                    'Full_Name' => $updatedUser->Full_Name, // تصحيح: استخدام حروف كبيرة
-                    'Email' => $updatedUser->Email, // تصحيح: استخدام حروف كبيرة
-                    'Photo' => $updatedUser->Photo ? Storage::url($updatedUser->Photo) : null, // تصحيح: استخدام حروف كبيرة
-                    'Story' => $trainee->Story ?? null,
-                    'Preferred_Languages' => $languages,
-                    'Institution_Or_School' => $trainee->Institution_Or_School ?? null,
-                    'Areas_Of_Interest' => $interests,
-                    'Current_Role' => $trainee->Current_Role ?? null,
-                    'Education_Level' => $trainee->Education_Level ?? null,
-                    'Linkedin_Link' => $updatedUser->Linkedin_Link ?? null, // تصحيح: استخدام حروف كبيرة
-                ],
+             
             ], 200);
         } catch (\Exception $e) {
             \Log::error('Failed to update trainee profile', [
