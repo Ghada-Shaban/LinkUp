@@ -111,8 +111,8 @@ class ProfileController extends Controller
     }
 
     if ($request->hasFile('Photo')) {
-        if ($user->Photo) { // تصحيح: استخدام حروف كبيرة
-            Storage::disk('public')->delete($user->Photo);
+        if ($user->photo) { // تصحيح: استخدام حروف كبيرة
+            Storage::disk('public')->delete($user->photo);
         }
         $updateData['Photo'] = $request->file('Photo')->store('photos', 'public'); // تصحيح: استخدام حروف كبيرة
     }
@@ -295,8 +295,8 @@ class ProfileController extends Controller
             }
 
             if ($request->hasFile('Photo')) {
-                if ($user->Photo) { // تصحيح: استخدام حروف كبيرة
-                    Storage::disk('public')->delete($user->Photo);
+                if ($user->photo) { // تصحيح: استخدام حروف كبيرة
+                    Storage::disk('public')->delete($user->photo);
                 }
                 $updateData['Photo'] = $request->file('Photo')->store('photos', 'public'); // تصحيح: استخدام حروف كبيرة
             }
