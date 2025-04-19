@@ -111,12 +111,12 @@ public function updateCoachProfile(Request $request, int $user_id): \Illuminate\
         $updateData['Linkedin_Link'] = $validated['Linkedin_Link']; // قد تحتاج لتغيير هذا أيضًا
     }
 
-    if ($request->hasFile('Photo')) {
-        if ($user->Photo) { // تصحيح: استخدام حروف كبيرة
-            Storage::disk('public')->delete($user->Photo);
+   if ($request->hasFile('Photo')) {
+            if ($user->Photo) {
+                Storage::disk('public')->delete($user->Photo);
+            }
+            $updateData['Photo'] = $request->file('Photo')->store('photos', 'public');
         }
-        $updateData['Photo'] = $request->file('Photo')->store('photos', 'public'); // تصحيح: استخدام حروف كبيرة
-    }
 
     if (!empty($updateData)) {
         \Log::info('Updating user table', ['User_ID' => $user->User_ID, 'updateData' => $updateData]);
