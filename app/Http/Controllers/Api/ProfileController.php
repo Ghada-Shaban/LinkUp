@@ -257,21 +257,7 @@ class ProfileController extends Controller
 
         return response()->json([
             'message' => $message,
-            'profile' => [
-                'User_ID' => $updatedUser->User_ID,
-                'Full_Name' => $updatedUser->full_name,
-                'Email' => $updatedUser->email,
-                'Photo' => !empty($updatedUser->photo) ? url(Storage::url($updatedUser->photo)) : null,
-                'Bio' => $coach->Bio ?? null,
-                'Languages' => $languages,
-                'Company_or_School' => $coach->Company_or_School ?? null,
-                'Skills' => $skills,
-                'Title' => $coach->Title ?? null,
-                'Years_Of_Experience' => $coach->Years_Of_Experience ?? 0,
-                'Months_Of_Experience' => $coach->Months_Of_Experience ?? 0,
-                'Linkedin_Link' => $updatedUser->linkedin_link ?? null,
-                'availability' => $availability,
-            ],
+       
         ], 200);
     }
 
@@ -446,19 +432,7 @@ class ProfileController extends Controller
 
                 return response()->json([
                     'message' => $message,
-                    'profile' => [
-                        'User_ID' => $updatedUser->User_ID,
-                        'Full_Name' => $updatedUser->full_name,
-                        'Email' => $updatedUser->email,
-                        'Photo' => !empty($updatedUser->photo) ? url(Storage::url($updatedUser->photo)) : null,
-                        'Story' => $trainee->Story ?? null,
-                        'Preferred_Languages' => $languages,
-                        'Institution_Or_School' => $trainee->Institution_Or_School ?? null,
-                        'Areas_Of_Interest' => $interests,
-                        'Current_Role' => $trainee->Current_Role ?? null,
-                        'Education_Level' => $trainee->Education_Level ?? null,
-                        'Linkedin_Link' => $updatedUser->linkedin_link ?? null,
-                    ],
+                 
                 ], 200);
             } catch (\Exception $e) {
                 \Log::error('Failed to update trainee profile', [
