@@ -43,7 +43,7 @@ class User extends Authenticatable
     // أضف هذه الدالة داخل class User مباشرة
 public function getPhotoUrlAttribute()
 {
-    return $this->Photo ? Storage::url($this->Photo) : null;
+    return $this->photo ? Storage::url($this->photo) : null;
 }
 
     public function coach() { 
