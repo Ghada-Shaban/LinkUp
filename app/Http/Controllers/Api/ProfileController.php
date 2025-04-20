@@ -399,17 +399,21 @@ class ProfileController extends Controller
         $coach = Coach::where('User_ID', $user_id)->first();
         $languages = CoachLanguage::where('coach_id', $user_id)->pluck('Language');
         $skills = CoachSkill::where('coach_id', $user_id)->pluck('Skill');
-        $availability = CoachAvailability::where('User_ID', $user_id)
-            ->get()
-            ->groupBy('Day_Of_Week')
-            ->map(function ($slots) {
-                return $slots->map(function ($slot) {
-                    return [
-                        'start_time' => $slot->Start_Time,
-                        'end_time' => $slot->End_Time,
-                    ];
-                });
+        $availabilityData = CoachAvailability::where('User_ID', $user_id)
+        ->get()
+        ->groupBy('Day_Of_Week')
+        ->map(function ($slots) {
+            return $slots->map(function ($slot) {
+                return [
+                    'start_time' => $slot->Start_Time,
+                    'end_time' => $slot->End_Time,
+                ];
             });
+        });
+        $availability = [
+        'days' => $availabilityData->keys()->toArray(), // Extract the days as an array
+        'time_slots' => $availabilityData->toArray(),   // Use the grouped data as time_slots
+    ];
 
         return response()->json([
             'message' => 'Coach profile retrieved successfully',
