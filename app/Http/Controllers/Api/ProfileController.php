@@ -405,8 +405,8 @@ class ProfileController extends Controller
         ->map(function ($slots) {
             return $slots->map(function ($slot) {
                 return [
-                    'start_time' => $slot->Start_Time,
-                    'end_time' => $slot->End_Time,
+                    'start_time' => \Carbon\Carbon::parse($slot->Start_Time)->format('H:i'),
+                    'end_time' => \Carbon\Carbon::parse($slot->End_Time)->format('H:i'),
                 ];
             });
         });
