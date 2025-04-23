@@ -1,0 +1,123 @@
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use App\Http\Controllers\Controller;
+use Illuminate\Http\Request;
+use App\Models\Availability;
+use App\Models\Service;
+use App\Models\MentorshipRequest;
+use App\Models\User;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Carbon\Carbon;
+
+class BookingController extends Controller
+{
+    /**
+     * عرض الأيام المتاحة للكوتش
+     */
+    public function getAvailableDates(Request $request, $coachId)
+    {
+        $validated = $request->validate([
+            'service_id' => 'required|exists:services,service_id',
+            'month' => 'required|date_format:Y-m',
+        ]);
+
+        $service = Service::findOrFail($request->service_id);
+        if ($service->coach_id !== $coachId) {
+            Log::warning('Service does not belong to coach', [
+                'coach_id' => $coachId,
+                'service_id' => $request->service_id,
+            ]);
+            return response()->json(['message' => 'Invalid service'], 400);
+        }
+
+        $startOfMonth = Carbon::parse($request->month)->startOfMonth();
+        $endOfMonth = Carbon::parse($request->month)->endOfMonth();
+
+        $availabilities = Availability::where('coach_id', $coachId)
+            ->whereBetween('date', [$startOfMonth, $endOfMonth])
+            ->where('is_booked', false)
+            ->get()
+            ->groupBy('date')
+            ->map(function ($group) {
+                return [
+                    'date' => $group->first()->date,
+                    'is_available' => true,
+                ];
+            })
+            ->values();
+
+        // إضافة كل الأيام مع الحالة
+        $allDays = [];
+        $currentDate = $startOfMonth->copy();
+        while ($currentDate <= $endOfMonth) {
+            $isAvailable = $availabilities->firstWhere('date', $currentDate->toDateString());
+            $allDays[] = [
+                'date' => $currentDate->toDateString(),
+                'status' => $isAvailable ? 'available' : 'unavailable',
+            ];
+            $currentDate->addDay();
+        }
+
+        Log::info('Fetched available dates', [
+            'coach_id' => $coachId,
+            'month' => $request->month,
+            'dates_count' => count($availabilities),
+        ]);
+
+        return response()->json([
+            'available_dates' => $allDays,
+            'service' => [
+                'service_id' => $service->service_id,
+                'name' => $service->name,
+                'price' => $service->price,
+            ],
+        ]);
+    }
+
+    /**
+     * عرض الفترات المتاحة في يوم معين
+     */
+    public function getAvailableSlots(Request $request, $coachId)
+    {
+        $validated = $request->validate([
+            'service_id' => 'required|exists:services,service_id',
+            'date' => 'required|date|after:now',
+            'duration' => 'required|integer|in:30,60,120', // خيارات الـ Duration
+        ]);
+
+        $service = Service::findOrFail($request with json(['message' => 'Invalid service'], 400);
+        }
+
+        $availabilities = Availability::where('coach_id', $coachId)
+            ->where('date', $request->date)
+            ->where('is_booked', false)
+            ->get();
+
+        $slots = [];
+        foreach ($availabilities as $availability) {
+            $start = Carbon::parse($availability->date . ' ' . $availability->start_time);
+            $end = Carbon::parse($availability->date . ' ' . $availability->end_time);
+            $duration = $request->duration; // الـ Duration من الـ Trainee
+
+            while ($start->addMinutes($duration)->lte($end)) {
+                $slotStart = $start->copy()->subMinutes($duration);
+                $slots[] = $slotStart->format('H:i');
+            }
+        }
+
+        Log::info('Fetched available slots', [
+            'coach_id' => $coachId,
+            'date' => $request->date,
+            'duration' => $request->duration,
+            'slots_count' => count($slots),
+        ]);
+
+        return response()->json([
+            'available_slots' => $slots,
+        ]);
+    }
+}
