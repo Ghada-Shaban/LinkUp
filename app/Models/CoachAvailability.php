@@ -14,7 +14,6 @@ class CoachAvailability extends Model
         'date',
         'start_time',
         'end_time',
-        'is_booked',
     ];
     public function coach()
     {
