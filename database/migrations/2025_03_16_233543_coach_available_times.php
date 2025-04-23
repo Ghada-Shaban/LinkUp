@@ -13,11 +13,7 @@ return new class extends Migration
     {
         Schema::create('coach_available_times', function (Blueprint $table) {
             // Foreign key referencing the `coaches` table
-            $table->unsignedBigInteger('User_ID');
-            $table->foreign('User_ID')
-                  ->references('User_ID')
-                  ->on('coaches')
-                  ->onDelete('cascade');
+            $table->unsignedBigInteger('coach_id');
 
             // Day of the week (enum)
             $table->enum('Day_Of_Week', [
@@ -29,10 +25,14 @@ return new class extends Migration
             $table->time('End_Time');
 
             // Composite primary key to ensure uniqueness
-            $table->primary(['User_ID', 'Day_Of_Week', 'Start_Time', 'End_Time']);
+            $table->primary(['coach_id', 'Day_Of_Week', 'Start_Time', 'End_Time']);
 
             // Timestamps for created_at and updated_at
             $table->timestamps();
+            $table->foreign('coach_id')
+                  ->references('User_ID')
+                  ->on('coaches') // or 'users' depending on your table
+                  ->onDelete('cascade');
         });
     }
 
