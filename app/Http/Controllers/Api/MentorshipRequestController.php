@@ -17,7 +17,7 @@ use Illuminate\Validation\Rule;
 use Carbon\Carbon;
 use App\Mail\RequestAccepted;
 use App\Mail\RequestRejected;
-use App\Mail\NewMentorshipRequest; // إضافة الـ Import
+use App\Mail\NewMentorshipRequest;
 
 class MentorshipRequestController extends Controller
 {
@@ -55,7 +55,7 @@ class MentorshipRequestController extends Controller
                 }
             ],
             'title' => 'required|string|max:255',
-            'type' => ['required', Rule::in(['One_to_One', 'Group', 'Plan'])],
+            'type' => ['required', Rule::in(['Group', 'Plan'])], // هنشيل One_to_One
             'first_session_time' => [
                 'required',
                 'date',
@@ -193,7 +193,7 @@ class MentorshipRequestController extends Controller
                 'first_session_time' => $validated['first_session_time'],
                 'duration_minutes' => $validated['duration_minutes'],
                 'plan_schedule' => $planSchedule,
-                'mentorship_plan_id' => $validated['mentorship_plan_id'] ?? null,
+                'mentorship_plan_id' => $validated['type'] === 'Plan' ? $validated['mentorship_plan_id'] : null,
                 'status' => 'pending'
             ]);
 
@@ -210,7 +210,7 @@ class MentorshipRequestController extends Controller
                 'status' => 'success',
                 'message' => $validated['type'] === 'Plan' 
                     ? '4-session plan created successfully' 
-                    : 'Mentorship request created successfully',
+                    : 'Group mentorship request created successfully', // عدلنا الرسالة
                 'data' => $mentorshipRequest->load(['service', 'coach.user'])
             ];
 
@@ -292,6 +292,7 @@ class MentorshipRequestController extends Controller
                     // ملاحظة: مافيش is_booked، فمش هنحدّث حاجة هنا
                 }
             } else {
+                // النوع هنا هيبقى Group بس
                 $sessionStart = Carbon::parse($request->first_session_time);
                 $sessionEnd = $sessionStart->copy()->addMinutes($request->duration_minutes);
                 $dayOfWeek = $sessionStart->format('l');
