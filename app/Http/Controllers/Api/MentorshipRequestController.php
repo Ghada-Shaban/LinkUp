@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\MentorshipRequest;
-use App\Models\Availability;
+use App\Models\CoachAvailability;
 use App\Models\Service;
 use App\Models\MentorshipPlan;
 use App\Models\User;
