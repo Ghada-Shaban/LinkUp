@@ -8,6 +8,7 @@ use App\Models\Availability;
 use App\Models\Service;
 use App\Models\MentorshipRequest;
 use App\Models\User;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 
@@ -18,6 +19,19 @@ class BookingController extends Controller
      */
     public function getAvailableDates(Request $request, $coachId)
     {
+        // التحقق من أن الـ Trainee ماعندوش طلبات Pending أو Accepted
+        $existingRequest = MentorshipRequest::where('trainee_id', Auth::id())
+            ->whereIn('status', ['pending', 'accepted'])
+            ->exists();
+
+        if ($existingRequest) {
+            Log::warning('Trainee has an existing request', [
+                'trainee_id' => Auth::id(),
+                'coach_id' => $coachId,
+            ]);
+            return response()->json(['message' => 'You already have a pending or accepted request'], 403);
+        }
+
         $validated = $request->validate([
             'service_id' => 'required|exists:services,service_id',
             'month' => 'required|date_format:Y-m',
@@ -82,10 +96,22 @@ class BookingController extends Controller
      */
     public function getAvailableSlots(Request $request, $coachId)
     {
+        // التحقق من أن الـ Trainee ماعندوش طلبات Pending أو Accepted
+        $existingRequest = MentorshipRequest::where('trainee_id', Auth::id())
+            ->whereIn('status', ['pending', 'accepted'])
+            ->exists();
+
+        if ($existingRequest) {
+            Log::warning('Trainee has an existing request', [
+                'trainee_id' => Auth::id(),
+                'coach_id' => $coachId,
+            ]);
+            return response()->json(['message' => 'You already have a pending or accepted request'], 403);
+        }
+
         $validated = $request->validate([
             'service_id' => 'required|exists:services,service_id',
             'date' => 'required|date|after:now',
-            'duration' => 'required|integer|in:30,60,120',
         ]);
 
         $service = Service::findOrFail($request->service_id);
@@ -116,12 +142,13 @@ class BookingController extends Controller
             });
 
         $slots = [];
+        $duration = 60; // تثبيت الـ duration على 60 دقيقة
+
         foreach ($availabilities as $availability) {
             $start = Carbon::parse($availability->date . ' ' . $availability->start_time);
             $end = Carbon::parse($availability->date . ' ' . $availability->end_time);
-            $duration = $request->duration;
 
-            // تقسيم الفترة المتاحة إلى Slots
+            // تقسيم الفترة المتاحة إلى Slots بساعة
             while ($start->copy()->addMinutes($duration)->lte($end)) {
                 $slotStart = $start->copy();
                 $slotEnd = $slotStart->copy()->addMinutes($duration);
@@ -149,7 +176,7 @@ class BookingController extends Controller
         Log::info('Fetched available slots', [
             'coach_id' => $coachId,
             'date' => $request->date,
-            'duration' => $request->duration,
+            'duration' => $duration,
             'slots_count' => count($slots),
         ]);
 
