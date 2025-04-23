@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\MentorshipRequest;
-use App\Models\CoachAvailability;
+use App\Models\CoachAvailability; // تغيير من Availability إلى CoachAvailability
 use App\Models\Service;
 use App\Models\MentorshipPlan;
 use App\Models\User;
@@ -33,6 +33,13 @@ class MentorshipRequestController extends Controller
                         $fail('The selected service does not exist');
                         return;
                     }
+
+                    // Debug Log لـ coach_id
+                    Log::debug('Service details in store', [
+                        'service_id' => $value,
+                        'coach_id' => $service->coach_id,
+                        'coach_id_type' => gettype($service->coach_id),
+                    ]);
 
                     // For Plan requests, check it's linked to a 4-session plan
                     if ($request->type === 'Plan') {
@@ -75,12 +82,12 @@ class MentorshipRequestController extends Controller
         $service = Service::findOrFail($validated['service_id']);
         $slotStart = Carbon::parse($validated['first_session_time']);
         $slotEnd = $slotStart->copy()->addMinutes($validated['duration_minutes']);
+        $dayOfWeek = $slotStart->format('l'); // Monday, Tuesday, ...
 
-        $availability = Availability::where('coach_id', $service->coach_id)
-            ->where('date', $slotStart->toDateString())
-            ->where('start_time', '<=', $slotStart->format('H:i'))
-            ->where('end_time', '>=', $slotEnd->format('H:i'))
-            ->where('is_booked', false)
+        $availability = CoachAvailability::where('User_ID', (int)$service->coach_id)
+            ->where('Day_Of_Week', $dayOfWeek)
+            ->where('Start_Time', '<=', $slotStart->format('H:i:s'))
+            ->where('End_Time', '>=', $slotEnd->format('H:i:s'))
             ->first();
 
         if (!$availability) {
@@ -88,6 +95,7 @@ class MentorshipRequestController extends Controller
                 'trainee_id' => Auth::id(),
                 'service_id' => $validated['service_id'],
                 'date' => $slotStart->toDateString(),
+                'day_of_week' => $dayOfWeek,
                 'start_time' => $slotStart->format('H:i'),
                 'duration' => $validated['duration_minutes'],
             ]);
@@ -95,7 +103,7 @@ class MentorshipRequestController extends Controller
         }
 
         // التحقق من عدم التداخل مع طلبات أخرى
-        $conflictingRequests = MentorshipRequest::where('coach_id', $service->coach_id)
+        $conflictingRequests = MentorshipRequest::where('coach_id', (int)$service->coach_id)
             ->whereIn('status', ['pending', 'accepted'])
             ->whereDate('first_session_time', $slotStart->toDateString())
             ->get()
@@ -110,6 +118,7 @@ class MentorshipRequestController extends Controller
                 'trainee_id' => Auth::id(),
                 'service_id' => $validated['service_id'],
                 'date' => $slotStart->toDateString(),
+                'day_of_week' => $dayOfWeek,
                 'start_time' => $slotStart->format('H:i'),
             ]);
             return response()->json(['message' => 'Selected slot is already reserved'], 400);
@@ -124,13 +133,13 @@ class MentorshipRequestController extends Controller
             for ($i = 0; $i < 4; $i++) {
                 $currentSessionTime = Carbon::parse($sessionTime->format('Y-m-d H:i:s'));
                 $currentSessionEnd = $currentSessionTime->copy()->addMinutes($validated['duration_minutes']);
+                $currentDayOfWeek = $currentSessionTime->format('l');
 
                 // التحقق من توفر الجلسة في coach_available_times
-                $sessionAvailability = Availability::where('coach_id', $service->coach_id)
-                    ->where('date', $currentSessionTime->toDateString())
-                    ->where('start_time', '<=', $currentSessionTime->format('H:i'))
-                    ->where('end_time', '>=', $currentSessionEnd->format('H:i'))
-                    ->where('is_booked', false)
+                $sessionAvailability = CoachAvailability::where('User_ID', (int)$service->coach_id)
+                    ->where('Day_Of_Week', $currentDayOfWeek)
+                    ->where('Start_Time', '<=', $currentSessionTime->format('H:i:s'))
+                    ->where('End_Time', '>=', $currentSessionEnd->format('H:i:s'))
                     ->first();
 
                 if (!$sessionAvailability) {
@@ -138,13 +147,14 @@ class MentorshipRequestController extends Controller
                         'trainee_id' => Auth::id(),
                         'service_id' => $validated['service_id'],
                         'date' => $currentSessionTime->toDateString(),
+                        'day_of_week' => $currentDayOfWeek,
                         'start_time' => $currentSessionTime->format('H:i'),
                     ]);
                     return response()->json(['message' => "Session $i is not available"], 400);
                 }
 
                 // التحقق من عدم التداخل مع طلبات أخرى
-                $sessionConflicts = MentorshipRequest::where('coach_id', $service->coach_id)
+                $sessionConflicts = MentorshipRequest::where('coach_id', (int)$service->coach_id)
                     ->whereIn('status', ['pending', 'accepted'])
                     ->whereDate('first_session_time', $currentSessionTime->toDateString())
                     ->get()
@@ -159,6 +169,7 @@ class MentorshipRequestController extends Controller
                         'trainee_id' => Auth::id(),
                         'service_id' => $validated['service_id'],
                         'date' => $currentSessionTime->toDateString(),
+                        'day_of_week' => $currentDayOfWeek,
                         'start_time' => $currentSessionTime->format('H:i'),
                     ]);
                     return response()->json(['message' => "Session $i is already reserved"], 400);
@@ -174,7 +185,7 @@ class MentorshipRequestController extends Controller
             // إنشاء طلب Mentorship
             $mentorshipRequest = MentorshipRequest::create([
                 'trainee_id' => Auth::id(),
-                'coach_id' => $service->coach_id,
+                'coach_id' => (int)$service->coach_id,
                 'service_id' => $validated['service_id'],
                 'title' => $validated['title'],
                 'type' => $validated['type'],
@@ -217,7 +228,6 @@ class MentorshipRequestController extends Controller
         }
     }
 
-    // Trainee: View their requests (all statuses)
     public function traineeIndex()
     {
         $requests = MentorshipRequest::with(['service', 'coach.user'])
@@ -227,11 +237,10 @@ class MentorshipRequestController extends Controller
 
         return response()->json([
             'status' => 'success',
-            'data' => $requests->groupBy('status') // Group by status for easier frontend handling
+            'data' => $requests->groupBy('status')
         ]);
     }
 
-    // Coach: View pending requests
     public function coachPendingRequests()
     {
         $requests = MentorshipRequest::with(['service', 'trainee.user'])
@@ -246,7 +255,6 @@ class MentorshipRequestController extends Controller
         ]);
     }
 
-    // Coach: Accept a request
     public function acceptRequest($id)
     {
         $request = MentorshipRequest::where('coach_id', Auth::id())
@@ -272,34 +280,29 @@ class MentorshipRequestController extends Controller
                 foreach ($request->plan_schedule as $sessionTime) {
                     $sessionStart = Carbon::parse($sessionTime);
                     $sessionEnd = $sessionStart->copy()->addMinutes($request->duration_minutes);
+                    $dayOfWeek = $sessionStart->format('l');
 
-                    $availability = Availability::where('coach_id', $request->coach_id)
-                        ->where('date', $sessionStart->toDateString())
-                        ->where('start_time', '<=', $sessionStart->format('H:i'))
-                        ->where('end_time', '>=', $sessionEnd->format('H:i'))
-                        ->where('is_booked', false)
+                    $availability = CoachAvailability::where('User_ID', (int)$request->coach_id)
+                        ->where('Day_Of_Week', $dayOfWeek)
+                        ->where('Start_Time', '<=', $sessionStart->format('H:i:s'))
+                        ->where('End_Time', '>=', $sessionEnd->format('H:i:s'))
                         ->first();
 
-                    if ($availability) {
-                        $availability->is_booked = true;
-                        $availability->save();
-                    }
+                    // ملاحظة: مافيش is_booked، فمش هنحدّث حاجة هنا
+                    // لو عايز تضيف إدارة الحجز، هتحتاج تعديل الجدول
                 }
             } else {
                 $sessionStart = Carbon::parse($request->first_session_time);
                 $sessionEnd = $sessionStart->copy()->addMinutes($request->duration_minutes);
+                $dayOfWeek = $sessionStart->format('l');
 
-                $availability = Availability::where('coach_id', $request->coach_id)
-                    ->where('date', $sessionStart->toDateString())
-                    ->where('start_time', '<=', $sessionStart->format('H:i'))
-                    ->where('end_time', '>=', $sessionEnd->format('H:i'))
-                    ->where('is_booked', false)
+                $availability = CoachAvailability::where('User_ID', (int)$request->coach_id)
+                    ->where('Day_Of_Week', $dayOfWeek)
+                    ->where('Start_Time', '<=', $sessionStart->format('H:i:s'))
+                    ->where('End_Time', '>=', $sessionEnd->format('H:i:s'))
                     ->first();
 
-                if ($availability) {
-                    $availability->is_booked = true;
-                    $availability->save();
-                }
+                // ملاحظة: مافيش is_booked، فمش هنحدّث حاجة هنا
             }
 
             // إرسال إيميل للـ Trainee
@@ -326,7 +329,6 @@ class MentorshipRequestController extends Controller
         }
     }
 
-    // Coach: Reject a request
     public function rejectRequest($id)
     {
         $request = MentorshipRequest::where('coach_id', Auth::id())
@@ -369,7 +371,6 @@ class MentorshipRequestController extends Controller
         }
     }
 
-    // Generate plan schedule for Plan type requests
     private function generatePlanSchedule($firstSessionTime)
     {
         $sessions = [];
