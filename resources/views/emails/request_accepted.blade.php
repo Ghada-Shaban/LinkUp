@@ -20,6 +20,6 @@
     @endif
 
     <p>You can view the details in your upcoming sessions.</p>
-    <p>Best regards,<br>Your Mentorship Platform</p>
+    <p>Best regards,<br>LinkUp Platform</p>
 </body>
 </html>
