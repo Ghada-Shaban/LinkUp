@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\MentorshipRequest;
-use App\Models\CoachAvailability; // تغيير من Availability إلى CoachAvailability
+use App\Models\CoachAvailability;
 use App\Models\Service;
 use App\Models\MentorshipPlan;
 use App\Models\User;
@@ -17,6 +17,7 @@ use Illuminate\Validation\Rule;
 use Carbon\Carbon;
 use App\Mail\RequestAccepted;
 use App\Mail\RequestRejected;
+use App\Mail\NewMentorshipRequest; // إضافة الـ Import
 
 class MentorshipRequestController extends Controller
 {
@@ -289,7 +290,6 @@ class MentorshipRequestController extends Controller
                         ->first();
 
                     // ملاحظة: مافيش is_booked، فمش هنحدّث حاجة هنا
-                    // لو عايز تضيف إدارة الحجز، هتحتاج تعديل الجدول
                 }
             } else {
                 $sessionStart = Carbon::parse($request->first_session_time);
