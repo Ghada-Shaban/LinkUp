@@ -251,35 +251,47 @@ class BookingController extends Controller
                 ];
             });
 
+        // توليد كل الـ Time Slots في اليوم (من 00:00 إلى 23:00)
         $slots = [];
-        $duration = 60; // تثبيت الـ duration على 60 دقيقة
+        $duration = 60; // كل Slot ساعة
+        $startOfDay = Carbon::parse($request->date)->startOfDay();
 
-        foreach ($availabilities as $availability) {
-            $start = Carbon::parse($request->date . ' ' . $availability->Start_Time);
-            $end = Carbon::parse($request->date . ' ' . $availability->End_Time);
+        for ($hour = 0; $hour < 24; $hour++) {
+            $slotStart = $startOfDay->copy()->addHours($hour);
+            $slotEnd = $slotStart->copy()->addMinutes($duration);
 
-            // تقسيم الفترة المتاحة إلى Slots بساعة
-            while ($start->copy()->addMinutes($duration)->lte($end)) {
-                $slotStart = $start->copy();
-                $slotEnd = $slotStart->copy()->addMinutes($duration);
+            // التحقق إذا كان الـ Slot ده موجود في coach_available_times
+            $isAvailableInSchedule = false;
+            foreach ($availabilities as $availability) {
+                $availStart = Carbon::parse($request->date . ' ' . $availability->Start_Time);
+                $availEnd = Carbon::parse($request->date . ' ' . $availability->End_Time);
 
-                // التحقق من الحجز
+                if ($slotStart->gte($availStart) && $slotEnd->lte($availEnd)) {
+                    $isAvailableInSchedule = true;
+                    break;
+                }
+            }
+
+            // التحقق إذا كان الـ Slot محجوز
+            $isBooked = false;
+            if ($isAvailableInSchedule) {
                 $isBooked = $bookedSlots->contains(function ($booked) use ($slotStart, $slotEnd) {
                     return $slotStart->format('H:i:s') >= $booked['start'] &&
                            $slotEnd->format('H:i:s') <= $booked['end'];
                 });
-
-                $slots[] = [
-                    'time' => $slotStart->format('H:i'),
-                    'status' => $isBooked ? 'booked' : 'available',
-                ];
-
-                $start->addMinutes($duration);
             }
-        }
 
-        // إزالة التكرارات (لو فيه تداخل في الفترات)
-        $slots = collect($slots)->unique('time')->values()->toArray();
+            // تحديد الـ status
+            $status = 'unavailable';
+            if ($isAvailableInSchedule) {
+                $status = $isBooked ? 'booked' : 'available';
+            }
+
+            $slots[] = [
+                'time' => $slotStart->format('H:i'),
+                'status' => $status,
+            ];
+        }
 
         Log::info('Fetched available slots', [
             'coach_id' => $coachId,
