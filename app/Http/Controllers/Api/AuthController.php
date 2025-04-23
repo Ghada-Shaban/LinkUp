@@ -147,7 +147,7 @@ class AuthController extends Controller
                 if (isset($availability['time_slots'][$day])) {
                     foreach ($availability['time_slots'][$day] as $slot) {
                         $availabilityRecord = CoachAvailability::create([
-                            'User_ID' => $userID,
+                            'coach_id' => $userID,
                             'Day_Of_Week' => $day,
                             'Start_Time' => $slot['start_time'],
                             'End_Time' => $slot['end_time'],
