@@ -11,9 +11,9 @@ class CoachAvailability extends Model
     protected $table = 'coach_available_times';
    protected $fillable = [
         'coach_id',
-        'date',
-        'start_time',
-        'end_time',
+        'Day_Of_Week',
+        'Start_Time',
+        'End_Time',
     ];
     public function coach()
     {
