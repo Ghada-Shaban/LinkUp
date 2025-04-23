@@ -9,14 +9,15 @@ class CoachAvailability extends Model
 {
     use HasFactory;
     protected $table = 'coach_available_times';
-    protected $fillable = [
-        'User_ID',
-        'Day_Of_Week',
-        'Start_Time',
-        'End_Time',
+   protected $fillable = [
+        'coach_id',
+        'date',
+        'start_time',
+        'end_time',
+        'is_booked',
     ];
     public function coach()
     {
-        return $this->belongsTo(coach::class, 'coach_id', 'User_ID');
+        return $this->belongsTo(Coach::class, 'User_ID', 'User_ID');
     }
 }
