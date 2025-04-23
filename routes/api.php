@@ -9,7 +9,8 @@ use App\Http\Controllers\Api\MentorshipRequestController;
 use App\Http\Controllers\Api\CoachServiceController;
 use App\Http\Controllers\Api\ReviewController;
 use App\Http\Controllers\Api\ProfileController;
-use App\Http\Controllers\Api\CoachController; // إضافة الـ CoachController
+use App\Http\Controllers\Api\CoachController;
+use App\Http\Controllers\Api\BookingController; // إضافة الـ BookingController
 
 /*
 |--------------------------------------------------------------------------
@@ -21,10 +22,6 @@ use App\Http\Controllers\Api\CoachController; // إضافة الـ CoachControll
 | be assigned to the "api" middleware group. Make something great!
 |
 */
-
-Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
-    return $request->user();
-});
 
 Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();
@@ -47,8 +44,6 @@ Route::prefix('password')->group(function () {
 Route::get('service/enums', [EnumController::class, 'getServiceEnums']);
 
 Route::prefix('coach/{coachId}')->middleware(['auth:api', 'check.coach.ownership'])->group(function () {
-  
-
     // باقي الـ Routes
     Route::get('services/count', [CoachServiceController::class, 'getServicesCount']);
     Route::post('services', [CoachServiceController::class, 'createService']);
@@ -60,6 +55,10 @@ Route::prefix('coach/{coachId}')->middleware(['auth:api', 'check.coach.ownership
 
 Route::prefix('coach/{coachId}')->middleware(['auth:api', 'check.trainee'])->group(function () {
     Route::post('group-mentorship/{groupMentorshipId}/join', [CoachServiceController::class, 'joinGroupMentorship']);
+    
+    // الـ Routes الجديدة لـ BookingController
+    Route::get('available-dates', [BookingController::class, 'getAvailableDates']);
+    Route::get('available-slots', [BookingController::class, 'getAvailableSlots']);
 });
 
 // Routes الخاصة بـ NewSessionController
@@ -71,7 +70,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/sessions/{sessionId}/cancel', [NewSessionController::class, 'cancelSession']);
 });
 
-// Routes الخاصة بـ MentorshipRequestController (مش هتعدل حاجة هنا)
+// Routes الخاصة بـ MentorshipRequestController
 Route::middleware('auth:sanctum')->group(function () {
     // Trainee routes
     Route::prefix('trainee')->group(function () {
@@ -87,25 +86,18 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/mentorship-requests/pending', [MentorshipRequestController::class, 'coachPendingRequests']);
         Route::post('/mentorship-requests/{id}/accept', [MentorshipRequestController::class, 'acceptRequest']);
         Route::post('/mentorship-requests/{id}/reject', [MentorshipRequestController::class, 'rejectRequest']);
-         
     });
 });
- // Route لجلب الخدمات بناءً على service_type
-    Route::get('coach/{coachId}/services', [CoachServiceController::class, 'getServices']);
-       // Get Coach profile for all
-    Route::get('/coachprofile/{user_id}', [ProfileController::class, 'getCoachProfile2']);
 
-  
+// Route لجلب الخدمات بناءً على service_type
+Route::get('coach/{coachId}/services', [CoachServiceController::class, 'getServices']);
+// Get Coach profile for all
+Route::get('/coachprofile/{user_id}', [ProfileController::class, 'getCoachProfile2']);
 
-
-// Route الخاصة بـ Explore Coaches (الإضافة الجديدة)
+// Route الخاصة بـ Explore Coaches
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/coaches/explore', [CoachController::class, 'exploreCoaches']);
 });
-
-
-
-
 
 Route::middleware('auth:sanctum')->group(function () {
     // Update profile (Coach & Trainee)
