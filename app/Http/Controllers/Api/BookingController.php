@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-use App\Models\CoachAvailability; // تغيير من Availability إلى CoachAvailability
+use App\Models\CoachAvailability;
 use App\Models\Service;
 use App\Models\MentorshipRequest;
 use App\Models\User;
@@ -77,24 +77,83 @@ class BookingController extends Controller
         $availabilities = CoachAvailability::where('User_ID', $coachId)
             ->whereIn('Day_Of_Week', $this->getDaysOfWeekInMonth($startOfMonth, $endOfMonth))
             ->get()
-            ->groupBy('Day_Of_Week')
-            ->map(function ($group) {
-                return [
-                    'day_of_week' => $group->first()->Day_Of_Week,
-                    'is_available' => true,
-                ];
+            ->groupBy('Day_Of_Week');
+
+        // جلب الحجوزات (Pending أو Accepted) في الشهر
+        $bookedSlots = MentorshipRequest::where('coach_id', $coachId)
+            ->whereIn('status', ['pending', 'accepted'])
+            ->whereBetween('first_session_time', [$startOfMonth, $endOfMonth])
+            ->get()
+            ->groupBy(function ($request) {
+                return Carbon::parse($request->first_session_time)->toDateString();
             })
-            ->values();
+            ->map(function ($requests, $date) {
+                return $requests->map(function ($request) {
+                    return [
+                        'start' => Carbon::parse($request->first_session_time)->format('H:i:s'),
+                        'end' => Carbon::parse($request->first_session_time)
+                            ->addMinutes($request->duration_minutes)
+                            ->format('H:i:s'),
+                    ];
+                });
+            });
 
         // إضافة كل الأيام مع الحالة
         $allDays = [];
         $currentDate = $startOfMonth->copy();
         while ($currentDate <= $endOfMonth) {
-            $dayOfWeek = $currentDate->format('l'); // اسم اليوم (Monday, Tuesday, ...)
-            $isAvailable = $availabilities->firstWhere('day_of_week', $dayOfWeek);
+            $dayOfWeek = $currentDate->format('l');
+            $dateString = $currentDate->toDateString();
+
+            $status = 'unavailable';
+            if (isset($availabilities[$dayOfWeek])) {
+                // جلب كل الـ Slots المتاحة في اليوم
+                $daySlots = [];
+                foreach ($availabilities[$dayOfWeek] as $availability) {
+                    $start = Carbon::parse($dateString . ' ' . $availability->Start_Time);
+                    $end = Carbon::parse($dateString . ' ' . $availability->End_Time);
+                    $duration = 60; // نفس الـ duration المستخدم في getAvailableSlots
+
+                    while ($start->copy()->addMinutes($duration)->lte($end)) {
+                        $slotStart = $start->copy();
+                        $slotEnd = $slotStart->copy()->addMinutes($duration);
+
+                        $daySlots[] = [
+                            'start' => $slotStart->format('H:i:s'),
+                            'end' => $slotEnd->format('H:i:s'),
+                        ];
+
+                        $start->addMinutes($duration);
+                    }
+                }
+
+                // التحقق من الحجوزات في اليوم
+                $bookedDaySlots = $bookedSlots[$dateString] ?? collect([]);
+                $allBooked = true;
+                $hasAvailable = false;
+
+                foreach ($daySlots as $slot) {
+                    $isBooked = $bookedDaySlots->contains(function ($bookedSlot) use ($slot) {
+                        return $slot['start'] >= $bookedSlot['start'] && $slot['end'] <= $bookedSlot['end'];
+                    });
+
+                    if (!$isBooked) {
+                        $hasAvailable = true;
+                        $allBooked = false;
+                        break;
+                    }
+                }
+
+                if ($hasAvailable) {
+                    $status = 'available';
+                } elseif ($allBooked && $bookedDaySlots->isNotEmpty()) {
+                    $status = 'booked';
+                }
+            }
+
             $allDays[] = [
-                'date' => $currentDate->toDateString(),
-                'status' => $isAvailable ? 'available' : 'unavailable',
+                'date' => $dateString,
+                'status' => $status,
             ];
             $currentDate->addDay();
         }
@@ -103,6 +162,7 @@ class BookingController extends Controller
             'coach_id' => $coachId,
             'month' => $request->month,
             'dates_count' => count($availabilities),
+            'booked_dates' => array_keys($bookedSlots->toArray()),
         ]);
 
         return response()->json([
@@ -184,8 +244,10 @@ class BookingController extends Controller
             ->get()
             ->map(function ($request) {
                 return [
-                    'start' => Carbon::parse($request->first_session_time),
-                    'end' => Carbon::parse($request->first_session_time)->addMinutes($request->duration_minutes),
+                    'start' => Carbon::parse($request->first_session_time)->format('H:i:s'),
+                    'end' => Carbon::parse($request->first_session_time)
+                        ->addMinutes($request->duration_minutes)
+                        ->format('H:i:s'),
                 ];
             });
 
@@ -201,35 +263,34 @@ class BookingController extends Controller
                 $slotStart = $start->copy();
                 $slotEnd = $slotStart->copy()->addMinutes($duration);
 
-                // التحقق من عدم التداخل مع الطلبات الموجودة
-                $isAvailable = true;
-                foreach ($bookedSlots as $booked) {
-                    if ($slotStart < $booked['end'] && $slotEnd > $booked['start']) {
-                        $isAvailable = false;
-                        break;
-                    }
-                }
+                // التحقق من الحجز
+                $isBooked = $bookedSlots->contains(function ($booked) use ($slotStart, $slotEnd) {
+                    return $slotStart->format('H:i:s') >= $booked['start'] &&
+                           $slotEnd->format('H:i:s') <= $booked['end'];
+                });
 
-                if ($isAvailable) {
-                    $slots[] = $slotStart->format('H:i');
-                }
+                $slots[] = [
+                    'time' => $slotStart->format('H:i'),
+                    'status' => $isBooked ? 'booked' : 'available',
+                ];
 
                 $start->addMinutes($duration);
             }
         }
 
         // إزالة التكرارات (لو فيه تداخل في الفترات)
-        $slots = array_unique($slots);
+        $slots = collect($slots)->unique('time')->values()->toArray();
 
         Log::info('Fetched available slots', [
             'coach_id' => $coachId,
             'date' => $request->date,
             'duration' => $duration,
             'slots_count' => count($slots),
+            'slots' => $slots,
         ]);
 
         return response()->json([
-            'available_slots' => array_values($slots),
+            'available_slots' => $slots,
         ]);
     }
 
@@ -241,7 +302,7 @@ class BookingController extends Controller
         $days = [];
         $currentDate = $startOfMonth->copy();
         while ($currentDate <= $endOfMonth) {
-            $days[] = $currentDate->format('l'); // Monday, Tuesday, ...
+            $days[] = $currentDate->format('l');
             $currentDate->addDay();
         }
         return array_unique($days);
