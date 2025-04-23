@@ -38,12 +38,36 @@ class BookingController extends Controller
         ]);
 
         $service = Service::findOrFail($request->service_id);
-        if ($service->coach_id !== $coachId) {
+        
+        // Debug Log لمعرفة قيم وأنواع coach_id
+        Log::debug('Service details', [
+            'service_id' => $request->service_id,
+            'coach_id_from_service' => $service->coach_id,
+            'coach_id_from_request' => $coachId,
+            'service_coach_id_type' => gettype($service->coach_id),
+            'coach_id_type' => gettype($coachId),
+            'service_coach_id_value' => var_export($service->coach_id, true),
+        ]);
+
+        // استخدام Casting صريح لتجنب مشاكل Type Casting
+        if ((int)$service->coach_id !== (int)$coachId) {
             Log::warning('Service does not belong to coach', [
                 'coach_id' => $coachId,
                 'service_id' => $request->service_id,
+                'service_coach_id' => $service->coach_id,
+                'service_coach_id_type' => gettype($service->coach_id),
+                'coach_id_type' => gettype($coachId),
             ]);
-            return response()->json(['message' => 'Invalid service'], 400);
+            return response()->json([
+                'message' => 'Invalid service',
+                'details' => [
+                    'service_id' => $request->service_id,
+                    'coach_id_from_request' => $coachId,
+                    'coach_id_from_service' => $service->coach_id,
+                    'service_coach_id_type' => gettype($service->coach_id),
+                    'coach_id_type' => gettype($coachId),
+                ]
+            ], 400);
         }
 
         $startOfMonth = Carbon::parse($request->month)->startOfMonth();
@@ -115,12 +139,36 @@ class BookingController extends Controller
         ]);
 
         $service = Service::findOrFail($request->service_id);
-        if ($service->coach_id !== $coachId) {
+        
+        // Debug Log لمعرفة قيم وأنواع coach_id
+        Log::debug('Service details for slots', [
+            'service_id' => $request->service_id,
+            'coach_id_from_service' => $service->coach_id,
+            'coach_id_from_request' => $coachId,
+            'service_coach_id_type' => gettype($service->coach_id),
+            'coach_id_type' => gettype($coachId),
+            'service_coach_id_value' => var_export($service->coach_id, true),
+        ]);
+
+        // استخدام Casting صريح لتجنب مشاكل Type Casting
+        if ((int)$service->coach_id !== (int)$coachId) {
             Log::warning('Service does not belong to coach', [
                 'coach_id' => $coachId,
                 'service_id' => $request->service_id,
+                'service_coach_id' => $service->coach_id,
+                'service_coach_id_type' => gettype($service->coach_id),
+                'coach_id_type' => gettype($coachId),
             ]);
-            return response()->json(['message' => 'Invalid service'], 400);
+            return response()->json([
+                'message' => 'Invalid service',
+                'details' => [
+                    'service_id' => $request->service_id,
+                    'coach_id_from_request' => $coachId,
+                    'coach_id_from_service' => $service->coach_id,
+                    'service_coach_id_type' => gettype($service->coach_id),
+                    'coach_id_type' => gettype($coachId),
+                ]
+            ], 400);
         }
 
         // جلب الفترات المتاحة من coach_available_times
