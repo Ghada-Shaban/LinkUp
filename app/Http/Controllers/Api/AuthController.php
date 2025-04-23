@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller; 
 use App\Mail\WelcomeMail;
 use App\Models\Coach;
-use App\Models\Availability;
+use App\Models\CoachAvailability;
 use App\Models\CoachLanguage;
 use App\Models\CoachSkill;
 use App\Models\Trainee;
