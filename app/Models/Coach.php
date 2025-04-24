@@ -16,7 +16,8 @@ class Coach extends Model
 
     protected $fillable = [
         'User_ID', 'Title', 'Company_or_School',
-        'Bio', 'admin_id', 'Years_Of_Experience', 'Months_Of_Experience'
+        'Bio', 'admin_id', 'Years_Of_Experience', 'Months_Of_Experience',
+        'status',
     ];
 
     public function skills()
@@ -33,6 +34,9 @@ class Coach extends Model
     {
         return $this->belongsTo(Admin::class);
     }
+    const STATUS_PENDING = 'pending';
+    const STATUS_APPROVED = 'approved';
+    const STATUS_REJECTED = 'rejected';
 
     public function user()
     {
