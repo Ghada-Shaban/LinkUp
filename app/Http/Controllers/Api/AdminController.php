@@ -13,12 +13,7 @@ use Illuminate\Support\Facades\DB;
 
 class AdminController extends Controller
 {
-    /**
- * Get all pending coach registration requests.
- *
- * @param Request $request
- * @return \Illuminate\Http\JsonResponse
- */
+  
 public function getPendingCoachRequests(Request $request)
 {
     // Check if the authenticated user is an admin
