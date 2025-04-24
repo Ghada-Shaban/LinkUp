@@ -40,9 +40,8 @@ public function getPendingCoachRequests(Request $request)
                     'photo' => $coach->user->photo,
                     'languages' => $coach->languages->pluck('language'),
                     'skills' => $coach->skills->pluck('skill'),
-                    'status' => $coach->status,
-                    'created_at' => $coach->created_at,
-                    'updated_at' => $coach->updated_at,
+                 
+                   
                 ];
             });
 
