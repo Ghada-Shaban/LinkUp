@@ -33,6 +33,13 @@ public function getAvailableSlotsAttribute()
     {
         return $this->max_participants - $this->current_participants;
     }
-    
+    public function requests()
+    {
+        return $this->morphMany(MentorshipRequest::class, 'requestable');
+    }
+    public function coach()
+    {
+        return $this->service->coach();
+    }
 }
 
