@@ -145,8 +145,8 @@ class AuthController extends Controller
             'message' => 'Failed to submit registration request',
             'error' => $e->getMessage(),
         ], 500);
-        
-    
+    }
+    }
     private function setAvailability($userID, array $availability)
     {
         $savedSlots = [];
