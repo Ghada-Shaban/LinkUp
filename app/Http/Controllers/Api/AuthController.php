@@ -88,7 +88,7 @@ class AuthController extends Controller
             'availability.time_slots.*.*.start_time' => 'required_with:availability|date_format:H:i',
             'availability.time_slots.*.*.end_time' => 'required_with:availability|date_format:H:i|after:availability.time_slots.*.*.start_time',
         ]));
-
+    try {
         return DB::transaction(function () use ($validated, $request) {
             $photoPath = $request->hasFile('Photo') ? $request->file('Photo')->store('photos', 'public') : null;
         
