@@ -244,25 +244,45 @@ class AuthController extends Controller
         });
     }
 
-    public function login(Request $request)
-    {
-        $request->validate([
-            'Email' => 'required|email',
-            'Password' => 'required',
-        ]);
+   public function login(Request $request): 
+{
+   
+    $request->validate([
+        'email' => 'required|email',
+        'password' => 'required',
+    ]);
 
-        $user = User::where('Email', $request->Email)->first();
-        if ($user && Hash::check($request->Password, $user->password)) {
-            $token = $user->createToken('user-token')->plainTextToken;
-            $role = $user->role_profile;
+   
+    $user = User::where('email', $request->email)->first();
 
+    // Check if user exists and password matches
+    if (!$user || !Hash::check($request->password, $user->password)) {
+        return response()->json([
+            'message' => 'Invalid credentials',
+        ], 401);
+    }
+
+ 
+    if ($user->role_profile === 'Coach') {
+        $coach = Coach::where('User_ID', $user->User_ID)->first();
+        if ($coach && $coach->status === Coach::STATUS_PENDING) {
             return response()->json([
-                'message' => "Login successful $role",
-                'token' => $token,
-                'User_ID' => $user->User_ID,
-                'role' => $role,
-            ]);
+                'message' => 'Your account is still pending approval',
+            ], 403);
         }
+    }
+
+ 
+    $token = $user->createToken('user-token')->plainTextToken;
+    $role = $user->role_profile;
+
+    return response()->json([
+        'message' => "Login successful $role",
+        'token' => $token,
+        'User_ID' => $user->User_ID,
+        'role' => $role,
+    ], 200);
+}
 
         return response()->json([
             'message' => 'Invalid credentials',
