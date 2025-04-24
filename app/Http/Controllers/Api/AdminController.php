@@ -19,7 +19,7 @@ class AdminController extends Controller
  * @param Request $request
  * @return \Illuminate\Http\JsonResponse
  */
-public function getPendingCoachRequests(Request $request): \Illuminate\Http\JsonResponse
+public function getPendingCoachRequests(Request $request)
 {
     // Check if the authenticated user is an admin
     $authAdmin = auth('sanctum')->user();
@@ -74,8 +74,7 @@ public function getPendingCoachRequests(Request $request): \Illuminate\Http\Json
  * @param int $userId
  * @return \Illuminate\Http\JsonResponse
  */
-public function handleCoachRequest(Request $request, $userId): \Illuminate\Http\JsonResponse
-{
+public function handleCoachRequest(Request $request, $userId){
     // Check if the authenticated user is an admin
     $authAdmin = auth('sanctum')->user();
     if (!$authAdmin || !($authAdmin instanceof Admin)) {
@@ -132,7 +131,7 @@ public function handleCoachRequest(Request $request, $userId): \Illuminate\Http\
         ], 500);
     }
 }
-   
+}
         
            
             
