@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\CoachServiceController;
 use App\Http\Controllers\Api\ReviewController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\CoachController;
+use App\Http\Controllers\Api\AdminController;
 use App\Http\Controllers\Api\BookingController; // إضافة الـ BookingController
 
 /*
@@ -110,3 +111,6 @@ Route::middleware('auth:sanctum')->group(function () {
     // Get Trainee profile
     Route::get('/trainee/profile/{user_id}', [ProfileController::class, 'getTraineeProfile']);
 });
+//admin
+Route::get('/admin/coach-requests', [AdminController::class, 'getPendingCoachRequests']);
+Route::post('/admin/coach-requests/{coachId}/handle', [AdminController::class, 'handleCoachRequest']);
