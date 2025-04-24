@@ -108,7 +108,8 @@ class AuthController extends Controller
                 'Bio' => $validated['Bio'],
                 'admin_id' => 1, 
                 'Years_Of_Experience' => $validated['Years_Of_Experience'],
-                'Months_Of_Experience' => $validated['Months_Of_Experience']
+                'Months_Of_Experience' => $validated['Months_Of_Experience'],
+                'status' => Coach::STATUS_PENDING,
             ]);
 
             foreach ($validated['Skills'] as $skill) {
