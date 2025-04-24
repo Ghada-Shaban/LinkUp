@@ -19,4 +19,20 @@ class MentorshipPlan extends Model
     {
         return $this->belongsTo(Mentorship::class, 'service_id', 'service_id');
     }
+    public function mentorship()
+    {
+        return $this->belongsTo(Mentorship::class, 'service_id', 'service_id');
+    }
+    public function requests()
+    {
+        return $this->morphMany(MentorshipRequest::class, 'requestable');
+    }
+    public function service()
+    {
+        return $this->belongsTo(Service::class, 'service_id');
+    }
+    public function coach()
+    {
+        return $this->service->coach();
+    }
 }
