@@ -26,6 +26,7 @@ return new class extends Migration
             $table->foreignId('admin_id')->constrained('admins')->onDelete('cascade');
             $table->integer('Years_Of_Experience')->default(0);
             $table->integer('Months_Of_Experience')->default(0);
+            $table->enum('status', ['pending', 'approved', 'rejected'])
             $table->timestamps();
             $table->primary('User_ID');
             
