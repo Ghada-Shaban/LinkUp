@@ -119,4 +119,8 @@ public function getPhotoUrlAttribute()
             }
         });
     }
+    public function requests()
+    {
+        return $this->morphMany(MentorshipRequest::class, 'requestable');
+    }
 }
