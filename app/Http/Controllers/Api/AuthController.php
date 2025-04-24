@@ -283,7 +283,7 @@ class AuthController extends Controller
         'User_ID' => $user->User_ID,
         'role' => $role,
     ], 200);
-}
+
 
         return response()->json([
             'message' => 'Invalid credentials',
