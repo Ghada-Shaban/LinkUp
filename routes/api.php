@@ -114,3 +114,11 @@ Route::middleware('auth:sanctum')->group(function () {
 //admin
 Route::get('/admin/coach-requests', [AdminController::class, 'getPendingCoachRequests']);
 Route::post('/admin/coach-requests/{coachId}/handle', [AdminController::class, 'handleCoachRequest']);
+//updated requests path
+Route::middleware('auth:sanctum')->group(function () {
+    Route::post('/mentorship-request', [MentorshipRequestController::class, 'requestMentorship']);
+    Route::get('/traineerequest', [MentorshipRequestController::class, 'traineegetrequest']);
+    Route::get('/coach/requests', [MentorshipRequestController::class, 'viewRequests']);
+    Route::post('/coach/requests/{id}/accept', [MentorshipRequestController::class, 'acceptRequest']);
+    Route::post('/coach/requests/{id}/reject', [MentorshipRequestController::class, 'rejectRequest']);
+});
