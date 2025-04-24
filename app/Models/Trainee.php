@@ -53,4 +53,8 @@ use Illuminate\Database\Eloquent\Model;
     {
         return $this->hasMany(EmailPerformanceReport::class, 'trainee_id', 'User_ID');
     }
+    public function mentorshipRequests()
+    {
+        return $this->hasMany(MentorshipRequest::class, 'trainee_id', 'User_ID');
+    }
 }
