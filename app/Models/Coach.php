@@ -76,4 +76,12 @@ class Coach extends Model
     }
 
     protected $appends = ['average_rating'];
+    public function requests()
+    {
+        return $this->morphMany(MentorshipRequest::class, 'requestable');
+    }
+    public function mentorshipRequests()
+    {
+        return $this->hasMany(MentorshipRequest::class, 'coach_id', 'User_ID');
+    }
 }
