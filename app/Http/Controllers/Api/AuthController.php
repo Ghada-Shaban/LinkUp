@@ -132,13 +132,20 @@ class AuthController extends Controller
             Mail::to($user->Email)->send(new WelcomeMail($user));
 
             return response()->json([
-                'message' => 'Coach registered successfully',
-                'user' => $user,
-                'token' => $user->createToken('auth_token')->plainTextToken,
-                'photo_path' => $photoPath
-            ], 201);
-        });
-    }
+            'message' => 'Registration request submitted successfully. Awaiting admin approval.',
+            'user_id' => $user->User_ID,
+        ], 201);
+    } catch (\Exception $e) {
+        \Log::error('Failed to submit coach registration request', [
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString(),
+        ]);
+        return response()->json([
+            'message' => 'Failed to submit registration request',
+            'error' => $e->getMessage(),
+        ], 500);
+        }
+    
     private function setAvailability($userID, array $availability)
     {
         $savedSlots = [];
