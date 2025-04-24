@@ -135,7 +135,7 @@ class AuthController extends Controller
             'message' => 'Registration request submitted successfully. Awaiting admin approval.',
             'user_id' => $user->User_ID,
         ], 201);
-        }
+        });
     } catch (\Exception $e) {
         \Log::error('Failed to submit coach registration request', [
             'error' => $e->getMessage(),
