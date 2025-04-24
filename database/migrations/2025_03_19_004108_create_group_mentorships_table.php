@@ -23,8 +23,8 @@ return new class extends Migration
                 'Thursday', 'Friday', 'Saturday', 'Sunday'
             ]); 
             $table->time('start_time'); 
-            $table->json('trainee_ids')->nullable()->after('coach_id');
-            $table->boolean('is_active')->default(true)->after('trainee_ids');
+            $table->json('trainee_ids')->nullable();
+            $table->boolean('is_active')->default(true);
             $table->foreign('service_id')->references('service_id')->on('services')->onDelete('cascade');
         });
     }
