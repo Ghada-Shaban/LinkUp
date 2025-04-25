@@ -306,18 +306,16 @@ public function login(Request $request)
             }
         }
 
-        $token = $user->createToken('user-token')->plainTextToken;
-        $role = $user->role_profile;
+$token = $user->createToken('user-token')->plainTextToken;
+$role = $user->role_profile;
 
-        return response()->json([
-            'message' => "Login successful $role",
-            'token' => $token,
-            'User_ID' => $user->User_ID,
-            'role' => $role,
-        ], 200);
-    }
+return response()->json([
+    'message' => "Login successful $role",
+    'token' => $token,
+    'User_ID' => $user->User_ID,
+    'role' => $role,
+], 200);
 
-    // باقي الـ methods زي ما هي...
 }
 
     public function logout(Request $request)
