@@ -246,7 +246,6 @@ class AuthController extends Controller
         });
     }
 
-
 public function login(Request $request)
 {
     $request->validate([
@@ -258,8 +257,8 @@ public function login(Request $request)
     $admin = Admin::where('Email', $request->Email)->first();
 
     if ($admin) {
-        // التحقق من الباسوورد للـ admin
-        if (!Hash::check($request->Password, $admin->password)) {
+        // التحقق من الباسوورد للـ admin (مقارنة مباشرة لأنه plain text)
+        if ($request->Password !== $admin->password) {
             return response()->json([
                 'message' => 'Invalid credentials',
             ], 401);
@@ -306,7 +305,7 @@ public function login(Request $request)
         'User_ID' => $user->User_ID,
         'role' => $role,
     ], 200);
-    
+
         
     }
 
