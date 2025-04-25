@@ -246,47 +246,47 @@ class AuthController extends Controller
         });
     }
 
-   public function login(Request $request)
+
+public function login(Request $request)
 {
-   
     $request->validate([
         'Email' => 'required|email',
         'Password' => 'required',
     ]);
 
-   
-    $admin = Admin::where('Email', $request->email)->first();
+    // ابحث عن الـ admin في جدول admins
+    $admin = Admin::where('Email', $request->Email)->first();
 
     if ($admin) {
-        // If admin is found, check the password
-        if ($request->password, $admin->password) {
+        // التحقق من الباسوورد للـ admin
+        if (!Hash::check($request->Password, $admin->password)) {
             return response()->json([
                 'message' => 'Invalid credentials',
             ], 401);
         }
 
-        // Generate token for admin
+        // إنشاء token للـ admin
         $token = $admin->createToken('admin-token')->plainTextToken;
 
         return response()->json([
             'message' => 'Login successful Admin',
             'token' => $token,
-            'User_ID' => $admin->id, // أو أي حقل ID بتستخدميه في جدول admins
+            'User_ID' => $admin->id,
             'role' => 'Admin',
         ], 200);
     }
 
-    // If not found in admins, try the users table (Coach/Trainee)
-    $user = User::where('Email', $request->email)->first();
+    // لو مش admin، ابحث في جدول users (Coach/Trainee)
+    $user = User::where('Email', $request->Email)->first();
 
-    // Check if user exists and password matches
-    if (!$user || !Hash::check($request->password, $user->password)) {
+    // التحقق من وجود الـ user والباسوورد
+    if (!$user || !Hash::check($request->Password, $user->password)) {
         return response()->json([
             'message' => 'Invalid credentials',
         ], 401);
     }
 
-    // Check if the user is a Coach and their status
+    // التحقق لو الـ user هو Coach وحالته pending
     if ($user->role_profile === 'Coach') {
         $coach = Coach::where('User_ID', $user->User_ID)->first();
         if ($coach && $coach->status === Coach::STATUS_PENDING) {
@@ -296,7 +296,7 @@ class AuthController extends Controller
         }
     }
 
-    // Generate token for user (Coach/Trainee)
+    // إنشاء token للـ user (Coach/Trainee)
     $token = $user->createToken('user-token')->plainTextToken;
     $role = $user->role_profile;
 
@@ -306,7 +306,6 @@ class AuthController extends Controller
         'User_ID' => $user->User_ID,
         'role' => $role,
     ], 200);
-
     
         
     }
