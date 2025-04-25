@@ -292,7 +292,7 @@ public function login(Request $request)
     if (!$user) {
         return response()->json([
             'message' => 'User not found',
-            'email' => $email,
+            
         ], 404);
     }
 
