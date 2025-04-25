@@ -7,7 +7,8 @@ use Illuminate\Http\Request;
 use App\Models\CoachAvailability;
 use App\Models\Service;
 use App\Models\MentorshipRequest;
-use App\Models\User;
+use App\Models\GroupMentorship;
+use App\Models\NewSession;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
@@ -19,9 +20,9 @@ class BookingController extends Controller
      */
     public function getAvailableDates(Request $request, $coachId)
     {
-        // التحقق من أن الـ Trainee ماعندوش طلبات Pending أو Accepted
+        // التحقق من أن الـ Trainee ماعندوش طلبات Pending أو Accepted أو Pending Payment
         $existingRequest = MentorshipRequest::where('trainee_id', Auth::id())
-            ->whereIn('status', ['pending', 'accepted'])
+            ->whereIn('status', ['pending', 'accepted', 'pending_payment'])
             ->exists();
 
         if ($existingRequest) {
@@ -29,7 +30,7 @@ class BookingController extends Controller
                 'trainee_id' => Auth::id(),
                 'coach_id' => $coachId,
             ]);
-            return response()->json(['message' => 'You already have a pending or accepted request'], 403);
+            return response()->json(['message' => 'You already have a pending, accepted, or awaiting payment request'], 403);
         }
 
         $validated = $request->validate([
@@ -38,7 +39,7 @@ class BookingController extends Controller
         ]);
 
         $service = Service::findOrFail($request->service_id);
-        
+
         // Debug Log لمعرفة قيم وأنواع coach_id
         Log::debug('Service details', [
             'service_id' => $request->service_id,
@@ -79,20 +80,20 @@ class BookingController extends Controller
             ->get()
             ->groupBy('Day_Of_Week');
 
-        // جلب الحجوزات (Pending أو Accepted) في الشهر
-        $bookedSlots = MentorshipRequest::where('coach_id', $coachId)
-            ->whereIn('status', ['pending', 'accepted'])
-            ->whereBetween('first_session_time', [$startOfMonth, $endOfMonth])
+        // جلب الحجوزات (pending أو upcoming) في الشهر من جدول new_sessions
+        $bookedSlots = NewSession::where('coach_id', $coachId)
+            ->whereIn('status', ['pending', 'upcoming'])
+            ->whereBetween('session_time', [$startOfMonth, $endOfMonth])
             ->get()
-            ->groupBy(function ($request) {
-                return Carbon::parse($request->first_session_time)->toDateString();
+            ->groupBy(function ($session) {
+                return Carbon::parse($session->session_time)->toDateString();
             })
-            ->map(function ($requests, $date) {
-                return $requests->map(function ($request) {
+            ->map(function ($sessions, $date) {
+                return $sessions->map(function ($session) {
                     return [
-                        'start' => Carbon::parse($request->first_session_time)->format('H:i:s'),
-                        'end' => Carbon::parse($request->first_session_time)
-                            ->addMinutes($request->duration_minutes)
+                        'start' => Carbon::parse($session->session_time)->format('H:i:s'),
+                        'end' => Carbon::parse($session->session_time)
+                            ->addMinutes($session->duration_minutes)
                             ->format('H:i:s'),
                     ];
                 });
@@ -180,9 +181,9 @@ class BookingController extends Controller
      */
     public function getAvailableSlots(Request $request, $coachId)
     {
-        // التحقق من أن الـ Trainee ماعندوش طلبات Pending أو Accepted
+        // التحقق من أن الـ Trainee ماعندوش طلبات Pending أو Accepted أو Pending Payment
         $existingRequest = MentorshipRequest::where('trainee_id', Auth::id())
-            ->whereIn('status', ['pending', 'accepted'])
+            ->whereIn('status', ['pending', 'accepted', 'pending_payment'])
             ->exists();
 
         if ($existingRequest) {
@@ -190,7 +191,7 @@ class BookingController extends Controller
                 'trainee_id' => Auth::id(),
                 'coach_id' => $coachId,
             ]);
-            return response()->json(['message' => 'You already have a pending or accepted request'], 403);
+            return response()->json(['message' => 'You already have a pending, accepted, or awaiting payment request'], 403);
         }
 
         $validated = $request->validate([
@@ -199,7 +200,7 @@ class BookingController extends Controller
         ]);
 
         $service = Service::findOrFail($request->service_id);
-        
+
         // Debug Log لمعرفة قيم وأنواع coach_id
         Log::debug('Service details for slots', [
             'service_id' => $request->service_id,
@@ -237,16 +238,16 @@ class BookingController extends Controller
             ->where('Day_Of_Week', $dayOfWeek)
             ->get();
 
-        // جلب الطلبات الموجودة (Pending أو Accepted) في اليوم
-        $bookedSlots = MentorshipRequest::where('coach_id', $coachId)
-            ->whereIn('status', ['pending', 'accepted'])
-            ->whereDate('first_session_time', $request->date)
+        // جلب الجلسات المحجوزة (pending أو upcoming) في اليوم من جدول new_sessions
+        $bookedSlots = NewSession::where('coach_id', $coachId)
+            ->whereIn('status', ['pending', 'upcoming'])
+            ->whereDate('session_time', $request->date)
             ->get()
-            ->map(function ($request) {
+            ->map(function ($session) {
                 return [
-                    'start' => Carbon::parse($request->first_session_time)->format('H:i:s'),
-                    'end' => Carbon::parse($request->first_session_time)
-                        ->addMinutes($request->duration_minutes)
+                    'start' => Carbon::parse($session->session_time)->format('H:i:s'),
+                    'end' => Carbon::parse($session->session_time)
+                        ->addMinutes($session->duration_minutes)
                         ->format('H:i:s'),
                 ];
             });
