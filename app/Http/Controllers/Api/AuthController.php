@@ -291,7 +291,7 @@ public function login(Request $request)
 
     if (!$user) {
         return response()->json([
-            'message' => 'User not found',
+            'message' =>  'The associated user account is missing. Please contact support for more details.',
             
         ], 404);
     }
