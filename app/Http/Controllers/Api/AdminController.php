@@ -70,9 +70,10 @@ public function getPendingCoachRequests(Request $request)
  * @param int $userId
  * @return \Illuminate\Http\JsonResponse
  */
-public function handleCoachRequest(Request $request, $userId){
+public function handleCoachRequest(Request $request, $userId)
+{
     // Check if the authenticated user is an admin
-  $authAdmin = auth('admin-api')->user();
+    $authAdmin = auth('admin-api')->user();
     if (!$authAdmin) {
         return response()->json(['message' => 'Unauthorized'], 401);
     }
@@ -83,11 +84,15 @@ public function handleCoachRequest(Request $request, $userId){
     ]);
 
     try {
+        // Find the coach, including soft-deleted ones if necessary
         $coach = Coach::where('User_ID', $userId)->firstOrFail();
 
         if ($coach->status !== Coach::STATUS_PENDING) {
             return response()->json(['message' => 'Request has already been processed'], 400);
         }
+
+        // Get the user before any deletion (to access photo if exists)
+        $user = $coach->user;
 
         if ($validated['action'] === 'approve') {
             $coach->status = Coach::STATUS_APPROVED;
@@ -98,18 +103,23 @@ public function handleCoachRequest(Request $request, $userId){
             $message = 'Coach registration request rejected';
 
             // Delete related data
-            CoachLanguage::where('coach_id', $userId)->delete();
-            CoachSkill::where('coach_id', $userId)->delete();
-            $coach->delete();
-            User::where('User_ID', $userId)->delete();
+            CoachLanguage::where('coach_id', $userId)->forceDelete();
+            CoachSkill::where('coach_id', $userId)->forceDelete();
 
             // Delete photo if exists
-            if ($coach->user->photo) {
-                \Storage::disk('public')->delete($coach->user->photo);
+            if ($user && $user->photo) {
+                \Storage::disk('public')->delete($user->photo);
             }
+
+            // Delete coach and user (forceDelete to permanently remove)
+            $coach->forceDelete();
+            User::where('User_ID', $userId)->forceDelete();
         }
 
-        $coach->save();
+        // Save the coach (only if not deleted)
+        if ($validated['action'] === 'approve') {
+            $coach->save();
+        }
 
         return response()->json([
             'message' => $message,
@@ -123,7 +133,6 @@ public function handleCoachRequest(Request $request, $userId){
         ]);
         return response()->json([
             'message' => 'Failed to handle coach registration request',
-            'error' => $e->getMessage(),
         ], 500);
     }
 }
