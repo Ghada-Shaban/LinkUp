@@ -67,5 +67,15 @@ class Kernel extends HttpKernel
         'check.coach.ownership' => \App\Http\Middleware\CheckCoachOwnership::class, 
         'check.trainee' => \App\Http\Middleware\CheckTrainee::class,
     ];
-}
 
+    /**
+     * Define the application's command schedule.
+     *
+     * @param  \Illuminate\Console\Scheduling\Schedule  $schedule
+     * @return void
+     */
+    protected function schedule(\Illuminate\Console\Scheduling\Schedule $schedule)
+    {
+        $schedule->job(new \App\Jobs\CheckPendingPaymentsJob)->everyMinute();
+    }
+}
