@@ -1,5 +1,3 @@
-<?php
-
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -11,6 +9,7 @@ class Admin extends Authenticatable
 {
     use HasApiTokens, HasFactory;
 
+    protected $table = 'admins'; // التأكد من اسم الجدول
     protected $primaryKey = "id";
     public $incrementing = true;
     protected $keyType = 'int';
