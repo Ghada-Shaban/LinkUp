@@ -6,22 +6,19 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('new_sessions', function (Blueprint $table) {
             $table->id('new_session_id');
-            $table->dateTime('date_time');
+            $table->dateTime('date_time')->index(); // إضافة index لتحسين الأداء
             $table->integer('duration');
-            $table->enum('status', ['Pending', 'Scheduled', 'Completed', 'Cancelled'])->default('Pending');
+            $table->enum('status', ['Pending', 'Scheduled', 'Completed', 'Cancelled'])->default('Pending')->index(); // إضافة index
+            $table->enum('payment_status', ['Pending', 'Completed', 'Failed'])->default('Pending'); // إضافة عمود الدفع
             $table->string('meeting_link')->nullable();
             $table->unsignedBigInteger('service_id');
-            $table->unsignedBigInteger('mentorship_request_id')->nullable(); // العمود الجديد للربط
+            $table->unsignedBigInteger('mentorship_request_id')->nullable();
             $table->timestamps();
 
-            // Foreign key constraints
             $table->foreign('service_id')
                   ->references('service_id')
                   ->on('services')
@@ -34,9 +31,6 @@ return new class extends Migration
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('new_sessions');
