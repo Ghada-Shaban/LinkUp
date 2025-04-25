@@ -282,7 +282,7 @@ public function login(Request $request)
             'message' => 'Login successful Admin',
             'token' => $token,
             'admin_id' => $admin->id,
-            'role' => 'Admin',
+           
         ], 200);
     }
 
