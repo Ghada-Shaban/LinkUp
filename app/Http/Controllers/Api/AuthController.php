@@ -249,51 +249,57 @@ class AuthController extends Controller
 public function login(Request $request)
 {
     $request->validate([
-        'Email' => 'required|email',
-        'Password' => 'required',
+        'Email' => 'required_without:email|email',
+        'email' => 'required_without:Email|email',
+        'Password' => 'required_without:password',
+        'password' => 'required_without:Password',
     ]);
 
+    // جلب الإيميل والباسوورد بغض النظر عن الحالة (uppercase أو lowercase)
+    $email = strtolower($request->Email ?? $request->email);
+    $password = $request->Password ?? $request->password;
+
     // ابحث عن الـ admin في جدول admins (case-insensitive)
-    $email = strtolower($request->Email);
     $admin = Admin::whereRaw('LOWER(Email) = ?', [$email])->first();
 
-    if (!$admin) {
-        // Debugging response مؤقت
+    if ($admin) {
+        // التحقق من الباسوورد للـ admin (مقارنة مباشرة، case-insensitive، وتنظيف المسافات)
+        $requestPassword = trim(strtolower($password));
+        $adminPassword = trim(strtolower($admin->getRawOriginal('Password')));
+
+        if ($requestPassword !== $adminPassword) {
+            return response()->json([
+                'message' => 'Invalid credentials',
+                'request_password' => $password,
+                'admin_password' => $admin->getRawOriginal('Password'),
+            ], 401);
+        }
+
+        // إنشاء token للـ admin
+        $token = $admin->createToken('admin-token')->plainTextToken;
+
         return response()->json([
-            'message' => 'Admin not found',
-            'email' => $request->Email,
+            'message' => 'Login successful Admin',
+            'token' => $token,
+            'User_ID' => $admin->id,
+            'role' => 'Admin',
+        ], 200);
+    }
+
+    // لو مش admin، ابحث في جدول users (Coach/Trainee) مع التعامل مع case-insensitive
+    $user = User::whereRaw('LOWER(Email) = ?', [$email])->first();
+
+    if (!$user) {
+        return response()->json([
+            'message' => 'User not found',
+            'email' => $email,
         ], 404);
     }
 
-    // التحقق من الباسوورد للـ admin (مقارنة مباشرة، case-insensitive، وتنظيف المسافات)
-    $requestPassword = trim(strtolower($request->Password));
-    $adminPassword = trim(strtolower($admin->getRawOriginal('Password'))); // غيّرنا password لـ Password
-
-    if ($requestPassword !== $adminPassword) {
-        // Debugging response مؤقت
+    if (!Hash::check($password, $user->password)) {
         return response()->json([
             'message' => 'Invalid credentials',
-            'request_password' => $request->Password,
-            'admin_password' => $admin->getRawOriginal('Password'), // غيّرنا هنا كمان
-        ], 401);
-    }
-
-    // إنشاء token للـ admin
-    $token = $admin->createToken('admin-token')->plainTextToken;
-
-    return response()->json([
-        'message' => 'Login successful Admin',
-        'token' => $token,
-        'User_ID' => $admin->id,
-        'role' => 'Admin',
-    ], 200);
-
-    // باقي الكود بتاع الـ users (Coach/Trainee) زي ما هو
-    $user = User::where('Email', $request->Email)->first();
-
-    if (!$user || !Hash::check($request->Password, $user->password)) {
-        return response()->json([
-            'message' => 'Invalid credentials',
+            'request_password' => $password,
         ], 401);
     }
 
@@ -316,7 +322,6 @@ public function login(Request $request)
         'role' => $role,
     ], 200);
 }
-
     public function logout(Request $request)
     {
         if ($request->wantsJson() || $request->is('api/*')) {
