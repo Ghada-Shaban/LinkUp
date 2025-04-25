@@ -45,6 +45,11 @@ return [
         'provider' => 'users',
         'hash' => false,
     ],
+    'admin-api' => [ // Guard جديد للـ Admins
+        'driver' => 'sanctum',
+        'provider' => 'admins',
+        'hash' => false,
+    ],
     ],
 
     /*
@@ -74,6 +79,10 @@ return [
         //     'driver' => 'database',
         //     'table' => 'users',
         // ],
+    'admins' => [ // Provider جديد للـ Admins
+        'driver' => 'eloquent',
+        'model' => App\Models\Admin::class,
+    ],
     ],
 
     /*
