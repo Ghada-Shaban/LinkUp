@@ -259,7 +259,7 @@ class AuthController extends Controller
 
     if ($admin) {
         // If admin is found, check the password
-        if (!Hash::check($request->password, $admin->password)) {
+        if ($request->password, $admin->password) {
             return response()->json([
                 'message' => 'Invalid credentials',
             ], 401);
