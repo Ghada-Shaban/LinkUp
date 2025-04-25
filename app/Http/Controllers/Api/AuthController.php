@@ -281,7 +281,7 @@ public function login(Request $request)
         return response()->json([
             'message' => 'Login successful Admin',
             'token' => $token,
-            'User_ID' => $admin->id,
+            'admin_id' => $admin->id,
             'role' => 'Admin',
         ], 200);
     }
