@@ -277,7 +277,7 @@ class AuthController extends Controller
     }
 
     // If not found in admins, try the users table (Coach/Trainee)
-    $user = User::where('email', $request->email)->first();
+    $user = User::where('Email', $request->email)->first();
 
     // Check if user exists and password matches
     if (!$user || !Hash::check($request->password, $user->password)) {
