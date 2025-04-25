@@ -18,7 +18,8 @@ public function getPendingCoachRequests(Request $request)
 {
     // Check if the authenticated user is an admin
    
-    if (!$authAdmin || !($authAdmin instanceof Admin)) {
+  $authAdmin = auth('admin-api')->user();
+    if (!$authAdmin) {
         return response()->json(['message' => 'Unauthorized'], 401);
     }
 
@@ -70,8 +71,8 @@ public function getPendingCoachRequests(Request $request)
  */
 public function handleCoachRequest(Request $request, $userId){
     // Check if the authenticated user is an admin
-    $authAdmin = auth('sanctum')->user();
-    if (!$authAdmin || !($authAdmin instanceof Admin)) {
+  $authAdmin = auth('admin-api')->user();
+    if (!$authAdmin) {
         return response()->json(['message' => 'Unauthorized'], 401);
     }
 
