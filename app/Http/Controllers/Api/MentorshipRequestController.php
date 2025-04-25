@@ -18,8 +18,6 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\Rule;
 use Carbon\Carbon;
-use App\Mail\RequestAccepted;
-use App\Mail\RequestRejected;
 use App\Mail\NewMentorshipRequest;
 use App\Mail\PaymentReminder;
 use App\Mail\SessionBooked;
@@ -153,10 +151,6 @@ class MentorshipRequestController extends Controller
             $mentorshipRequest->responded_at = Carbon::now();
             $mentorshipRequest->save();
 
-            // Send email to Trainee
-            $trainee = User::find($mentorshipRequest->trainee_id);
-            Mail::to($trainee->email)->send(new RequestAccepted($mentorshipRequest));
-
             DB::commit();
             Log::info('Mentorship request accepted', [
                 'request_id' => $id,
@@ -207,10 +201,6 @@ class MentorshipRequestController extends Controller
             $mentorshipRequest->status = 'rejected';
             $mentorshipRequest->responded_at = Carbon::now();
             $mentorshipRequest->save();
-
-            // Send email to Trainee
-            $trainee = User::find($mentorshipRequest->trainee_id);
-            Mail::to($trainee->email)->send(new RequestRejected($mentorshipRequest));
 
             DB::commit();
             Log::info('Mentorship request rejected', [
@@ -266,7 +256,7 @@ class MentorshipRequestController extends Controller
             $dayOfWeek = $slotStart->format('l');
 
             // Check Coach Availability
-            $availability = CoachAvailability::where('coach_id', (int)$coachId)
+            $availability = CoachAvailability::where('User_ID', (int)$coachId)
                 ->where('Day_Of_Week', $dayOfWeek)
                 ->where('Start_Time', '<=', $slotStart->format('H:i:s'))
                 ->where('End_Time', '>=', $slotEnd->format('H:i:s'))
@@ -287,7 +277,7 @@ class MentorshipRequestController extends Controller
 
             // Check for conflicts
             $conflictingSessions = NewSession::where('coach_id', (int)$coachId)
-                ->where('status', 'upcoming')
+                ->whereIn('status', ['pending', 'upcoming'])
                 ->whereDate('session_time', $slotStart->toDateString())
                 ->get()
                 ->filter(function ($existingSession) use ($slotStart, $slotEnd) {
