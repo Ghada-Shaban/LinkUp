@@ -6,7 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Admin;
 use App\Models\User;
 use App\Models\Coach;
-use App\Models\CoachAvailability;
+use App\Models\CoachLanguage;
 use App\Models\CoachSkill;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
