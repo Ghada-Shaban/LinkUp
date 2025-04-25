@@ -9,6 +9,7 @@ use App\Models\CoachAvailability;
 use App\Models\CoachLanguage;
 use App\Models\CoachSkill;
 use App\Models\Trainee;
+use App\Models\Admin;
 use App\Models\TraineeAreaOfInterest;
 use App\Models\TraineePreferredLanguage;
 use App\Models\User;
