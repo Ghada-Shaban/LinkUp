@@ -18,11 +18,11 @@ class Admin extends Authenticatable
     protected $fillable = [
         'Full_Name',
         'Email',
-        'Password'
+        'Password' // هنا كمان اتأكد إنه Password
     ];
 
     protected $hidden = [
-        'password',
+        'Password',
         'remember_token'
     ];
 
