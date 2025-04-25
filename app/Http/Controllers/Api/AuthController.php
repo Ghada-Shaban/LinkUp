@@ -247,75 +247,74 @@ class AuthController extends Controller
     }
 
 public function login(Request $request)
-    {
-        $request->validate([
-            'Email' => 'required|email',
-            'Password' => 'required',
-        ]);
+{
+    $request->validate([
+        'Email' => 'required|email',
+        'Password' => 'required',
+    ]);
 
-        // ابحث عن الـ admin في جدول admins (case-insensitive)
-        $email = strtolower($request->Email);
-        $admin = Admin::whereRaw('LOWER(Email) = ?', [$email])->first();
+    // ابحث عن الـ admin في جدول admins (case-insensitive)
+    $email = strtolower($request->Email);
+    $admin = Admin::whereRaw('LOWER(Email) = ?', [$email])->first();
 
-        if (!$admin) {
-            // Debugging response مؤقت
-            return response()->json([
-                'message' => 'Admin not found',
-                'email' => $request->Email,
-            ], 404);
-        }
-
-        // التحقق من الباسوورد للـ admin (مقارنة مباشرة، case-insensitive، وتنظيف المسافات)
-        $requestPassword = trim(strtolower($request->Password));
-        $adminPassword = trim(strtolower($admin->password));
-
-        if ($requestPassword !== $adminPassword) {
-            // Debugging response مؤقت
-            return response()->json([
-                'message' => 'Invalid credentials',
-                'request_password' => $request->Password,
-                'admin_password' => $admin->password,
-            ], 401);
-        }
-
-        // إنشاء token للـ admin
-        $token = $admin->createToken('admin-token')->plainTextToken;
-
+    if (!$admin) {
+        // Debugging response مؤقت
         return response()->json([
-            'message' => 'Login successful Admin',
-            'token' => $token,
-            'User_ID' => $admin->id,
-            'role' => 'Admin',
-        ], 200);
+            'message' => 'Admin not found',
+            'email' => $request->Email,
+        ], 404);
+    }
 
-        // باقي الكود بتاع الـ users (Coach/Trainee) زي ما هو
-        $user = User::where('Email', $request->Email)->first();
+    // التحقق من الباسوورد للـ admin (مقارنة مباشرة، case-insensitive، وتنظيف المسافات)
+    $requestPassword = trim(strtolower($request->Password));
+    $adminPassword = trim(strtolower($admin->getRawOriginal('Password'))); // غيّرنا password لـ Password
 
-        if (!$user || !Hash::check($request->Password, $user->password)) {
+    if ($requestPassword !== $adminPassword) {
+        // Debugging response مؤقت
+        return response()->json([
+            'message' => 'Invalid credentials',
+            'request_password' => $request->Password,
+            'admin_password' => $admin->getRawOriginal('Password'), // غيّرنا هنا كمان
+        ], 401);
+    }
+
+    // إنشاء token للـ admin
+    $token = $admin->createToken('admin-token')->plainTextToken;
+
+    return response()->json([
+        'message' => 'Login successful Admin',
+        'token' => $token,
+        'User_ID' => $admin->id,
+        'role' => 'Admin',
+    ], 200);
+
+    // باقي الكود بتاع الـ users (Coach/Trainee) زي ما هو
+    $user = User::where('Email', $request->Email)->first();
+
+    if (!$user || !Hash::check($request->Password, $user->password)) {
+        return response()->json([
+            'message' => 'Invalid credentials',
+        ], 401);
+    }
+
+    if ($user->role_profile === 'Coach') {
+        $coach = Coach::where('User_ID', $user->User_ID)->first();
+        if ($coach && $coach->status === Coach::STATUS_PENDING) {
             return response()->json([
-                'message' => 'Invalid credentials',
-            ], 401);
+                'message' => 'Your account is still pending approval',
+            ], 403);
         }
+    }
 
-        if ($user->role_profile === 'Coach') {
-            $coach = Coach::where('User_ID', $user->User_ID)->first();
-            if ($coach && $coach->status === Coach::STATUS_PENDING) {
-                return response()->json([
-                    'message' => 'Your account is still pending approval',
-                ], 403);
-            }
-        }
+    $token = $user->createToken('user-token')->plainTextToken;
+    $role = $user->role_profile;
 
-$token = $user->createToken('user-token')->plainTextToken;
-$role = $user->role_profile;
-
-return response()->json([
-    'message' => "Login successful $role",
-    'token' => $token,
-    'User_ID' => $user->User_ID,
-    'role' => $role,
-], 200);
-
+    return response()->json([
+        'message' => "Login successful $role",
+        'token' => $token,
+        'User_ID' => $user->User_ID,
+        'role' => $role,
+    ], 200);
 }
 
     public function logout(Request $request)
