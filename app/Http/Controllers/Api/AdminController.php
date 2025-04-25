@@ -32,7 +32,7 @@ public function getPendingCoachRequests(Request $request)
                     'user_id' => $coach->User_ID,
                     'full_name' => $coach->user->full_name,
                     'email' => $coach->user->email,
-                    'bio' => $coach->bio,
+                    'bio' => $coach->Bio,
                     'company_or_school' => $coach->Company_or_School,
                     'title' => $coach->Title,
                     'years_of_experience' => $coach->Years_Of_Experience,
