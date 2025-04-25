@@ -17,7 +17,7 @@ class AdminController extends Controller
 public function getPendingCoachRequests(Request $request)
 {
     // Check if the authenticated user is an admin
-    $authAdmin = auth('sanctum')->user();
+   
     if (!$authAdmin || !($authAdmin instanceof Admin)) {
         return response()->json(['message' => 'Unauthorized'], 401);
     }
