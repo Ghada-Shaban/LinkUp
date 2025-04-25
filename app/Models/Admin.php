@@ -9,7 +9,7 @@ class Admin extends Authenticatable
 {
     use HasApiTokens, HasFactory;
 
-    protected $table = 'admins'; // التأكد من اسم الجدول
+    protected $table = 'admins';
     protected $primaryKey = "id";
     public $incrementing = true;
     protected $keyType = 'int';
