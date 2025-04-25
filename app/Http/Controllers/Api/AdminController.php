@@ -10,6 +10,7 @@ use App\Models\CoachLanguage;
 use App\Models\CoachSkill;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class AdminController extends Controller
 {
@@ -116,7 +117,7 @@ public function handleCoachRequest(Request $request, $userId){
             'status' => $coach->status,
         ], 200);
     } catch (\Exception $e) {
-        \log::error('Failed to handle coach registration request', [
+        \Log::error('Failed to handle coach registration request', [
             'error' => $e->getMessage(),
             'trace' => $e->getTraceAsString(),
         ]);
