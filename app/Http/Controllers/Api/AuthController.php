@@ -271,7 +271,7 @@ class AuthController extends Controller
                 'message' => 'Your account is still pending approval',
             ], 403);
         }
-    
+    }
 
  
     $token = $user->createToken('user-token')->plainTextToken;
@@ -284,10 +284,8 @@ class AuthController extends Controller
         'role' => $role,
     ], 200);
 
-    }
-        return response()->json([
-            'message' => 'Invalid credentials',
-        ], 401);
+    
+        
     }
 
     public function logout(Request $request)
