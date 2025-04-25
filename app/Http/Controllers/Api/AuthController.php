@@ -254,6 +254,28 @@ class AuthController extends Controller
     ]);
 
    
+    $admin = Admin::where('Email', $request->email)->first();
+
+    if ($admin) {
+        // If admin is found, check the password
+        if (!Hash::check($request->password, $admin->password)) {
+            return response()->json([
+                'message' => 'Invalid credentials',
+            ], 401);
+        }
+
+        // Generate token for admin
+        $token = $admin->createToken('admin-token')->plainTextToken;
+
+        return response()->json([
+            'message' => 'Login successful Admin',
+            'token' => $token,
+            'User_ID' => $admin->id, // أو أي حقل ID بتستخدميه في جدول admins
+            'role' => 'Admin',
+        ], 200);
+    }
+
+    // If not found in admins, try the users table (Coach/Trainee)
     $user = User::where('email', $request->email)->first();
 
     // Check if user exists and password matches
@@ -263,7 +285,7 @@ class AuthController extends Controller
         ], 401);
     }
 
- 
+    // Check if the user is a Coach and their status
     if ($user->role_profile === 'Coach') {
         $coach = Coach::where('User_ID', $user->User_ID)->first();
         if ($coach && $coach->status === Coach::STATUS_PENDING) {
@@ -273,7 +295,7 @@ class AuthController extends Controller
         }
     }
 
- 
+    // Generate token for user (Coach/Trainee)
     $token = $user->createToken('user-token')->plainTextToken;
     $role = $user->role_profile;
 
