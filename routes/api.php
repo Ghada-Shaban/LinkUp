@@ -65,7 +65,6 @@ Route::prefix('coach/{coachId}')->middleware(['auth:api', 'check.trainee'])->gro
 // Routes الخاصة بـ NewSessionController
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/sessions', [NewSessionController::class, 'index'])->name('sessions.index'); // تم تعديل الاسم من /upcoming-sessions لدعم كل الأنواع
-    Route::post('/sessions/accept/{requestId}', [NewSessionController::class, 'acceptSession']);
     Route::post('/sessions/update-meeting-link/{sessionId}', [NewSessionController::class, 'updateMeetingLink']);
     Route::post('/sessions/{sessionId}/complete', [NewSessionController::class, 'completeSession']);
     Route::post('/sessions/{sessionId}/cancel', [NewSessionController::class, 'cancelSession']);
