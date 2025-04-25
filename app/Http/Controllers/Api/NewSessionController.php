@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\NewSession;
-use App\Models\Book;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -25,13 +24,13 @@ class NewSessionController extends Controller
         $timeCondition = null;
 
         if ($type === 'upcoming') {
-            $statuses = ['Scheduled'];
-            $timeCondition = ['date_time', '>=', now()];
+            $statuses = ['upcoming'];
+            $timeCondition = ['session_time', '>=', now()];
         } elseif ($type === 'pending') {
-            $statuses = ['Pending'];
-            $timeCondition = ['date_time', '>=', now()];
+            $statuses = ['pending'];
+            $timeCondition = ['session_time', '>=', now()];
         } elseif ($type === 'history') {
-            $statuses = ['Completed', 'Cancelled'];
+            $statuses = ['completed', 'cancelled'];
             $timeCondition = null;
         } else {
             Log::warning('Invalid type parameter', [
@@ -44,10 +43,8 @@ class NewSessionController extends Controller
         $sessions = collect();
 
         if ($user->role_profile === 'Coach') {
-            $query = NewSession::with(['service.user', 'books.trainee'])
-                ->whereHas('service', function ($query) use ($user) {
-                    $query->where('coach_id', $user->User_ID);
-                })
+            $query = NewSession::with(['mentorshipRequest.requestable', 'trainee'])
+                ->where('coach_id', $user->User_ID)
                 ->whereIn('status', $statuses);
 
             if ($timeCondition) {
@@ -55,14 +52,18 @@ class NewSessionController extends Controller
             }
 
             $sessions = $query->get()->map(function ($session) {
-                $trainee = $session->books->first() ? $session->books->first()->trainee : null;
+                $trainee = $session->trainee;
+                $serviceName = $session->mentorshipRequest && $session->mentorshipRequest->requestable
+                    ? $session->mentorshipRequest->requestable->title
+                    : 'N/A';
                 return [
-                    'new_session_id' => $session->new_session_id,
-                    'date_time' => $session->date_time,
-                    'duration' => $session->duration,
+                    'new_session_id' => $session->id,
+                    'session_time' => $session->session_time,
+                    'duration' => $session->duration_minutes,
                     'status' => $session->status,
                     'meeting_link' => $session->meeting_link,
                     'trainee_name' => $trainee ? $trainee->name : 'N/A',
+                    'service_name' => $serviceName,
                 ];
             });
 
@@ -72,10 +73,8 @@ class NewSessionController extends Controller
                 'sessions' => $sessions->toArray()
             ]);
         } elseif ($user->role_profile === 'Trainee') {
-            $query = NewSession::with(['service.user', 'books.trainee'])
-                ->whereHas('books', function ($query) use ($user) {
-                    $query->where('trainee_id', $user->User_ID);
-                })
+            $query = NewSession::with(['mentorshipRequest.requestable', 'coach'])
+                ->where('trainee_id', $user->User_ID)
                 ->whereIn('status', $statuses);
 
             if ($timeCondition) {
@@ -83,14 +82,18 @@ class NewSessionController extends Controller
             }
 
             $sessions = $query->get()->map(function ($session) {
-                $coach = $session->service->user ?? null;
+                $coach = $session->coach;
+                $serviceName = $session->mentorshipRequest && $session->mentorshipRequest->requestable
+                    ? $session->mentorshipRequest->requestable->title
+                    : 'N/A';
                 return [
-                    'new_session_id' => $session->new_session_id,
-                    'date_time' => $session->date_time,
-                    'duration' => $session->duration,
+                    'new_session_id' => $session->id,
+                    'session_time' => $session->session_time,
+                    'duration' => $session->duration_minutes,
                     'status' => $session->status,
                     'meeting_link' => $session->meeting_link,
                     'coach_name' => $coach ? $coach->name : 'N/A',
+                    'service_name' => $serviceName,
                 ];
             });
 
@@ -113,58 +116,6 @@ class NewSessionController extends Controller
     }
 
     /**
-     * قبول طلب منتورشيب من الكوتش وإنشاء جلسة جديدة
-     */
-    public function acceptSession($requestId)
-    {
-        $user = Auth::user();
-        $mentorshipRequest = \App\Models\MentorshipRequest::findOrFail($requestId);
-
-        if ($user->role_profile !== 'Coach' || $mentorshipRequest->coach_id !== $user->User_ID) {
-            Log::warning('Unauthorized attempt to accept mentorship request', [
-                'user off session->user_id' => $user->User_ID,
-                'request_id' => $requestId
-            ]);
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
-
-        if ($session->status !== 'pending') {
-            Log::warning('Request cannot be accepted', [
-                'request_id' => $requestId,
-                'status' => $mentorshipRequest->status
-            ]);
-            return response()->json(['message' => 'Request cannot be accepted'], 400);
-        }
-
-        $mentorshipRequest->status = 'accepted';
-        $mentorshipRequest->save();
-
-        $session = new NewSession();
-        $session->date_time = $mentorshipRequest->first_session_time;
-        $session->duration = $mentorshipRequest->duration_minutes;
-        $session->status = 'Scheduled';
-        $session->service_id = $mentorshipRequest->service_id;
-        $session->mentorship_request_id = $mentorshipRequest->id;
-        $session->meeting_link = null;
-        $session->save();
-
-        $book = new Book();
-        $book->trainee_id = $mentorshipRequest->trainee_id;
-        $book->session_id = $session->new_session_id;
-        $book->save();
-
-        Log::info('Mentorship request accepted and session scheduled', [
-            'request_id' => $requestId,
-            'session_id' => $session->new_session_id
-        ]);
-
-        return response()->json([
-            'message' => 'Request accepted and session scheduled successfully!',
-            'session' => $session
-        ]);
-    }
-
-    /**
      * إتمام جلسة من الكوتش أو الترايني
      */
     public function completeSession($sessionId)
@@ -175,15 +126,9 @@ class NewSessionController extends Controller
         // التأكد أن المستخدم هو الكوتش أو الترايني لهذه الجلسة
         $isAuthorized = false;
         if ($user->role_profile === 'Coach') {
-            $isAuthorized = NewSession::where('new_session_id', $sessionId)
-                ->whereHas('service', function ($query) use ($user) {
-                    $query->where('coach_id', $user->User_ID);
-                })->exists();
+            $isAuthorized = $session->coach_id == $user->User_ID;
         } elseif ($user->role_profile === 'Trainee') {
-            $isAuthorized = NewSession::where('new_session_id', $sessionId)
-                ->whereHas('books', function ($query) use ($user) {
-                    $query->where('trainee_id', $user->User_ID);
-                })->exists();
+            $isAuthorized = $session->trainee_id == $user->User_ID;
         }
 
         if (!$isAuthorized) {
@@ -194,7 +139,7 @@ class NewSessionController extends Controller
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        if ($session->status !== 'Scheduled') {
+        if ($session->status !== 'upcoming') {
             Log::warning('Session cannot be completed', [
                 'session_id' => $sessionId,
                 'status' => $session->status
@@ -202,7 +147,7 @@ class NewSessionController extends Controller
             return response()->json(['message' => 'Session cannot be completed'], 400);
         }
 
-        $sessionEndTime = Carbon::parse($session->date_time)->addMinutes($session->duration);
+        $sessionEndTime = Carbon::parse($session->session_time)->addMinutes($session->duration_minutes);
         if (Carbon::now()->lt($sessionEndTime)) {
             Log::warning('Session cannot be completed yet', [
                 'session_id' => $sessionId,
@@ -211,14 +156,20 @@ class NewSessionController extends Controller
             return response()->json(['message' => 'Session cannot be completed yet. It has not ended.'], 400);
         }
 
-        $session->status = 'Completed';
+        $session->status = 'completed';
         $session->save();
 
+        // تحديث حالة الطلب إذا كان كل الجلسات اكتملت
         if ($session->mentorship_request_id) {
             $mentorshipRequest = \App\Models\MentorshipRequest::find($session->mentorship_request_id);
             if ($mentorshipRequest) {
-                $mentorshipRequest->status = 'completed';
-                $mentorshipRequest->save();
+                $remainingSessions = NewSession::where('mentorship_request_id', $mentorshipRequest->id)
+                    ->whereIn('status', ['pending', 'upcoming'])
+                    ->count();
+                if ($remainingSessions == 0) {
+                    $mentorshipRequest->status = 'completed';
+                    $mentorshipRequest->save();
+                }
             }
         }
 
@@ -242,15 +193,9 @@ class NewSessionController extends Controller
 
         $isAuthorized = false;
         if ($user->role_profile === 'Coach') {
-            $isAuthorized = NewSession::where('new_session_id', $sessionId)
-                ->whereHas('service', function ($query) use ($user) {
-                    $query->where('coach_id', $user->User_ID);
-                })->exists();
+            $isAuthorized = $session->coach_id == $user->User_ID;
         } elseif ($user->role_profile === 'Trainee') {
-            $isAuthorized = NewSession::where('new_session_id', $sessionId)
-                ->whereHas('books', function ($query) use ($user) {
-                    $query->where('trainee_id', $user->User_ID);
-                })->exists();
+            $isAuthorized = $session->trainee_id == $user->User_ID;
         }
 
         if (!$isAuthorized) {
@@ -261,7 +206,7 @@ class NewSessionController extends Controller
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        if ($session->status !== 'Scheduled' && $session->status !== 'Pending') {
+        if ($session->status !== 'upcoming' && $session->status !== 'pending') {
             Log::warning('Session cannot be cancelled', [
                 'session_id' => $sessionId,
                 'status' => $session->status
@@ -269,14 +214,20 @@ class NewSessionController extends Controller
             return response()->json(['message' => 'Session cannot be cancelled'], 400);
         }
 
-        $session->status = 'Cancelled';
+        $session->status = 'cancelled';
         $session->save();
 
+        // تحديث حالة الطلب إذا أُلغيت الجلسة
         if ($session->mentorship_request_id) {
             $mentorshipRequest = \App\Models\MentorshipRequest::find($session->mentorship_request_id);
             if ($mentorshipRequest) {
-                $mentorshipRequest->status = 'rejected';
-                $mentorshipRequest->save();
+                $remainingSessions = NewSession::where('mentorship_request_id', $mentorshipRequest->id)
+                    ->whereIn('status', ['pending', 'upcoming'])
+                    ->count();
+                if ($remainingSessions == 0) {
+                    $mentorshipRequest->status = 'cancelled';
+                    $mentorshipRequest->save();
+                }
             }
         }
 
@@ -302,12 +253,7 @@ class NewSessionController extends Controller
         $user = Auth::user();
         $session = NewSession::findOrFail($sessionId);
 
-        $isCoachSession = NewSession::where('new_session_id', $sessionId)
-            ->whereHas('service', function ($query) use ($user) {
-                $query->where('coach_id', $user->User_ID);
-            })->exists();
-
-        if (!$isCoachSession) {
+        if ($session->coach_id != $user->User_ID) {
             Log::warning('Unauthorized attempt to update meeting link', [
                 'user_id' => $user->User_ID,
                 'session_id' => $sessionId
