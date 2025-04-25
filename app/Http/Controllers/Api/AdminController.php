@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\Log;
 
 class AdminController extends Controller
 {
-  
+   
 public function getPendingCoachRequests(Request $request)
 {
     // Check if the authenticated user is an admin
