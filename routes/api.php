@@ -121,4 +121,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/coach/requests', [MentorshipRequestController::class, 'viewRequests']);
     Route::post('/coach/requests/{id}/accept', [MentorshipRequestController::class, 'acceptRequest']);
     Route::post('/coach/requests/{id}/reject', [MentorshipRequestController::class, 'rejectRequest']);
+    Route::post('/mentorship-requests/{id}/schedule', [MentorshipRequestController::class, 'scheduleSessions']);
+    Route::post('/mentorship-requests/{id}/initiate-payment', [MentorshipRequestController::class, 'initiatePayment']);
+    Route::get('/mentorship-requests/complete-payment', [MentorshipRequestController::class, 'completePayment']);
 });
