@@ -70,7 +70,7 @@ public function getPendingCoachRequests(Request $request)
  * @param int $userId
  * @return \Illuminate\Http\JsonResponse
  */
-public function handleCoachRequest(Request $request, $userId)
+public function handleCoachRequest(Request $request, $coachId)
 {
     // Check if the authenticated user is an admin
     $authAdmin = auth('admin-api')->user();
@@ -84,8 +84,8 @@ public function handleCoachRequest(Request $request, $userId)
     ]);
 
     try {
-        // Find the coach, including soft-deleted ones if necessary
-        $coach = Coach::where('User_ID', $userId)->firstOrFail();
+        // Find the coach by its primary key (id)
+        $coach = Coach::findOrFail($coachId);
 
         if ($coach->status !== Coach::STATUS_PENDING) {
             return response()->json(['message' => 'Request has already been processed'], 400);
@@ -103,8 +103,8 @@ public function handleCoachRequest(Request $request, $userId)
             $message = 'Coach registration request rejected';
 
             // Delete related data
-            CoachLanguage::where('coach_id', $userId)->forceDelete();
-            CoachSkill::where('coach_id', $userId)->forceDelete();
+            CoachLanguage::where('coach_id', $coach->User_ID)->forceDelete();
+            CoachSkill::where('coach_id', $coach->User_ID)->forceDelete();
 
             // Delete photo if exists
             if ($user && $user->photo) {
@@ -113,7 +113,7 @@ public function handleCoachRequest(Request $request, $userId)
 
             // Delete coach and user (forceDelete to permanently remove)
             $coach->forceDelete();
-            User::where('User_ID', $userId)->forceDelete();
+            User::where('User_ID', $coach->User_ID)->forceDelete();
         }
 
         // Save the coach (only if not deleted)
@@ -123,7 +123,7 @@ public function handleCoachRequest(Request $request, $userId)
 
         return response()->json([
             'message' => $message,
-            'user_id' => $userId,
+            'coach_id' => $coachId,
             'status' => $coach->status,
         ], 200);
     } catch (\Exception $e) {
