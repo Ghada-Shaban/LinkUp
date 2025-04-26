@@ -14,12 +14,13 @@ use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 use Stripe\Stripe;
 use Stripe\PaymentIntent;
+use App\Models\Price; // استيراد موديل Price
 
 class PaymentController extends Controller
 {
     public function __construct()
     {
-        Stripe::setApiKey(env('STRIPE_KEY')); // الـ Secret Key من ملف .env
+        Stripe::setApiKey(env('STRIPE_KEY'));
     }
 
     public function initiatePayment(Request $request, $type, $id)
@@ -52,13 +53,22 @@ class PaymentController extends Controller
         $description = '';
 
         if ($mentorshipRequest->requestable_type === 'App\\Models\\Service') {
-            $amount = $requestable->price * 100; // بالسنت
+            // جلب الـ Service مباشرة
+            $service = $requestable;
+            $priceEntry = Price::where('service_id', $service->service_id)->first();
+            $amount = $priceEntry ? $priceEntry->price * 100 : 0;
             $description = "Payment for Service ID: {$requestable->id}";
         } elseif ($mentorshipRequest->requestable_type === 'App\\Models\\GroupMentorship') {
-            $amount = $requestable->price * 100;
+            // جلب الـ Service المرتبط بالـ GroupMentorship
+            $service = $requestable->service;
+            $priceEntry = Price::where('service_id', $service->service_id)->first();
+            $amount = $priceEntry ? $priceEntry->price * 100 : 0;
             $description = "Payment for Group Mentorship ID: {$requestable->id}";
         } elseif ($mentorshipRequest->requestable_type === 'App\\Models\\MentorshipPlan') {
-            $amount = $requestable->price * 100;
+            // جلب الـ Service المرتبط بالـ MentorshipPlan
+            $service = $requestable->service;
+            $priceEntry = Price::where('service_id', $service->service_id)->first();
+            $amount = $priceEntry ? $priceEntry->price * 100 : 0;
             $description = "Payment for Mentorship Plan ID: {$requestable->id}";
         }
 
@@ -80,16 +90,16 @@ class PaymentController extends Controller
                 'payment_method_data' => [
                     'type' => 'card',
                     'card' => [
-                        'number' => '4242424242424242', // بطاقة اختبار
+                        'number' => '4242424242424242',
                         'exp_month' => 12,
                         'exp_year' => 2026,
                         'cvc' => '123',
                     ],
                 ],
-                'confirm' => true, // تأكيد الدفع مباشرة
+                'confirm' => true,
                 'automatic_payment_methods' => [
                     'enabled' => true,
-                    'allow_redirects' => 'never', // منع الـ Redirects (لأننا في الـ Backend)
+                    'allow_redirects' => 'never',
                 ],
             ]);
 
