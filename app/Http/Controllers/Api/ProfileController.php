@@ -507,7 +507,7 @@ class ProfileController extends Controller
                         // Update or create the slot
                         $availabilityRecord = CoachAvailability::updateOrCreate(
                             [
-                                'User_ID' => $userID,
+                                'coach_id' => $userID,
                                 'Day_Of_Week' => $day,
                                 'Start_Time' => $slot['start_time'],
                             ],
