@@ -1,13 +1,14 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Mentorship Request Rejected</title>
-</head>
-<body>
-    <h1>Mentorship Request Rejected</h1>
-    <p>Dear Trainee,</p>
-    <p>We regret to inform you that your mentorship request for "<strong>{{ $title }}</strong>" (Type: {{ $type }}) has been rejected.</p>
-    <p>Better luck next time! Please try booking another slot.</p>
-    <p>Best regards,<br>Your Mentorship Platform</p>
-</body>
-</html>
+@component('mail::message')
+
+# Mentorship Request Rejected
+
+Hello {{ $mentorshipRequest->trainee->name }},
+
+Unfortunately, your mentorship request for **{{ $mentorshipRequest->requestable->title }}** has been rejected by the coach.
+
+You can try submitting another request or contact the coach for more details.
+
+Thanks,  
+{{ config('app.name') }}
+
+@endcomponent
