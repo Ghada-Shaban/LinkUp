@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Mail\MentorshipRequestAccepted;
+use App\Mail\RequestAccepted;
 use App\Models\MentorshipRequest;
 use App\Models\NewSession;
 use App\Models\Service;
