@@ -124,7 +124,7 @@ class MentorshipRequestController extends Controller
 
         // إرسال الإيميل للـ Trainee
         try {
-            Mail::to($request->trainee->email)->send(RequestAccepted($request));
+            Mail::to($request->trainee->email)->send(new RequestAccepted($request));
         } catch (\Exception $e) {
             \Log::error('Failed to send Mentorship Request Accepted email', [
                 'request_id' => $id,
