@@ -16,7 +16,7 @@ use Illuminate\Support\Facades\Mail;
 use Carbon\Carbon;
 use App\Mail\SessionBooked;
 use Stripe\Stripe;
-use Stripe\PaymentIntent;
+use Stripe\Charge;
 
 class PaymentController extends Controller
 {
@@ -71,76 +71,56 @@ class PaymentController extends Controller
             return response()->json(['message' => 'Invalid payment type'], 400);
         }
 
-        // Validate payment details
+        // Validate the stripeToken
         $request->validate([
-            'card_number' => 'required|string',
-            'exp_month' => 'required|integer|between:1,12',
-            'exp_year' => 'required|integer|min:' . now()->year,
-            'cvc' => 'required|string|size:3',
+            'stripeToken' => 'required|string',
         ]);
 
-        Stripe::setApiKey(env('STRIPE_SECRET_KEY'));
+        Stripe::setApiKey(env('STRIPE_SECRET'));
 
         try {
             $price = $this->calculatePrice($type, $type === 'mentorship_request' ? $mentorshipRequest : $session);
 
-            // Create a Payment Intent
-            $paymentIntent = PaymentIntent::create([
+            // Create a Charge using the Stripe Token
+            $charge = Charge::create([
                 'amount' => $price * 100, // Amount in cents
                 'currency' => 'egp',
-                'payment_method_data' => [
-                    'type' => 'card',
-                    'card' => [
-                        'number' => $request->card_number,
-                        'exp_month' => $request->exp_month,
-                        'exp_year' => $request->exp_year,
-                        'cvc' => $request->cvc,
-                    ],
-                ],
+                'source' => $request->stripeToken,
+                'description' => "Payment for {$type} ID {$id}",
                 'metadata' => [
                     "{$type}_id" => $id,
                 ],
-                'return_url' => 'https://your-frontend-app.com/payment/return', // Replace with your Frontend URL
             ]);
 
-            // Return the client secret to the frontend
-            return response()->json([
-                'client_secret' => $paymentIntent->client_secret,
-                'payment_intent_id' => $paymentIntent->id,
-            ]);
+            if ($charge->status === 'succeeded') {
+                // Payment successful, delete the pending payment record if it exists
+                if ($type === 'mentorship_request') {
+                    $pendingPayment->delete();
+                }
+
+                // Proceed to complete the payment
+                return $this->completePayment($type, $id);
+            } else {
+                Log::warning('Payment failed', [
+                    "{$type}_id" => $id,
+                    'charge_id' => $charge->id,
+                    'status' => $charge->status,
+                ]);
+                return response()->json(['message' => 'Payment failed', 'status' => $charge->status], 400);
+            }
         } catch (\Exception $e) {
-            Log::error('Payment initiation failed', [
+            Log::error('Payment processing failed', [
                 "{$type}_id" => $id,
                 'error' => $e->getMessage(),
             ]);
-            return response()->json(['message' => 'Failed to initiate payment', 'error' => $e->getMessage()], 500);
+            return response()->json(['message' => 'Payment failed', 'error' => $e->getMessage()], 500);
         }
     }
 
     public function confirmPayment(Request $request, $type, $id)
     {
-        Stripe::setApiKey(env('STRIPE_SECRET_KEY'));
-
-        try {
-            $paymentIntentId = $request->input('payment_intent_id');
-            $paymentIntent = PaymentIntent::retrieve($paymentIntentId);
-
-            if ($paymentIntent->status === 'succeeded') {
-                return $this->completePayment($type, $id);
-            } else {
-                Log::warning('Payment confirmation failed', [
-                    'payment_intent_id' => $paymentIntentId,
-                    'status' => $paymentIntent->status,
-                ]);
-                return response()->json(['message' => 'Payment confirmation failed', 'status' => $paymentIntent->status], 400);
-            }
-        } catch (\Exception $e) {
-            Log::error('Failed to confirm payment', [
-                'payment_intent_id' => $paymentIntentId,
-                'error' => $e->getMessage(),
-            ]);
-            return response()->json(['message' => 'Failed to confirm payment', 'error' => $e->getMessage()], 500);
-        }
+        // This method is no longer needed since we're completing the payment in initiatePayment
+        return response()->json(['message' => 'Method not used with this implementation'], 400);
     }
 
     public function completePayment($type, $id)
