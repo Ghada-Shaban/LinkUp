@@ -122,12 +122,6 @@ class MentorshipRequestController extends Controller
         $request->responded_at = now();
         $request->save();
 
-        // Create a pending payment record with a due date (e.g., 24 hours from now)
-        \App\Models\PendingPayment::create([
-            'mentorship_request_id' => $request->id,
-            'payment_due_at' => now()->addHours(24),
-        ]);
-
         // إرسال الإيميل للـ Trainee
         try {
             Mail::to($request->trainee->email)->send(new RequestAccepted($request));
@@ -138,8 +132,12 @@ class MentorshipRequestController extends Controller
             ]);
         }
 
+        $nextStepMessage = $request->requestable_type === \App\Models\MentorshipPlan::class
+            ? "Trainee can now book sessions using /api/coach/{$request->coach_id}/book"
+            : "Trainee can now proceed to payment using /payment/initiate/mentorship_request/{$id}";
+
         return response()->json([
-            'message' => 'Request accepted successfully. Trainee can now proceed to payment using /payment/initiate/mentorship_request/' . $id,
+            'message' => "Request accepted successfully. {$nextStepMessage}",
         ]);
     }
 
@@ -165,74 +163,5 @@ class MentorshipRequestController extends Controller
         $request->save();
 
         return response()->json(['message' => 'Request rejected successfully.']);
-    }
-
-    public function scheduleSessions(Request $request, $id)
-    {
-        $mentorshipRequest = MentorshipRequest::findOrFail($id);
-
-        if ($mentorshipRequest->trainee_id !== Auth::user()->User_ID) {
-            return response()->json(['message' => 'This request does not belong to you.'], 403);
-        }
-
-        if ($mentorshipRequest->status !== 'accepted') {
-            return response()->json(['message' => 'Request must be accepted to schedule sessions.'], 400);
-        }
-
-        if ($mentorshipRequest->requestable_type !== \App\Models\MentorshipPlan::class) {
-            return response()->json(['message' => 'Scheduling is only for Mentorship Plans.'], 400);
-        }
-
-        $mentorshipPlan = $mentorshipRequest->requestable;
-        $sessionCount = $mentorshipPlan->session_count;
-
-        $request->validate([
-            'sessions' => 'required|array|size:' . $sessionCount,
-            'sessions.*.session_time' => 'required|date|after:now',
-            'sessions.*.duration_minutes' => 'required|integer|min:30',
-        ]);
-
-        $coachId = $mentorshipRequest->coach_id;
-        $sessions = $request->input('sessions');
-        $planSchedule = [];
-
-        foreach ($sessions as $index => $session) {
-            $slotStart = Carbon::parse($session['session_time']);
-            $planSchedule[] = [
-                'session_time' => $slotStart->toDateTimeString(),
-                'duration_minutes' => $session['duration_minutes'],
-            ];
-        }
-
-        DB::beginTransaction();
-        try {
-            foreach ($planSchedule as $session) {
-                NewSession::create([
-                    'mentorship_request_id' => $mentorshipRequest->id,
-                    'trainee_id' => $mentorshipRequest->trainee_id,
-                    'coach_id' => $mentorshipRequest->coach_id,
-                    'session_time' => $session['session_time'],
-                    'duration_minutes' => $session['duration_minutes'],
-                    'status' => 'upcoming',
-                ]);
-            }
-
-            DB::commit();
-            Log::info('Sessions scheduled successfully', [
-                'mentorship_request_id' => $mentorshipRequest->id,
-            ]);
-
-            return response()->json([
-                'message' => 'Sessions scheduled successfully.',
-                'request' => $mentorshipRequest->fresh(['requestable', 'trainee.user'])
-            ]);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error('Failed to schedule sessions', [
-                'request_id' => $id,
-                'error' => $e->getMessage(),
-            ]);
-            return response()->json(['error' => $e->getMessage()], 500);
-        }
     }
 }
