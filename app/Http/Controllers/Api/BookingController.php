@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\CoachAvailability;
 use App\Models\NewSession;
 use App\Models\Service;
+use App\Models\MentorshipRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -53,6 +54,7 @@ class BookingController extends Controller
             'service_id' => 'required|exists:services,service_id',
             'session_time' => 'required|date|after:now',
             'duration_minutes' => 'required|integer|min:30',
+            'mentorship_request_id' => 'nullable|exists:mentorship_requests,id', // Optional for MentorshipPlan sessions
         ]);
 
         $service = Service::findOrFail($request->service_id);
@@ -105,6 +107,38 @@ class BookingController extends Controller
             return response()->json(['message' => 'Selected slot is already reserved'], 400);
         }
 
+        $mentorshipRequestId = $request->mentorship_request_id;
+        $mentorshipRequest = null;
+
+        // If mentorship_request_id is provided, validate it
+        if ($mentorshipRequestId) {
+            $mentorshipRequest = MentorshipRequest::findOrFail($mentorshipRequestId);
+
+            if ($mentorshipRequest->trainee_id !== Auth::user()->User_ID) {
+                return response()->json(['message' => 'This mentorship request does not belong to you.'], 403);
+            }
+
+            if ($mentorshipRequest->status !== 'accepted') {
+                return response()->json(['message' => 'Mentorship request must be accepted to book sessions.'], 400);
+            }
+
+            if ($mentorshipRequest->requestable_type !== \App\Models\MentorshipPlan::class) {
+                return response()->json(['message' => 'Mentorship request must be for a Mentorship Plan to book sessions this way.'], 400);
+            }
+
+            // Check if the service_id matches the mentorship request's service
+            if ($mentorshipRequest->requestable->service_id !== $service->service_id) {
+                return response()->json(['message' => 'Service does not match the mentorship request.'], 400);
+            }
+
+            // Check if the number of booked sessions doesn't exceed session_count
+            $sessionCount = $mentorshipRequest->requestable->session_count;
+            $bookedSessions = NewSession::where('mentorship_request_id', $mentorshipRequestId)->count();
+            if ($bookedSessions >= $sessionCount) {
+                return response()->json(['message' => 'You have already booked the maximum number of sessions for this Mentorship Plan.'], 400);
+            }
+        }
+
         DB::beginTransaction();
         try {
             $session = NewSession::create([
@@ -114,7 +148,34 @@ class BookingController extends Controller
                 'duration_minutes' => $request->duration_minutes,
                 'status' => 'pending', // Pending until payment is completed
                 'service_id' => $service->service_id,
+                'mentorship_request_id' => $mentorshipRequestId, // Will be null for regular services
             ]);
+
+            // If this session is part of a MentorshipPlan, create a pending payment if all sessions are booked
+            if ($mentorshipRequest) {
+                $bookedSessions = NewSession::where('mentorship_request_id', $mentorshipRequestId)->count();
+                if ($bookedSessions == $mentorshipRequest->requestable->session_count) {
+                    \App\Models\PendingPayment::create([
+                        'mentorship_request_id' => $mentorshipRequestId,
+                        'payment_due_at' => now()->addHours(24),
+                    ]);
+                }
+
+                $message = $bookedSessions < $mentorshipRequest->requestable->session_count
+                    ? 'Session booked successfully. Book the remaining sessions to proceed to payment.'
+                    : 'Session booked successfully. Proceed to payment using /payment/initiate/mentorship_request/' . $mentorshipRequestId;
+
+                DB::commit();
+                Log::info('Session booked for Mentorship Plan, awaiting payment', [
+                    'session_id' => $session->id,
+                    'mentorship_request_id' => $mentorshipRequestId,
+                ]);
+
+                return response()->json([
+                    'message' => $message,
+                    'session' => $session,
+                ]);
+            }
 
             DB::commit();
             Log::info('Session booked, awaiting payment', [
