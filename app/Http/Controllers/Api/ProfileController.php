@@ -195,7 +195,7 @@ class ProfileController extends Controller
     // Update availability
     if (isset($validated['availability'])) {
         try {
-            CoachAvailability::where('User_ID', $user->User_ID)->delete();
+            CoachAvailability::where('coach_id', $user->User_ID)->delete();
             $this->setAvailability($user->User_ID, $validated['availability']);
         } catch (\Exception $e) {
             \Log::error('Error updating availability', ['User_ID' => $user->User_ID, 'error' => $e->getMessage()]);
@@ -208,7 +208,7 @@ class ProfileController extends Controller
     $coach = Coach::where('User_ID', $updatedUser->User_ID)->first();
     $languages = CoachLanguage::where('coach_id', $updatedUser->User_ID)->pluck('Language');
     $skills = CoachSkill::where('coach_id', $updatedUser->User_ID)->pluck('Skill');
-    $availability = CoachAvailability::where('User_ID', $updatedUser->User_ID)
+    $availability = CoachAvailability::where('coach_id', $updatedUser->User_ID)
         ->get()
         ->groupBy('Day_Of_Week')
         ->map(function ($slots) {
