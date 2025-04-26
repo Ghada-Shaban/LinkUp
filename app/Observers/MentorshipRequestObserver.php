@@ -92,11 +92,19 @@ class MentorshipRequestObserver
                 // إرسال إيميل للـ Trainee
                 $trainee = $mentorshipRequest->trainee;
                 if ($trainee) {
-                    Mail::to($trainee->email)->send(new RequestAccepted($mentorshipRequest));
-                    Log::info('Acceptance email sent to trainee', [
-                        'request_id' => $mentorshipRequest->id,
-                        'trainee_id' => $trainee->User_ID,
-                    ]);
+                    try {
+                        Mail::to($trainee->email)->send(new RequestAccepted($mentorshipRequest));
+                        Log::info('Acceptance email sent to trainee', [
+                            'request_id' => $mentorshipRequest->id,
+                            'trainee_id' => $trainee->User_ID,
+                        ]);
+                    } catch (\Exception $e) {
+                        Log::error('Failed to send Mentorship Request Accepted email', [
+                            'request_id' => $mentorshipRequest->id,
+                            'trainee_id' => $trainee->User_ID,
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
                 } else {
                     Log::warning('Trainee not found for acceptance email', [
                         'request_id' => $mentorshipRequest->id,
