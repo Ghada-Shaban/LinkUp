@@ -17,6 +17,6 @@ class CoachAvailability extends Model
     ];
     public function coach()
     {
-        return $this->belongsTo(Coach::class, 'User_ID', 'User_ID');
+        return $this->belongsTo(Coach::class, 'coach_id', 'User_ID');
     }
 }
