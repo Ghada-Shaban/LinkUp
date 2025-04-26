@@ -42,7 +42,7 @@ class ProfileController extends Controller
      * @param int $user_id
      * @return \Illuminate\Http\JsonResponse
      */
-   public function updateCoachProfile(Request $request, int $user_id): \Illuminate\Http\JsonResponse
+   public function updateCoachProfile(Request $request, int $user_id)
 {
     // Check if the authenticated user has permission
     $authUser = auth('sanctum')->user();
@@ -160,37 +160,45 @@ class ProfileController extends Controller
         }
     }
 
-    // Update skills
-    if (isset($validated['Skills'])) {
-        try {
-            CoachSkill::where('coach_id', $user->User_ID)->delete();
-            foreach ($validated['Skills'] as $skill) {
-                CoachSkill::create([
-                    'coach_id' => $user->User_ID,
-                    'Skill' => $skill,
-                ]);
-            }
-        } catch (\Exception $e) {
-            \Log::error('Error updating skills', ['User_ID' => $user->User_ID, 'error' => $e->getMessage()]);
-            return response()->json(['message' => 'Failed to update skills', 'error' => $e->getMessage()], 500);
+  // Update skills
+if (isset($validated['Skills'])) {
+    \Log::info('Skills received for update', ['User_ID' => $user->User_ID, 'Skills' => $validated['Skills']]);
+    try {
+        CoachSkill::where('coach_id', $user->User_ID)->delete();
+        foreach ($validated['Skills'] as $skill) {
+            CoachSkill::create([
+                'coach_id' => $user->User_ID,
+                'Skill' => $skill,
+            ]);
         }
+        \Log::info('Skills updated successfully', ['coach_id' => $user->User_ID]);
+    } catch (\Exception $e) {
+        \Log::error('Error updating skills', ['coach_id' => $user->User_ID, 'error' => $e->getMessage()]);
+        return response()->json(['message' => 'Failed to update skills'], 500);
     }
+} else {
+    \Log::info('No Skills provided for update', ['User_ID' => $user->User_ID]);
+}
 
-    // Update languages
-    if (isset($validated['Languages'])) {
-        try {
-            CoachLanguage::where('coach_id', $user->User_ID)->delete();
-            foreach ($validated['Languages'] as $language) {
-                CoachLanguage::create([
-                    'coach_id' => $user->User_ID,
-                    'Language' => $language,
-                ]);
-            }
-        } catch (\Exception $e) {
-            \Log::error('Error updating languages', ['User_ID' => $user->User_ID, 'error' => $e->getMessage()]);
-            return response()->json(['message' => 'Failed to update languages', 'error' => $e->getMessage()], 500);
+// Update languages
+if (isset($validated['Languages'])) {
+    \Log::info('Languages received for update', ['coach_id' => $user->User_ID, 'Languages' => $validated['Languages']]);
+    try {
+        CoachLanguage::where('coach_id', $user->User_ID)->delete();
+        foreach ($validated['Languages'] as $language) {
+            CoachLanguage::create([
+                'coach_id' => $user->User_ID,
+                'Language' => $language,
+            ]);
         }
+        \Log::info('Languages updated successfully', ['coach_id' => $user->User_ID]);
+    } catch (\Exception $e) {
+        \Log::error('Error updating languages', ['coach_id' => $user->User_ID, 'error' => $e->getMessage()]);
+        return response()->json(['message' => 'Failed to update languages'], 500);
     }
+} else {
+    \Log::info('No Languages provided for update', ['coach_id' => $user->User_ID]);
+}
 
     // Update availability
     if (isset($validated['availability'])) {
