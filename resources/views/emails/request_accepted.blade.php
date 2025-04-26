@@ -1,25 +1,18 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Mentorship Request Accepted</title>
-</head>
-<body>
-    <h1>Mentorship Request Accepted!</h1>
-    <p>Dear Trainee,</p>
-    <p>We are pleased to inform you that your mentorship request for "<strong>{{ $title }}</strong>" (Type: {{ $type }}) has been accepted.</p>
-    
-    @if($type === 'Plan')
-        <h2>Scheduled Sessions:</h2>
-        <ul>
-            @foreach($plan_schedule as $session)
-                <li>{{ \Carbon\Carbon::parse($session)->format('F j, Y, g:i A') }}</li>
-            @endforeach
-        </ul>
-    @else
-        <p><strong>Session Time:</strong> {{ \Carbon\Carbon::parse($session_time)->format('F j, Y, g:i A') }}</p>
-    @endif
+@component('mail::message')
 
-    <p>You can view the details in your upcoming sessions.</p>
-    <p>Best regards,<br>LinkUp Platform</p>
-</body>
-</html>
+# Mentorship Request Accepted
+
+Hello {{ $mentorshipRequest->trainee->name }},
+
+Your mentorship request for **{{ $mentorshipRequest->requestable->title }}** has been accepted by the coach.
+
+Please proceed to payment to confirm your booking.
+
+@component('mail::button', ['url' => url('/payment/initiate/mentorship_request/' . $mentorshipRequest->id)])
+Proceed to Payment
+@endcomponent
+
+Thanks,  
+{{ config('app.name') }}
+
+@endcomponent
