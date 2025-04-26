@@ -487,7 +487,7 @@ class ProfileController extends Controller
                 if (isset($availability['time_slots'][$day])) {
                     foreach ($availability['time_slots'][$day] as $slot) {
                         // Check for overlapping time slots on the same day, excluding the current slot
-                        $existingSlots = CoachAvailability::where('User_ID', $userID)
+                        $existingSlots = CoachAvailability::where('coach_id', $userID)
                             ->where('Day_Of_Week', $day)
                             ->where(function ($query) use ($slot) {
                                 $query->whereBetween('Start_Time', [$slot['start_time'], $slot['end_time']])
