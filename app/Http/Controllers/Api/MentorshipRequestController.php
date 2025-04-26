@@ -18,51 +18,50 @@ use Carbon\Carbon;
 
 class MentorshipRequestController extends Controller
 {
-public function requestMentorship(Request $request)
-{
-    $validated = $request->validate([
-        'service_id' => 'required|integer',
-        'service_type' => 'required|in:MentorshipPlan,GroupMentorship',
-    ]);
+    public function requestMentorship(Request $request)
+    {
+        $request->validate([
+            'service_id' => 'required|exists:services,service_id',
+            'service_type' => 'required|in:MentorshipPlan,GroupMentorship',
+        ]);
 
-    $user = Auth::user();
-    if ($user->role_profile !== 'Trainee') {
-        return response()->json(['message' => 'Unauthorized'], 403);
-    }
+        $typeMap = [
+            'MentorshipPlan' => \App\Models\MentorshipPlan::class,
+            'GroupMentorship' => \App\Models\GroupMentorship::class,
+        ];
 
-    $service = ($validated['service_type'] === 'MentorshipPlan')
-        ? MentorshipPlan::findOrFail($validated['service_id'])
-        : GroupMentorship::findOrFail($validated['service_id']);
+        $serviceTypeInput = $request->input('service_type');
+        $modelClass = $typeMap[$serviceTypeInput];
+        $serviceId = $request->input('service_id');
 
-    if ($service->coach_id == $user->User_ID) {
-        return response()->json(['message' => 'You cannot request your own service.'], 403);
-    }
+        // Get the actual service (plan or group mentorship)
+        $service = $modelClass::findOrFail($serviceId);
 
-    $mentorshipRequest = MentorshipRequest::create([
-        'requestable_id' => $service->service_id,
-        'requestable_type' => $validated['service_type'] === 'MentorshipPlan' ? MentorshipPlan::class : GroupMentorship::class,
-        'trainee_id' => $user->User_ID,
-        'coach_id' => $service->coach_id,
-        'status' => 'pending',
-    ]);
+        // Pull the coach from the service relationship
+        $coachId = $service->service->coach_id;
 
-    $serviceData = [
-        'service_id' => $service->service_id,
-        'title' => $service->title,
-        'session_count' => $service instanceof MentorshipPlan ? $service->session_count : null,
-    ];
+        $mentorshipRequest = MentorshipRequest::create([
+            'requestable_id' => $serviceId,
+            'requestable_type' => $modelClass,
+            'trainee_id' => Auth::user()->User_ID,
+            'coach_id' => $coachId,
+            'status' => 'pending',
+        ]);
 
-    return response()->json([
-        'message' => 'Mentorship request sent successfully.',
-        'request' => $mentorshipRequest->load('trainee', 'requestable'),
-        'trainee' => [
-            'name' => optional($mentorshipRequest->trainee)->full_name,
-            'email' => $mentorshipRequest->trainee->email,
-            'profile_picture' => $mentorshipRequest->trainee->photo_url ?? $mentorshipRequest->trainee->profile_photo_url,
-        ],
-        'service' => $serviceData,
-    ]);
-}
+        // Load trainee data for the response
+        $trainee = User::findOrFail(Auth::user()->User_ID);
+
+        return response()->json([
+            'message' => 'Mentorship request sent successfully.',
+            'request' => $mentorshipRequest,
+            'trainee' => [
+                'name' => $trainee->full_name, // Changed from name to full_name
+                'email' => $trainee->email,
+                'profile_picture' => $trainee->profile_picture ?? null,
+            ],
+            'service' => [
+                'service_id' => $service->service_id,
+                'title' => $service->title,
                 'session_count' => $service instanceof MentorshipPlan ? $service->session_count : null,
             ]
         ]);
