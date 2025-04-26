@@ -1,14 +1,26 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Session Booked Successfully</title>
-</head>
-<body>
-    <h1>Session Booked Successfully!</h1>
-    <p>Dear Trainee,</p>
-    <p>Your mentorship session has been booked successfully.</p>
-    <p><strong>Service:</strong> {{ $request->requestable->title }}</p>
-    <p>Please check your upcoming sessions for more details.</p>
-    <p>Thank you for choosing our platform!</p>
-</body>
-</html>
+@component('mail::message')
+
+# Session Booked Successfully
+
+Hello,
+
+Your session has been booked successfully!
+
+@if(isset($entity->mentorship_request_id))
+    **Service:** {{ $entity->requestable->title }}  
+    @if($entity->requestable_type === 'App\\Models\\MentorshipPlan')
+        Please schedule your sessions at your convenience.
+        @component('mail::button', ['url' => url('/mentorship-requests/' . $entity->id . '/schedule')])
+        Schedule Sessions
+        @endcomponent
+    @endif
+@else
+    **Service:** {{ \App\Models\Service::find($entity->service_id)->title ?? 'Service' }}  
+    **Session Time:** {{ \Carbon\Carbon::parse($entity->session_time)->format('Y-m-d H:i:s') }}  
+    **Duration:** {{ $entity->duration_minutes }} minutes
+@endif
+
+Thanks,  
+{{ config('app.name') }}
+
+@endcomponent
