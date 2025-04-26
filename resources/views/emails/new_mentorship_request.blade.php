@@ -1,22 +1,27 @@
-@component('mail::message')
+<!DOCTYPE html>
+<html>
+<head>
+    <title>New Mentorship Request</title>
+</head>
+<body>
+    <h1>New Mentorship Request</h1>
 
-# New Mentorship Request
+    <p>Hello Coach,</p>
 
-Hello Coach,
+    <p>A new mentorship request has been submitted by {{ $mentorshipRequest->trainee->name }}.</p>
 
-A new mentorship request has been submitted by {{ $mentorshipRequest->trainee->name }}.
+    <p>
+        <strong>Service:</strong> {{ $mentorshipRequest->requestable->title }} <br>
+        <strong>Trainee:</strong> {{ $mentorshipRequest->trainee->name }} <br>
+        <strong>Email:</strong> {{ $mentorshipRequest->trainee->email }}
+    </p>
 
-**Service:** {{ $mentorshipRequest->requestable->title }}  
-**Trainee:** {{ $mentorshipRequest->trainee->name }}  
-**Email:** {{ $mentorshipRequest->trainee->email }}
+    <p>Please review the request and take action.</p>
 
-Please review the request and take action.
+    <p>
+        <a href="{{ url('/coach/requests') }}" style="padding: 10px 20px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px;">View Requests</a>
+    </p>
 
-@component('mail::button', ['url' => url('/coach/requests')])
-View Requests
-@endcomponent
-
-Thanks,  
-{{ config('app.name') }}
-
-@endcomponent
+    <p>Thanks,<br>{{ config('app.name') }}</p>
+</body>
+</html>
