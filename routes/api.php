@@ -71,7 +71,7 @@ Route::middleware('auth:sanctum')->group(function () {
 // Routes الخاصة بـ MentorshipRequestController
 Route::middleware('auth:sanctum')->group(function () {
     // Trainee routes
-    Route::post('/mentorship-request', [MentorshipRequestController::class, 'requestMentorship']);
+    Route::post('/trainee/mentorship-requests', [MentorshipRequestController::class, 'requestMentorship']);
     Route::get('/traineerequest', [MentorshipRequestController::class, 'traineegetrequest']);
     
     // Coach routes
