@@ -13,5 +13,8 @@ class CoachLanguage extends Model
 
 public $timestamps = false;
 public $incrementing = false; 
-
+public function coach()
+    {
+        return $this->belongsTo(coach::class, 'coach_id', 'User_ID');
+    }
 }  
