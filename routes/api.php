@@ -57,7 +57,7 @@ Route::prefix('coach/{coachId}')->middleware(['auth:api', 'check.trainee'])->gro
     Route::post('group-mentorship/{groupMentorshipId}/join', [CoachServiceController::class, 'joinGroupMentorship']);
     Route::get('available-dates', [BookingController::class, 'getAvailableDates']);
     Route::get('available-slots', [BookingController::class, 'getAvailableSlots']);
-    Route::post('book', [BookingController::class, 'bookService']); // Added for booking regular services
+    Route::post('book', [BookingController::class, 'bookService']); // Used for booking regular services and MentorshipPlan sessions
 });
 
 // Routes الخاصة بـ NewSessionController
@@ -78,9 +78,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/coach/requests', [MentorshipRequestController::class, 'viewRequests']);
     Route::post('/coach/requests/{id}/accept', [MentorshipRequestController::class, 'acceptRequest']);
     Route::post('/coach/requests/{id}/reject', [MentorshipRequestController::class, 'rejectRequest']);
-
-    // Additional routes for scheduling
-    Route::post('/mentorship-requests/{id}/schedule', [MentorshipRequestController::class, 'scheduleSessions']);
 
     // Trainee review
     Route::post('/trainee/reviews', [ReviewController::class, 'store']);
