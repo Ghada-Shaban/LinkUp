@@ -16,6 +16,6 @@
         <a href="{{ url('/payment/initiate/mentorship_request/' . $mentorshipRequest->id) }}" style="padding: 10px 20px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px;">Proceed to Payment</a>
     </p>
 
-    <p>Thanks,<br>{{ config('app.name') }}</p>
+    <p>Thanks,LinkuUp Team </p>
 </body>
 </html>
