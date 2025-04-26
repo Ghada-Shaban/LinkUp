@@ -399,7 +399,7 @@ class ProfileController extends Controller
         $coach = Coach::where('User_ID', $user_id)->first();
         $languages = CoachLanguage::where('coach_id', $user_id)->pluck('Language');
         $skills = CoachSkill::where('coach_id', $user_id)->pluck('Skill');
-        $availabilityData = CoachAvailability::where('User_ID', $user_id)
+        $availabilityData = CoachAvailability::where('coach_id', $user_id)
         ->get()
         ->groupBy('Day_Of_Week')
         ->map(function ($slots) {
