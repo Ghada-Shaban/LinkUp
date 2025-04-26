@@ -6,7 +6,7 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Queue\SerializesModels;
 
-class MentorshipRequestAccepted extends Mailable
+class RequestAccepted extends Mailable
 {
     use Queueable, SerializesModels;
 
