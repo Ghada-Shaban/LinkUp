@@ -5,25 +5,21 @@ namespace App\Mail;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Queue\SerializesModels;
-use App\Models\MentorshipRequest;
 
 class SessionBooked extends Mailable
 {
     use Queueable, SerializesModels;
 
-    public $mentorshipRequest;
+    public $entity;
 
-    public function __construct(MentorshipRequest $mentorshipRequest)
+    public function __construct($entity)
     {
-        $this->mentorshipRequest = $mentorshipRequest;
+        $this->entity = $entity;
     }
 
     public function build()
     {
         return $this->subject('Session Booked Successfully')
-                    ->view('emails.session_booked')
-                    ->with([
-                        'request' => $this->mentorshipRequest,
-                    ]);
+                    ->view('emails.session_booked');
     }
 }
