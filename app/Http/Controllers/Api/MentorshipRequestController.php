@@ -10,6 +10,7 @@ use App\Models\Service;
 use App\Models\MentorshipPlan;
 use App\Models\GroupMentorship;
 use App\Models\User;
+use App\Models\PendingPayment; // استيراد موديل PendingPayment
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -121,6 +122,13 @@ class MentorshipRequestController extends Controller
         $request->status = 'accepted';
         $request->responded_at = now();
         $request->save();
+
+        // إنشاء سجل في جدول pending_payments
+        PendingPayment::create([
+            'mentorship_request_id' => $request->id,
+            'trainee_id' => $request->trainee_id,
+            'coach_id' => $request->coach_id,
+        ]);
 
         // إرسال الإيميل للـ Trainee
         try {
