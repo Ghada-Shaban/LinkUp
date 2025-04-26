@@ -14,13 +14,13 @@ use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 use Stripe\Stripe;
 use Stripe\PaymentIntent;
-use App\Models\Price; // استيراد موديل Price
+use App\Models\Price;
 
 class PaymentController extends Controller
 {
     public function __construct()
     {
-        Stripe::setApiKey(env('STRIPE_KEY'));
+        Stripe::setApiKey(env('STRIPE_SECRET_KEY')); // تغيير من STRIPE_KEY لـ STRIPE_SECRET_KEY
     }
 
     public function initiatePayment(Request $request, $type, $id)
@@ -53,19 +53,16 @@ class PaymentController extends Controller
         $description = '';
 
         if ($mentorshipRequest->requestable_type === 'App\\Models\\Service') {
-            // جلب الـ Service مباشرة
             $service = $requestable;
             $priceEntry = Price::where('service_id', $service->service_id)->first();
             $amount = $priceEntry ? $priceEntry->price * 100 : 0;
             $description = "Payment for Service ID: {$requestable->id}";
         } elseif ($mentorshipRequest->requestable_type === 'App\\Models\\GroupMentorship') {
-            // جلب الـ Service المرتبط بالـ GroupMentorship
             $service = $requestable->service;
             $priceEntry = Price::where('service_id', $service->service_id)->first();
             $amount = $priceEntry ? $priceEntry->price * 100 : 0;
             $description = "Payment for Group Mentorship ID: {$requestable->id}";
         } elseif ($mentorshipRequest->requestable_type === 'App\\Models\\MentorshipPlan') {
-            // جلب الـ Service المرتبط بالـ MentorshipPlan
             $service = $requestable->service;
             $priceEntry = Price::where('service_id', $service->service_id)->first();
             $amount = $priceEntry ? $priceEntry->price * 100 : 0;
@@ -77,7 +74,6 @@ class PaymentController extends Controller
         }
 
         try {
-            // إنشاء PaymentIntent
             $paymentIntent = PaymentIntent::create([
                 'amount' => $amount,
                 'currency' => $currency,
@@ -103,11 +99,9 @@ class PaymentController extends Controller
                 ],
             ]);
 
-            // لو الدفع نجح
             if ($paymentIntent->status === 'succeeded') {
                 $pendingPayment->delete();
 
-                // إنشاء جلسة جديدة
                 if ($mentorshipRequest->requestable_type === 'App\\Models\\GroupMentorship') {
                     $groupMentorship = $requestable;
                     $startDateTime = Carbon::parse($groupMentorship->day . ' ' . $groupMentorship->start_time);
