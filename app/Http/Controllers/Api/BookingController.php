@@ -17,7 +17,7 @@ class BookingController extends Controller
 {
     public function getAvailableDates(Request $request, $coachId)
     {
-        $availabilities = CoachAvailability::where('User_ID', $coachId)->get();
+        $availabilities = CoachAvailability::where('coach_id', $coachId)->get();
         $dates = $availabilities->map(function ($availability) {
             return [
                 'day_of_week' => $availability->Day_Of_Week,
@@ -34,7 +34,7 @@ class BookingController extends Controller
         $date = $request->query('date');
         $dayOfWeek = Carbon::parse($date)->format('l');
 
-        $availabilities = CoachAvailability::where('User_ID', $coachId)
+        $availabilities = CoachAvailability::where('coach_id', $coachId)
             ->where('Day_Of_Week', $dayOfWeek)
             ->get();
 
@@ -67,7 +67,7 @@ class BookingController extends Controller
         $dayOfWeek = $slotStart->format('l');
 
         // Check Coach Availability
-        $availability = CoachAvailability::where('User_ID', (int)$coachId)
+        $availability = CoachAvailability::where('coach_id', (int)$coachId)
             ->where('Day_Of_Week', $dayOfWeek)
             ->where('Start_Time', '<=', $slotStart->format('H:i:s'))
             ->where('End_Time', '>=', $slotEnd->format('H:i:s'))
@@ -195,4 +195,3 @@ class BookingController extends Controller
             return response()->json(['error' => $e->getMessage()], 500);
         }
     }
-}
