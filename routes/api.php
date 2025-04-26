@@ -86,6 +86,7 @@ Route::middleware('auth:sanctum')->group(function () {
 // Payment routes for all types of services
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/payment/initiate/{type}/{id}', [PaymentController::class, 'initiatePayment']);
+    Route::post('/payment/confirm/{type}/{id}', [PaymentController::class, 'confirmPayment']); // Added route for confirming payment
 });
 
 // Route لجلب الخدمات بناءً على service_type
