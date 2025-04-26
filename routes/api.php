@@ -74,7 +74,7 @@ Route::middleware('auth:sanctum')->group(function () {
 Route::middleware('auth:sanctum')->group(function () {
     // Trainee routes
     Route::prefix('trainee')->group(function () {
-        Route::post('/mentorship-requests', [MentorshipRequestController::class, 'store']);
+        Route::post('/mentorship-requests', [MentorshipRequestController::class, 'create']);
         Route::get('/mentorship-requests', [MentorshipRequestController::class, 'traineeIndex']);
 
         // make review
