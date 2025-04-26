@@ -17,33 +17,177 @@ class BookingController extends Controller
 {
     public function getAvailableDates(Request $request, $coachId)
     {
+        // Validate query parameters
+        $request->validate([
+            'service_id' => 'required|exists:services,service_id',
+            'month' => 'required|date_format:Y-m',
+        ]);
+
+        $serviceId = $request->query('service_id');
+        $month = $request->query('month');
+
+        // Verify that the coach provides the requested service
+        $service = Service::where('service_id', $serviceId)
+            ->where('coach_id', $coachId)
+            ->first();
+
+        if (!$service) {
+            return response()->json(['message' => 'Service does not belong to this coach'], 403);
+        }
+
+        // Parse the month and determine the date range
+        $startOfMonth = Carbon::parse($month)->startOfMonth();
+        $endOfMonth = Carbon::parse($month)->endOfMonth();
+        $currentDate = Carbon::today();
+
+        // Fetch coach's availability
         $availabilities = CoachAvailability::where('coach_id', $coachId)->get();
-        $dates = $availabilities->map(function ($availability) {
-            return [
-                'day_of_week' => $availability->Day_Of_Week,
-                'start_time' => $availability->Start_Time,
-                'end_time' => $availability->End_Time,
+
+        // Fetch booked sessions for the month
+        $bookedSessions = NewSession::where('coach_id', $coachId)
+            ->whereIn('status', ['pending', 'upcoming'])
+            ->whereBetween('session_time', [$startOfMonth, $endOfMonth])
+            ->get()
+            ->groupBy(function ($session) {
+                return Carbon::parse($session->session_time)->toDateString();
+            });
+
+        // Generate list of dates for the month
+        $dates = [];
+        $durationMinutes = 30; // Assuming 30-minute sessions as per screenshot
+
+        for ($date = $startOfMonth->copy(); $date->lte($endOfMonth); $date->addDay()) {
+            $dayOfWeek = $date->format('l');
+            $dateString = $date->toDateString();
+
+            // Check if the date is in the past
+            if ($date->lt($currentDate)) {
+                $dates[] = [
+                    'date' => $dateString,
+                    'day_of_week' => $dayOfWeek,
+                    'status' => 'unavailable',
+                ];
+                continue;
+            }
+
+            // Check if the coach is available on this day
+            $availability = $availabilities->firstWhere('Day_Of_Week', $dayOfWeek);
+
+            if (!$availability) {
+                $dates[] = [
+                    'date' => $dateString,
+                    'day_of_week' => $dayOfWeek,
+                    'status' => 'unavailable',
+                ];
+                continue;
+            }
+
+            // Check if the date is fully booked
+            $isBooked = false;
+            if (isset($bookedSessions[$dateString])) {
+                $sessionsOnDate = $bookedSessions[$dateString];
+                $startTime = Carbon::parse($availability->Start_Time);
+                $endTime = Carbon::parse($availability->End_Time);
+                $totalMinutesAvailable = $endTime->diffInMinutes($startTime);
+                $totalSlots = $totalMinutesAvailable / $durationMinutes;
+
+                $bookedMinutes = 0;
+                foreach ($sessionsOnDate as $session) {
+                    $bookedMinutes += $session->duration_minutes;
+                }
+
+                $bookedSlots = $bookedMinutes / $durationMinutes;
+                if ($bookedSlots >= $totalSlots) {
+                    $isBooked = true;
+                }
+            }
+
+            $status = $isBooked ? 'booked' : 'available';
+            $dates[] = [
+                'date' => $dateString,
+                'day_of_week' => $dayOfWeek,
+                'status' => $status,
             ];
-        });
+        }
 
         return response()->json($dates);
     }
 
     public function getAvailableSlots(Request $request, $coachId)
     {
+        // Validate query parameters
+        $request->validate([
+            'date' => 'required|date',
+            'service_id' => 'required|exists:services,service_id',
+        ]);
+
         $date = $request->query('date');
+        $serviceId = $request->query('service_id');
         $dayOfWeek = Carbon::parse($date)->format('l');
 
+        // Verify that the coach provides the requested service
+        $service = Service::where('service_id', $serviceId)
+            ->where('coach_id', $coachId)
+            ->first();
+
+        if (!$service) {
+            return response()->json(['message' => 'Service does not belong to this coach'], 403);
+        }
+
+        // Check if the date is in the past
+        $selectedDate = Carbon::parse($date);
+        if ($selectedDate->lt(Carbon::today())) {
+            return response()->json(['message' => 'Cannot book slots for past dates'], 400);
+        }
+
+        // Fetch coach's availability for the day
         $availabilities = CoachAvailability::where('coach_id', $coachId)
             ->where('Day_Of_Week', $dayOfWeek)
             ->get();
 
-        $slots = $availabilities->map(function ($availability) {
-            return [
-                'start_time' => $availability->Start_Time,
-                'end_time' => $availability->End_Time,
-            ];
-        });
+        if ($availabilities->isEmpty()) {
+            return response()->json(['message' => 'No availability on this day'], 400);
+        }
+
+        // Fetch booked sessions for the date
+        $bookedSessions = NewSession::where('coach_id', $coachId)
+            ->whereIn('status', ['pending', 'upcoming'])
+            ->whereDate('session_time', $selectedDate->toDateString())
+            ->get();
+
+        // Generate time slots (30-minute intervals)
+        $slots = [];
+        $durationMinutes = 30; // Assuming 30-minute sessions as per screenshot
+
+        foreach ($availabilities as $availability) {
+            $startTime = Carbon::parse($availability->Start_Time);
+            $endTime = Carbon::parse($availability->End_Time);
+
+            while ($startTime->lt($endTime)) {
+                $slotEnd = $startTime->copy()->addMinutes($durationMinutes);
+                if ($slotEnd->gt($endTime)) {
+                    break; // Don't include partial slots
+                }
+
+                $slotStartFormatted = $startTime->format('H:i:s');
+                $slotEndFormatted = $slotEnd->format('H:i:s');
+
+                // Check if this slot is booked
+                $isBooked = $bookedSessions->filter(function ($session) use ($startTime, $slotEnd) {
+                    $sessionStart = Carbon::parse($session->session_time);
+                    $sessionEnd = $sessionStart->copy()->addMinutes($session->duration_minutes);
+                    return $startTime->lt($sessionEnd) && $slotEnd->gt($sessionStart);
+                })->isNotEmpty();
+
+                $slots[] = [
+                    'start_time' => $slotStartFormatted,
+                    'end_time' => $slotEndFormatted,
+                    'status' => $isBooked ? 'unavailable' : 'available',
+                ];
+
+                $startTime->addMinutes($durationMinutes);
+            }
+        }
 
         return response()->json($slots);
     }
