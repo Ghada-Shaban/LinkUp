@@ -2,10 +2,10 @@
 
 namespace App\Mail;
 
-use App\Models\MentorshipRequest;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Queue\SerializesModels;
+use App\Models\MentorshipRequest;
 
 class RequestAccepted extends Mailable
 {
@@ -21,13 +21,6 @@ class RequestAccepted extends Mailable
     public function build()
     {
         return $this->subject('Your Mentorship Request Has Been Accepted')
-                    ->view('emails.request_accepted')
-                    ->with([
-                        'request' => $this->mentorshipRequest,
-                        'session_time' => $this->mentorshipRequest->first_session_time,
-                        'title' => $this->mentorshipRequest->title,
-                        'type' => $this->mentorshipRequest->type,
-                        'plan_schedule' => $this->mentorshipRequest->plan_schedule,
-                    ]);
+                    ->view('emails.request_accepted');
     }
 }
