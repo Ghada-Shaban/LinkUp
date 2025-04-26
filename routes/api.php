@@ -11,7 +11,7 @@ use App\Http\Controllers\Api\ReviewController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\CoachController;
 use App\Http\Controllers\Api\AdminController;
-use App\Http\Controllers\Api\BookingController; // إضافة الـ BookingController
+use App\Http\Controllers\Api\BookingController;
 
 /*
 |--------------------------------------------------------------------------
@@ -37,34 +37,30 @@ Route::prefix('auth')->group(function () {
 });
 
 Route::prefix('password')->group(function () {
-    Route::post('/forgot', [\App\Http\Controllers\Api\PasswordResetController::class, 'sendOtp']); // إرسال OTP
-    Route::post('/verify-otp', [\App\Http\Controllers\Api\PasswordResetController::class, 'verifyOtp']); // التحقق من OTP
-    Route::post('/reset', [\App\Http\Controllers\Api\PasswordResetController::class, 'resetPassword']); // إعادة تعيين كلمة المرور
+    Route::post('/forgot', [\App\Http\Controllers\Api\PasswordResetController::class, 'sendOtp']);
+    Route::post('/verify-otp', [\App\Http\Controllers\Api\PasswordResetController::class, 'verifyOtp']);
+    Route::post('/reset', [\App\Http\Controllers\Api\PasswordResetController::class, 'resetPassword']);
 });
 
 Route::get('service/enums', [EnumController::class, 'getServiceEnums']);
 
 Route::prefix('coach/{coachId}')->middleware(['auth:api', 'check.coach.ownership'])->group(function () {
-    // باقي الـ Routes
     Route::get('services/count', [CoachServiceController::class, 'getServicesCount']);
     Route::post('services', [CoachServiceController::class, 'createService']);
     Route::put('services/{serviceId}', [CoachServiceController::class, 'updateService']);
     Route::delete('services/{serviceId}', [CoachServiceController::class, 'deleteService']);
-    // reviews
     Route::get('/reviews', [ReviewController::class, 'show']);
 });
 
 Route::prefix('coach/{coachId}')->middleware(['auth:api', 'check.trainee'])->group(function () {
     Route::post('group-mentorship/{groupMentorshipId}/join', [CoachServiceController::class, 'joinGroupMentorship']);
-    
-    // الـ Routes الجديدة لـ BookingController
     Route::get('available-dates', [BookingController::class, 'getAvailableDates']);
     Route::get('available-slots', [BookingController::class, 'getAvailableSlots']);
 });
 
 // Routes الخاصة بـ NewSessionController
 Route::middleware('auth:sanctum')->group(function () {
-    Route::get('/sessions', [NewSessionController::class, 'index'])->name('sessions.index'); // تم تعديل الاسم من /upcoming-sessions لدعم كل الأنواع
+    Route::get('/sessions', [NewSessionController::class, 'index'])->name('sessions.index');
     Route::post('/sessions/update-meeting-link/{sessionId}', [NewSessionController::class, 'updateMeetingLink']);
     Route::post('/sessions/{sessionId}/complete', [NewSessionController::class, 'completeSession']);
     Route::post('/sessions/{sessionId}/cancel', [NewSessionController::class, 'cancelSession']);
@@ -73,20 +69,21 @@ Route::middleware('auth:sanctum')->group(function () {
 // Routes الخاصة بـ MentorshipRequestController
 Route::middleware('auth:sanctum')->group(function () {
     // Trainee routes
-    Route::prefix('trainee')->group(function () {
-        Route::post('/mentorship-requests', [MentorshipRequestController::class, 'create']);
-        Route::get('/mentorship-requests', [MentorshipRequestController::class, 'traineeIndex']);
-
-        // make review
-        Route::post('/reviews', [ReviewController::class, 'store']);
-    });
-
+    Route::post('/mentorship-request', [MentorshipRequestController::class, 'requestMentorship']);
+    Route::get('/traineerequest', [MentorshipRequestController::class, 'traineegetrequest']);
+    
     // Coach routes
-    Route::prefix('coach')->group(function () {
-        Route::get('/mentorship-requests/pending', [MentorshipRequestController::class, 'coachPendingRequests']);
-        Route::post('/mentorship-requests/{id}/accept', [MentorshipRequestController::class, 'acceptRequest']);
-        Route::post('/mentorship-requests/{id}/reject', [MentorshipRequestController::class, 'rejectRequest']);
-    });
+    Route::get('/coach/requests', [MentorshipRequestController::class, 'viewRequests']);
+    Route::post('/coach/requests/{id}/accept', [MentorshipRequestController::class, 'acceptRequest']);
+    Route::post('/coach/requests/{id}/reject', [MentorshipRequestController::class, 'rejectRequest']);
+
+    // Additional routes for scheduling and payment
+    Route::post('/mentorship-requests/{id}/schedule', [MentorshipRequestController::class, 'scheduleSessions']);
+    Route::post('/mentorship-requests/{id}/initiate-payment', [MentorshipRequestController::class, 'initiatePayment']);
+    Route::get('/mentorship-requests/complete-payment', [MentorshipRequestController::class, 'completePayment']);
+
+    // Trainee review
+    Route::post('/trainee/reviews', [ReviewController::class, 'store']);
 });
 
 // Route لجلب الخدمات بناءً على service_type
@@ -110,17 +107,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Get Trainee profile
     Route::get('/trainee/profile/{user_id}', [ProfileController::class, 'getTraineeProfile']);
 });
-//admin
+
+// Admin routes
 Route::get('/admin/coach-requests', [AdminController::class, 'getPendingCoachRequests']);
 Route::post('/admin/coach-requests/{coachId}/handle', [AdminController::class, 'handleCoachRequest']);
-//updated requests path
-Route::middleware('auth:sanctum')->group(function () {
-    Route::post('/mentorship-request', [MentorshipRequestController::class, 'requestMentorship']);
-    Route::get('/traineerequest', [MentorshipRequestController::class, 'traineegetrequest']);
-    Route::get('/coach/requests', [MentorshipRequestController::class, 'viewRequests']);
-    Route::post('/coach/requests/{id}/accept', [MentorshipRequestController::class, 'acceptRequest']);
-    Route::post('/coach/requests/{id}/reject', [MentorshipRequestController::class, 'rejectRequest']);
-    Route::post('/mentorship-requests/{id}/schedule', [MentorshipRequestController::class, 'scheduleSessions']);
-    Route::post('/mentorship-requests/{id}/initiate-payment', [MentorshipRequestController::class, 'initiatePayment']);
-    Route::get('/mentorship-requests/complete-payment', [MentorshipRequestController::class, 'completePayment']);
-});
