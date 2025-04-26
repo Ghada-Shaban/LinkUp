@@ -2,56 +2,41 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use App\Models\GroupMentorship;
-use App\Models\MentorshipPlan;
+use App\Observers\MentorshipRequestObserver;
 
 class MentorshipRequest extends Model
 {
-    protected $fillable = [
-        'requestable_id', 
-        'requestable_type', 
-        'trainee_id', 
-        'coach_id', 
-        'status', 
-        'responded_at',
-        'first_session_time',
-        'duration_minutes',
-        'plan_schedule',
-        // 'payment_due_at',
-    ];
+    use HasFactory;
 
-    protected $casts = [
-        'plan_schedule' => 'array',
-        // 'payment_due_at' => 'datetime',
+    protected $fillable = [
+        'requestable_id',
+        'requestable_type',
+        'trainee_id',
+        'coach_id',
+        'status',
     ];
 
     public function requestable()
     {
         return $this->morphTo();
     }
-    
-    public function coach()
-    {
-        return $this->belongsTo(Coach::class, 'coach_id', 'User_ID');
-    }
-    
+
     public function trainee()
     {
-        return $this->belongsTo(Trainee::class, 'trainee_id', 'User_ID');
+        return $this->belongsTo(User::class, 'trainee_id', 'User_ID');
     }
 
-    public function toArray()
+    public function coach()
     {
-        $array = parent::toArray();
+        return $this->belongsTo(User::class, 'coach_id', 'User_ID');
+    }
 
-        if ($this->requestable_type === GroupMentorship::class) {
-            $array['service_type'] = 'Group Mentorship';
-        } elseif ($this->requestable_type === MentorshipPlan::class) {
-            $array['service_type'] = 'Mentorship Plan';
-        }
+    protected static function boot()
+    {
+        parent::boot();
 
-        unset($array['requestable_type']); 
-        return $array;
+        static::observe(MentorshipRequestObserver::class);
     }
 }
