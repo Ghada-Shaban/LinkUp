@@ -97,34 +97,49 @@ class PaymentController extends Controller
                         'cvc' => $request->cvc,
                     ],
                 ],
-                'confirm' => true,
                 'metadata' => [
                     "{$type}_id" => $id,
                 ],
+                'return_url' => 'https://your-frontend-app.com/payment/return', // Replace with your Frontend URL
             ]);
 
-            if ($paymentIntent->status === 'succeeded') {
-                // Payment successful, delete the pending payment record if it exists
-                if ($type === 'mentorship_request') {
-                    $pendingPayment->delete();
-                }
-
-                // Proceed to complete the payment
-                return $this->completePayment($type, $id);
-            } else {
-                Log::warning('Payment failed', [
-                    "{$type}_id" => $id,
-                    'payment_intent_id' => $paymentIntent->id,
-                    'status' => $paymentIntent->status,
-                ]);
-                return response()->json(['message' => 'Payment failed'], 400);
-            }
+            // Return the client secret to the frontend
+            return response()->json([
+                'client_secret' => $paymentIntent->client_secret,
+                'payment_intent_id' => $paymentIntent->id,
+            ]);
         } catch (\Exception $e) {
-            Log::error('Payment processing failed', [
+            Log::error('Payment initiation failed', [
                 "{$type}_id" => $id,
                 'error' => $e->getMessage(),
             ]);
-            return response()->json(['message' => 'Payment failed', 'error' => $e->getMessage()], 500);
+            return response()->json(['message' => 'Failed to initiate payment', 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    public function confirmPayment(Request $request, $type, $id)
+    {
+        Stripe::setApiKey(env('STRIPE_SECRET_KEY'));
+
+        try {
+            $paymentIntentId = $request->input('payment_intent_id');
+            $paymentIntent = PaymentIntent::retrieve($paymentIntentId);
+
+            if ($paymentIntent->status === 'succeeded') {
+                return $this->completePayment($type, $id);
+            } else {
+                Log::warning('Payment confirmation failed', [
+                    'payment_intent_id' => $paymentIntentId,
+                    'status' => $paymentIntent->status,
+                ]);
+                return response()->json(['message' => 'Payment confirmation failed', 'status' => $paymentIntent->status], 400);
+            }
+        } catch (\Exception $e) {
+            Log::error('Failed to confirm payment', [
+                'payment_intent_id' => $paymentIntentId,
+                'error' => $e->getMessage(),
+            ]);
+            return response()->json(['message' => 'Failed to confirm payment', 'error' => $e->getMessage()], 500);
         }
     }
 
@@ -135,6 +150,12 @@ class PaymentController extends Controller
 
             if ($mentorshipRequest->status !== 'accepted') {
                 return response()->json(['message' => 'Request must be accepted to complete payment'], 400);
+            }
+
+            // Delete the pending payment record
+            $pendingPayment = \App\Models\PendingPayment::where('mentorship_request_id', $mentorshipRequest->id)->first();
+            if ($pendingPayment) {
+                $pendingPayment->delete();
             }
 
             DB::beginTransaction();
