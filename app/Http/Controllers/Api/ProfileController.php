@@ -198,7 +198,7 @@ class ProfileController extends Controller
             CoachAvailability::where('coach_id', $user->User_ID)->delete();
             $this->setAvailability($user->User_ID, $validated['availability']);
         } catch (\Exception $e) {
-            \Log::error('Error updating availability', ['User_ID' => $user->User_ID, 'error' => $e->getMessage()]);
+            \Log::error('Error updating availability', ['coach_id' => $user->User_ID, 'error' => $e->getMessage()]);
             return response()->json(['message' => 'Failed to update availability', 'error' => $e->getMessage()], 500);
         }
     }
