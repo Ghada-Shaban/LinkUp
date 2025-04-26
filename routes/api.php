@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\EnumController;
 use App\Http\Controllers\Api\NewSessionController;
 use App\Http\Controllers\Api\MentorshipRequestController;
+use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\CoachServiceController;
 use App\Http\Controllers\Api\ReviewController;
 use App\Http\Controllers\Api\ProfileController;
@@ -56,6 +57,7 @@ Route::prefix('coach/{coachId}')->middleware(['auth:api', 'check.trainee'])->gro
     Route::post('group-mentorship/{groupMentorshipId}/join', [CoachServiceController::class, 'joinGroupMentorship']);
     Route::get('available-dates', [BookingController::class, 'getAvailableDates']);
     Route::get('available-slots', [BookingController::class, 'getAvailableSlots']);
+    Route::post('book', [BookingController::class, 'bookService']); // Added for booking regular services
 });
 
 // Routes الخاصة بـ NewSessionController
@@ -77,13 +79,16 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/coach/requests/{id}/accept', [MentorshipRequestController::class, 'acceptRequest']);
     Route::post('/coach/requests/{id}/reject', [MentorshipRequestController::class, 'rejectRequest']);
 
-    // Additional routes for scheduling and payment
+    // Additional routes for scheduling
     Route::post('/mentorship-requests/{id}/schedule', [MentorshipRequestController::class, 'scheduleSessions']);
-    Route::post('/mentorship-requests/{id}/initiate-payment', [MentorshipRequestController::class, 'initiatePayment']);
-    Route::get('/mentorship-requests/complete-payment', [MentorshipRequestController::class, 'completePayment']);
 
     // Trainee review
     Route::post('/trainee/reviews', [ReviewController::class, 'store']);
+});
+
+// Payment routes for all types of services
+Route::middleware('auth:sanctum')->group(function () {
+    Route::post('/payment/initiate/{type}/{id}', [PaymentController::class, 'initiatePayment']);
 });
 
 // Route لجلب الخدمات بناءً على service_type
