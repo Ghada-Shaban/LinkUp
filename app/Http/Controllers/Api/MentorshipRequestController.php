@@ -122,6 +122,12 @@ class MentorshipRequestController extends Controller
         $request->responded_at = now();
         $request->save();
 
+        // Create a pending payment record with a due date (e.g., 24 hours from now)
+        \App\Models\PendingPayment::create([
+            'mentorship_request_id' => $request->id,
+            'payment_due_at' => now()->addHours(24),
+        ]);
+
         // إرسال الإيميل للـ Trainee
         try {
             Mail::to($request->trainee->email)->send(new RequestAccepted($request));
