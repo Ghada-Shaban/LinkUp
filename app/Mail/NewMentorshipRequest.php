@@ -21,6 +21,6 @@ class NewMentorshipRequest extends Mailable
     public function build()
     {
         return $this->subject('New Mentorship Request')
-                    ->view('emails.mentorship_request');
+                    ->view('emails.new_mentorship_request');
     }
 }
