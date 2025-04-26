@@ -10,7 +10,7 @@ use App\Models\Service;
 use App\Models\MentorshipPlan;
 use App\Models\GroupMentorship;
 use App\Models\User;
-use App\Models\PendingPayment; // استيراد موديل PendingPayment
+use App\Models\PendingPayment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -128,6 +128,7 @@ class MentorshipRequestController extends Controller
             'mentorship_request_id' => $request->id,
             'trainee_id' => $request->trainee_id,
             'coach_id' => $request->coach_id,
+            'payment_due_at' => now()->addHours(24), // تاريخ الاستحقاق بعد 24 ساعة من دلوقتي
         ]);
 
         // إرسال الإيميل للـ Trainee
