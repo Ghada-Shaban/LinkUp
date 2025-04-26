@@ -8,11 +8,11 @@
 
     <p>Hello Coach,</p>
 
-    <p>A new mentorship request has been submitted by {{ $mentorshipRequest->trainee->name }}.</p>
+    <p>A new mentorship request has been submitted by {{ $mentorshipRequest->trainee->full_name }}.</p>
 
     <p>
         <strong>Service:</strong> {{ $mentorshipRequest->requestable->title }} <br>
-        <strong>Trainee:</strong> {{ $mentorshipRequest->trainee->name }} <br>
+        <strong>Trainee:</strong> {{ $mentorshipRequest->trainee->full_name }} <br>
         <strong>Email:</strong> {{ $mentorshipRequest->trainee->email }}
     </p>
 
