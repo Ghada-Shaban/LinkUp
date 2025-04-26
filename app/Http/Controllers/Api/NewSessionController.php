@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\NewSession;
+use App\Models\Service;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -53,9 +54,15 @@ class NewSessionController extends Controller
 
             $sessions = $query->get()->map(function ($session) {
                 $trainee = $session->trainee;
-                $serviceName = $session->mentorshipRequest && $session->mentorshipRequest->requestable
-                    ? $session->mentorshipRequest->requestable->title
-                    : 'N/A';
+                // Get service name from mentorship request if exists, otherwise from service_id
+                $serviceName = 'N/A';
+                if ($session->mentorship_request_id && $session->mentorshipRequest && $session->mentorshipRequest->requestable) {
+                    $serviceName = $session->mentorshipRequest->requestable->title;
+                } elseif ($session->service_id) {
+                    $service = Service::find($session->service_id);
+                    $serviceName = $service ? $service->title : 'N/A';
+                }
+
                 return [
                     'new_session_id' => $session->id,
                     'session_time' => $session->session_time,
@@ -83,9 +90,15 @@ class NewSessionController extends Controller
 
             $sessions = $query->get()->map(function ($session) {
                 $coach = $session->coach;
-                $serviceName = $session->mentorshipRequest && $session->mentorshipRequest->requestable
-                    ? $session->mentorshipRequest->requestable->title
-                    : 'N/A';
+                // Get service name from mentorship request if exists, otherwise from service_id
+                $serviceName = 'N/A';
+                if ($session->mentorship_request_id && $session->mentorshipRequest && $session->mentorshipRequest->requestable) {
+                    $serviceName = $session->mentorshipRequest->requestable->title;
+                } elseif ($session->service_id) {
+                    $service = Service::find($session->service_id);
+                    $serviceName = $service ? $service->title : 'N/A';
+                }
+
                 return [
                     'new_session_id' => $session->id,
                     'session_time' => $session->session_time,
