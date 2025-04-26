@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Mail\MentorshipRequestAccepted;
 use App\Models\MentorshipRequest;
 use App\Models\NewSession;
 use App\Models\Service;
@@ -13,6 +14,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\Rule;
 use Carbon\Carbon;
 
@@ -55,7 +57,7 @@ class MentorshipRequestController extends Controller
             'message' => 'Mentorship request sent successfully.',
             'request' => $mentorshipRequest,
             'trainee' => [
-                'name' => $trainee->full_name, // Changed from name to full_name
+                'name' => $trainee->full_name,
                 'email' => $trainee->email,
                 'profile_picture' => $trainee->profile_picture ?? null,
             ],
@@ -117,7 +119,18 @@ class MentorshipRequestController extends Controller
         }
 
         $request->status = 'accepted';
+        $request->responded_at = now();
         $request->save();
+
+        // إرسال الإيميل للـ Trainee
+        try {
+            Mail::to($request->trainee->email)->send(new MentorshipRequestAccepted($request));
+        } catch (\Exception $e) {
+            \Log::error('Failed to send Mentorship Request Accepted email', [
+                'request_id' => $id,
+                'error' => $e->getMessage(),
+            ]);
+        }
 
         return response()->json([
             'message' => 'Request accepted successfully. Trainee can now proceed to payment using /payment/initiate/mentorship_request/' . $id,
