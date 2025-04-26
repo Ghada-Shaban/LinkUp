@@ -2,10 +2,10 @@
 
 namespace App\Mail;
 
-use App\Models\MentorshipRequest;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Queue\SerializesModels;
+use App\Models\MentorshipRequest;
 
 class RequestRejected extends Mailable
 {
@@ -21,11 +21,6 @@ class RequestRejected extends Mailable
     public function build()
     {
         return $this->subject('Your Mentorship Request Has Been Rejected')
-                    ->view('emails.request_rejected')
-                    ->with([
-                        'request' => $this->mentorshipRequest,
-                        'title' => $this->mentorshipRequest->title,
-                        'type' => $this->mentorshipRequest->type,
-                    ]);
+                    ->view('emails.request_rejected');
     }
 }
