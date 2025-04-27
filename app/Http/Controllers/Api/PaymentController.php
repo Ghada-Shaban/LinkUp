@@ -57,7 +57,7 @@ class PaymentController extends Controller
             $priceEntry = Price::where('service_id', $service->service_id)->first();
             $amount = $priceEntry ? $priceEntry->price * 100 : 0;
             $description = "Payment for Service ID: {$requestable->id}";
-        } elseif ($mentorshipRequest->requestable_type === 'App\\Models\\GroupMentorship') {
+        } elseif ($mentorshipRequest->requestable_type === 'App I\\Models\\GroupMentorship') {
             $service = $requestable->service;
             $priceEntry = Price::where('service_id', $service->service_id)->first();
             $amount = $priceEntry ? $priceEntry->price * 100 : 0;
@@ -88,7 +88,7 @@ class PaymentController extends Controller
                     'trainee_id' => $mentorshipRequest->trainee_id,
                     'coach_id' => $mentorshipRequest->coach_id,
                 ],
-                'payment_method' => $request->input('payment_method_id'), // استخدمنا payment_method_id بدل بيانات الكارت
+                'payment_method' => $request->input('payment_method_id'),
                 'confirm' => true,
                 'automatic_payment_methods' => [
                     'enabled' => true,
@@ -112,7 +112,7 @@ class PaymentController extends Controller
                         'coach_id' => $mentorshipRequest->coach_id,
                         'session_time' => $startDateTime,
                         'duration' => $groupMentorship->duration_minutes,
-                        'status' => 'upcoming',
+                        'status' => 'Scheduled', // التعديل هنا: غيّرنا 'upcoming' لـ 'Scheduled'
                     ]);
                 }
 
