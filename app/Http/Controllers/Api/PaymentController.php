@@ -73,12 +73,9 @@ class PaymentController extends Controller
             return response()->json(['message' => 'Invalid amount'], 400);
         }
 
-        // Validate card details from request
+        // Validate payment_method_id
         $request->validate([
-            'card_number' => 'required|string',
-            'exp_month' => 'required|integer|between:1,12',
-            'exp_year' => 'required|integer|min:2023',
-            'cvc' => 'required|string|size:3',
+            'payment_method_id' => 'required|string',
         ]);
 
         try {
@@ -91,15 +88,7 @@ class PaymentController extends Controller
                     'trainee_id' => $mentorshipRequest->trainee_id,
                     'coach_id' => $mentorshipRequest->coach_id,
                 ],
-                'payment_method_data' => [
-                    'type' => 'card',
-                    'card' => [
-                        'number' => $request->input('card_number'),
-                        'exp_month' => $request->input('exp_month'),
-                        'exp_year' => $request->input('exp_year'),
-                        'cvc' => $request->input('cvc'),
-                    ],
-                ],
+                'payment_method' => $request->input('payment_method_id'), // استخدمنا payment_method_id بدل بيانات الكارت
                 'confirm' => true,
                 'automatic_payment_methods' => [
                     'enabled' => true,
