@@ -46,15 +46,15 @@ class BookingController extends Controller
         // Fetch booked sessions for the month
         $bookedSessions = NewSession::where('coach_id', $coachId)
             ->whereIn('status', ['pending', 'upcoming'])
-            ->whereBetween('session_time', [$startOfMonth, $endOfMonth])
+            ->whereBetween('date_time', [$startOfMonth, $endOfMonth])
             ->get()
             ->groupBy(function ($session) {
-                return Carbon::parse($session->session_time)->toDateString();
+                return Carbon::parse($session->date_time)->toDateString();
             });
 
         // Generate list of dates for the month
         $dates = [];
-        $durationMinutes = 30; // Assuming 30-minute sessions as per screenshot
+        $duration = 60; // تغيير duration_minutes إلى duration وتحديده بـ 60 دقيقة
 
         for ($date = $startOfMonth->copy(); $date->lte($endOfMonth); $date->addDay()) {
             $dayOfWeek = $date->format('l');
@@ -89,14 +89,14 @@ class BookingController extends Controller
                 $startTime = Carbon::parse($availability->Start_Time);
                 $endTime = Carbon::parse($availability->End_Time);
                 $totalMinutesAvailable = $endTime->diffInMinutes($startTime);
-                $totalSlots = $totalMinutesAvailable / $durationMinutes;
+                $totalSlots = $totalMinutesAvailable / $duration;
 
                 $bookedMinutes = 0;
                 foreach ($sessionsOnDate as $session) {
-                    $bookedMinutes += $session->duration_minutes;
+                    $bookedMinutes += $session->duration; // تغيير duration_minutes إلى duration
                 }
 
-                $bookedSlots = $bookedMinutes / $durationMinutes;
+                $bookedSlots = $bookedMinutes / $duration;
                 if ($bookedSlots >= $totalSlots) {
                     $isBooked = true;
                 }
@@ -152,19 +152,19 @@ class BookingController extends Controller
         // Fetch booked sessions for the date
         $bookedSessions = NewSession::where('coach_id', $coachId)
             ->whereIn('status', ['pending', 'upcoming'])
-            ->whereDate('session_time', $selectedDate->toDateString())
+            ->whereDate('date_time', $selectedDate->toDateString())
             ->get();
 
-        // Generate time slots (30-minute intervals)
+        // Generate time slots (60-minute intervals)
         $slots = [];
-        $durationMinutes = 30; // Assuming 30-minute sessions as per screenshot
+        $duration = 60; // تغيير duration_minutes إلى duration وتحديده بـ 60 دقيقة
 
         foreach ($availabilities as $availability) {
             $startTime = Carbon::parse($availability->Start_Time);
             $endTime = Carbon::parse($availability->End_Time);
 
             while ($startTime->lt($endTime)) {
-                $slotEnd = $startTime->copy()->addMinutes($durationMinutes);
+                $slotEnd = $startTime->copy()->addMinutes($duration);
                 if ($slotEnd->gt($endTime)) {
                     break; // Don't include partial slots
                 }
@@ -174,8 +174,8 @@ class BookingController extends Controller
 
                 // Check if this slot is booked
                 $isBooked = $bookedSessions->filter(function ($session) use ($startTime, $slotEnd) {
-                    $sessionStart = Carbon::parse($session->session_time);
-                    $sessionEnd = $sessionStart->copy()->addMinutes($session->duration_minutes);
+                    $sessionStart = Carbon::parse($session->date_time);
+                    $sessionEnd = $sessionStart->copy()->addMinutes($session->duration); // تغيير duration_minutes إلى duration
                     return $startTime->lt($sessionEnd) && $slotEnd->gt($sessionStart);
                 })->isNotEmpty();
 
@@ -185,7 +185,7 @@ class BookingController extends Controller
                     'status' => $isBooked ? 'unavailable' : 'available',
                 ];
 
-                $startTime->addMinutes($durationMinutes);
+                $startTime->addMinutes($duration);
             }
         }
 
@@ -196,11 +196,10 @@ class BookingController extends Controller
     {
         $request->validate([
             'service_id' => 'required|exists:services,service_id',
-            'start_time' => 'required|date_format:H:i:s', // الوقت المختار (مثلاً 21:00:00)
-            'start_date' => 'required|date|after:now', // أول يوم للحجز
-            'weeks' => 'required|integer|min:1', // عدد الأسابيع (مثلاً 3 أسابيع)
-            'duration_minutes' => 'required|integer|min:30',
-            'mentorship_request_id' => 'required|exists:mentorship_requests,id', // مطلوب لـ MentorshipPlan
+            'start_time' => 'required|date_format:H:i:s',
+            'start_date' => 'required|date|after:now',
+            'weeks' => 'required|integer|min:1',
+            'mentorship_request_id' => 'required|exists:mentorship_requests,id',
         ]);
 
         $service = Service::findOrFail($request->service_id);
@@ -237,7 +236,6 @@ class BookingController extends Controller
             return response()->json(['message' => 'You have already booked the maximum number of sessions for this Mentorship Plan.'], 400);
         }
 
-        // عدد الجلسات اللي هيتحجزوا هيكون على حسب عدد الأسابيع
         $weeks = $request->weeks;
         if ($weeks > $remainingSessions) {
             return response()->json(['message' => "You can only book $remainingSessions more session(s) for this Mentorship Plan."], 400);
@@ -245,7 +243,7 @@ class BookingController extends Controller
 
         $startDate = Carbon::parse($request->start_date);
         $startTime = Carbon::parse($request->start_time);
-        $durationMinutes = $request->duration_minutes;
+        $duration = 60; // تحديد الـ duration بـ 60 دقيقة دايمًا
 
         $sessionsToBook = [];
         $dayOfWeek = $startDate->format('l');
@@ -254,7 +252,7 @@ class BookingController extends Controller
         for ($i = 0; $i < $weeks; $i++) {
             $sessionDate = $startDate->copy()->addWeeks($i);
             $sessionDateTime = $sessionDate->setTime($startTime->hour, $startTime->minute, $startTime->second);
-            $slotEnd = $sessionDateTime->copy()->addMinutes($durationMinutes);
+            $slotEnd = $sessionDateTime->copy()->addMinutes($duration);
 
             // Check Coach Availability for this date
             $availability = CoachAvailability::where('coach_id', (int)$coachId)
@@ -270,7 +268,7 @@ class BookingController extends Controller
                     'date' => $sessionDateTime->toDateString(),
                     'day_of_week' => $dayOfWeek,
                     'start_time' => $sessionDateTime->format('H:i'),
-                    'duration' => $durationMinutes,
+                    'duration' => $duration,
                 ]);
                 return response()->json(['message' => "Selected slot is not available on {$sessionDateTime->toDateString()}"], 400);
             }
@@ -278,11 +276,11 @@ class BookingController extends Controller
             // Check for conflicts on this date
             $conflictingSessions = NewSession::where('coach_id', (int)$coachId)
                 ->whereIn('status', ['pending', 'upcoming'])
-                ->whereDate('session_time', $sessionDateTime->toDateString())
+                ->whereDate('date_time', $sessionDateTime->toDateString())
                 ->get()
                 ->filter(function ($existingSession) use ($sessionDateTime, $slotEnd) {
-                    $reqStart = Carbon::parse($existingSession->session_time);
-                    $reqEnd = $reqStart->copy()->addMinutes($existingSession->duration_minutes);
+                    $reqStart = Carbon::parse($existingSession->date_time);
+                    $reqEnd = $reqStart->copy()->addMinutes($existingSession->duration); // تغيير duration_minutes إلى duration
                     return $sessionDateTime < $reqEnd && $slotEnd > $reqStart;
                 });
 
@@ -298,8 +296,8 @@ class BookingController extends Controller
             }
 
             $sessionsToBook[] = [
-                'session_time' => $sessionDateTime->toDateTimeString(),
-                'duration_minutes' => $durationMinutes,
+                'date_time' => $sessionDateTime->toDateTimeString(),
+                'duration' => $duration,
             ];
         }
 
@@ -310,9 +308,9 @@ class BookingController extends Controller
                 $session = NewSession::create([
                     'trainee_id' => Auth::user()->User_ID,
                     'coach_id' => $coachId,
-                    'session_time' => $sessionData['session_time'],
-                    'duration_minutes' => $sessionData['duration_minutes'],
-                    'status' => 'pending', // Pending until payment is completed
+                    'date_time' => $sessionData['date_time'],
+                    'duration' => $sessionData['duration'], // تغيير duration_minutes إلى duration
+                    'status' => 'pending',
                     'service_id' => $service->service_id,
                     'mentorship_request_id' => $mentorshipRequestId,
                 ]);
@@ -354,4 +352,3 @@ class BookingController extends Controller
         }
     }
 }
-
