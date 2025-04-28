@@ -144,17 +144,17 @@ class PaymentController extends Controller
                 }
 
                 // التحقق من current_participants قبل الزيادة
-                if ($groupMentorship->current_participants < $groupMentorship->max_participants) {
-                    $groupMentorship->increment('current_participants');
+                $traineeIds = json_decode($groupMentorship->trainee_ids, true) ?? [];
+                if (!in_array($mentorshipRequest->trainee_id, $traineeIds)) {
+                    $traineeIds[] = $mentorshipRequest->trainee_id;
+                    $groupMentorship->trainee_ids = json_encode($traineeIds);
+                    // تحديث current_participants بناءً على عدد الـ trainee_ids
+                    $groupMentorship->current_participants = count($traineeIds);
+                    $groupMentorship->save();
+                }
 
-                    // إضافة trainee_id لـ trainee_ids
-                    $traineeIds = json_decode($groupMentorship->trainee_ids, true) ?? [];
-                    if (!in_array($mentorshipRequest->trainee_id, $traineeIds)) {
-                        $traineeIds[] = $mentorshipRequest->trainee_id;
-                        $groupMentorship->trainee_ids = json_encode($traineeIds);
-                        $groupMentorship->save();
-                    }
-                } else {
+                // التحقق إذا كان current_participants وصل لـ max_participants
+                if ($groupMentorship->current_participants > $groupMentorship->max_participants) {
                     Log::warning('Group Mentorship is full', [
                         'group_mentorship_id' => $groupMentorship->id,
                     ]);
