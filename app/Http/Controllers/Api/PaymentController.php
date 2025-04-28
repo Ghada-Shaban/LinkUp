@@ -108,16 +108,15 @@ class PaymentController extends Controller
                 return response()->json(['message' => 'Payment failed: ' . $paymentIntent->status], 400);
             }
 
-            // لو الدفع نجح، سجّل الدفع في جدول payments
+            // تسجيل الدفع في جدول payments
             $payment = Payment::create([
-                'amount' => $amount / 100,
-                'payment_method' => $request->input('payment_method_id'),
-                'payment_status' => 'succeeded',
-                'date_time' => Carbon::now(),
                 'mentorship_request_id' => $mentorshipRequest->id,
+                'amount' => $amount / 100,
+                'payment_method' => 'Credit_Card', // لأنك بتستخدمي Stripe
+                'payment_status' => 'Completed',
+                'date_time' => Carbon::now(),
             ]);
 
-            // لو الدفع اتسجل بنجاح، نكمّل باقي العمليات
             if ($mentorshipRequest->requestable_type === 'App\\Models\\GroupMentorship') {
                 $groupMentorship = $requestable;
                 $startDateTime = Carbon::parse($groupMentorship->day . ' ' . $groupMentorship->start_time);
@@ -126,12 +125,15 @@ class PaymentController extends Controller
                 }
 
                 $newSession = NewSession::create([
+                    'coach_id' => $mentorshipRequest->coach_id,
+                    'trainee_id' => $mentorshipRequest->trainee_id,
                     'date_time' => $startDateTime,
                     'duration' => $groupMentorship->duration_minutes,
-                    'status' => 'Scheduled',
-                    'payment_status' => 'succeeded',
-                    'mentorship_request_id' => $mentorshipRequest->id,
+                    'status' => NewSession::STATUS_SCHEDULED,
+                    'payment_status' => 'Completed',
+                    'meeting_link' => null, // ممكن تضيفي رابط الاجتماع لو عندك
                     'service_id' => $requestable->service_id,
+                    'mentorship_request_id' => $mentorshipRequest->id,
                 ]);
 
                 if (!$newSession) {
