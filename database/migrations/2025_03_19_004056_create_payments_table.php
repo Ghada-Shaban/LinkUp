@@ -13,11 +13,17 @@ return new class extends Migration
     {
         Schema::create('payments', function (Blueprint $table) {
             $table->id('payment_id');
+            $table->unsignedBigInteger('mentorship_request_id'); // شيلنا after('payment_id')
             $table->decimal('amount', 10, 2);
             $table->enum('payment_method', ['Credit_Card', 'Fawry', 'InstaPay']);
             $table->enum('payment_status', ['Pending', 'Completed', 'Failed', 'Refunded', 'Cancelled']);
             $table->dateTime('date_time');
             $table->timestamps();
+
+            $table->foreign('mentorship_request_id')
+                  ->references('id')
+                  ->on('mentorship_requests')
+                  ->onDelete('cascade');
         });
     }
 
