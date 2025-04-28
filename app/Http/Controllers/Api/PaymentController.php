@@ -112,7 +112,7 @@ class PaymentController extends Controller
             $payment = Payment::create([
                 'mentorship_request_id' => $mentorshipRequest->id,
                 'amount' => $amount / 100,
-                'payment_method' => 'Credit_Card', // لأنك بتستخدمي Stripe
+                'payment_method' => 'Credit_Card',
                 'payment_status' => 'Completed',
                 'date_time' => Carbon::now(),
             ]);
@@ -131,7 +131,7 @@ class PaymentController extends Controller
                     'duration' => $groupMentorship->duration_minutes,
                     'status' => NewSession::STATUS_SCHEDULED,
                     'payment_status' => 'Completed',
-                    'meeting_link' => null, // ممكن تضيفي رابط الاجتماع لو عندك
+                    'meeting_link' => null,
                     'service_id' => $requestable->service_id,
                     'mentorship_request_id' => $mentorshipRequest->id,
                 ]);
@@ -142,9 +142,19 @@ class PaymentController extends Controller
                     ]);
                     return response()->json(['message' => 'Payment succeeded but failed to create session'], 500);
                 }
+
+                // التحقق من current_participants قبل الزيادة
+                if ($groupMentorship->current_participants < $groupMentorship->max_participants) {
+                    $groupMentorship->increment('current_participants');
+                } else {
+                    Log::warning('Group Mentorship is full', [
+                        'group_mentorship_id' => $groupMentorship->id,
+                    ]);
+                    return response()->json(['message' => 'Group Mentorship is full'], 400);
+                }
             }
 
-            // لو كل حاجة اكتملت بنجاح، امسح السجل من pending_payments
+            // امسح السجل من pending_payments
             $pendingPayment->delete();
 
             return response()->json([
