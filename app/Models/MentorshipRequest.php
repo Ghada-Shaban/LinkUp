@@ -5,6 +5,10 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
+// إضافة use للكلاسات GroupMentorship و MentorshipPlan
+use App\Models\GroupMentorship;
+use App\Models\MentorshipPlan;
+
 class MentorshipRequest extends Model
 {
     use HasFactory;
