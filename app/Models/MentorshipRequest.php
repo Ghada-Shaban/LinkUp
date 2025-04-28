@@ -4,39 +4,94 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use App\Observers\MentorshipRequestObserver;
 
 class MentorshipRequest extends Model
 {
     use HasFactory;
 
+    protected $table = 'mentorship_requests';
+    protected $primaryKey = 'id';
+
     protected $fillable = [
-        'requestable_id',
-        'requestable_type',
         'trainee_id',
         'coach_id',
+        'requestable_type',
+        'requestable_id',
         'status',
     ];
 
+    protected $casts = [
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
+    ];
+
+    const STATUS_PENDING = 'pending';
+    const STATUS_ACCEPTED = 'accepted';
+    const STATUS_REJECTED = 'rejected';
+
+    /**
+     * الـ Default Attributes
+     */
+    protected $attributes = [
+        'status' => self::STATUS_PENDING,
+    ];
+
+    /**
+     * علاقة مع الـ Requestable (Polymorphic)
+     */
     public function requestable()
     {
         return $this->morphTo();
     }
 
+    /**
+     * علاقة مع الـ Trainee
+     */
     public function trainee()
     {
-        return $this->belongsTo(User::class, 'trainee_id', 'User_ID');
+        return $this->belongsTo(User::class, 'trainee_id', 'User_ID')
+            ->where('role_profile', 'Trainee');
     }
 
+    /**
+     * علاقة مع الـ Coach
+     */
     public function coach()
     {
-        return $this->belongsTo(User::class, 'coach_id', 'User_ID');
+        return $this->belongsTo(User::class, 'coach_id', 'User_ID')
+            ->where('role_profile', 'Coach');
     }
 
-    protected static function boot()
+    /**
+     * دالة مساعدة للتحقق إذا كان الطلب Pending
+     */
+    public function isPending()
     {
-        parent::boot();
+        return $this->status === self::STATUS_PENDING;
+    }
 
-        static::observe(MentorshipRequestObserver::class);
+    /**
+     * دالة مساعدة للتحقق إذا كان الطلب Accepted
+     */
+    public function isAccepted()
+    {
+        return $this->status === self::STATUS_ACCEPTED;
+    }
+
+    /**
+     * تعديل شكل البيانات عند تحويل الموديل لـ Array/JSON
+     */
+    public function toArray()
+    {
+        $array = parent::toArray();
+
+        if ($this->requestable_type === GroupMentorship::class) {
+            $array['service_type'] = 'Group Mentorship';
+        } elseif ($this->requestable_type === MentorshipPlan::class) {
+            $array['service_type'] = 'Group Mentorship Plan';
+        }
+
+        unset($array['requestable_type']);
+        return $array;
     }
 }
