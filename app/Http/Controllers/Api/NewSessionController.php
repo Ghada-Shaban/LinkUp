@@ -26,10 +26,10 @@ class NewSessionController extends Controller
 
         if ($type === 'upcoming') {
             $statuses = ['upcoming'];
-            $timeCondition = ['session_time', '>=', now()];
+            $timeCondition = ['date_time', '>=', now()];
         } elseif ($type === 'pending') {
             $statuses = ['pending'];
-            $timeCondition = ['session_time', '>=', now()];
+            $timeCondition = ['date_time', '>=', now()];
         } elseif ($type === 'history') {
             $statuses = ['completed', 'cancelled'];
             $timeCondition = null;
@@ -44,7 +44,7 @@ class NewSessionController extends Controller
         $sessions = collect();
 
         if ($user->role_profile === 'Coach') {
-            $query = NewSession::with(['mentorshipRequest.requestable', 'trainee'])
+            $query = NewSession::with(['trainee'])
                 ->where('coach_id', $user->User_ID)
                 ->whereIn('status', $statuses);
 
@@ -54,19 +54,16 @@ class NewSessionController extends Controller
 
             $sessions = $query->get()->map(function ($session) {
                 $trainee = $session->trainee;
-                // Get service name from mentorship request if exists, otherwise from service_id
                 $serviceName = 'N/A';
-                if ($session->mentorship_request_id && $session->mentorshipRequest && $session->mentorshipRequest->requestable) {
-                    $serviceName = $session->mentorshipRequest->requestable->title;
-                } elseif ($session->service_id) {
+                if ($session->service_id) {
                     $service = Service::find($session->service_id);
                     $serviceName = $service ? $service->title : 'N/A';
                 }
 
                 return [
                     'new_session_id' => $session->id,
-                    'session_time' => $session->session_time,
-                    'duration' => $session->duration_minutes,
+                    'session_time' => $session->date_time,
+                    'duration' => $session->duration,
                     'status' => $session->status,
                     'meeting_link' => $session->meeting_link,
                     'trainee_name' => $trainee ? $trainee->name : 'N/A',
@@ -80,7 +77,7 @@ class NewSessionController extends Controller
                 'sessions' => $sessions->toArray()
             ]);
         } elseif ($user->role_profile === 'Trainee') {
-            $query = NewSession::with(['mentorshipRequest.requestable', 'coach'])
+            $query = NewSession::with(['coach'])
                 ->where('trainee_id', $user->User_ID)
                 ->whereIn('status', $statuses);
 
@@ -90,19 +87,16 @@ class NewSessionController extends Controller
 
             $sessions = $query->get()->map(function ($session) {
                 $coach = $session->coach;
-                // Get service name from mentorship request if exists, otherwise from service_id
                 $serviceName = 'N/A';
-                if ($session->mentorship_request_id && $session->mentorshipRequest && $session->mentorshipRequest->requestable) {
-                    $serviceName = $session->mentorshipRequest->requestable->title;
-                } elseif ($session->service_id) {
+                if ($session->service_id) {
                     $service = Service::find($session->service_id);
                     $serviceName = $service ? $service->title : 'N/A';
                 }
 
                 return [
                     'new_session_id' => $session->id,
-                    'session_time' => $session->session_time,
-                    'duration' => $session->duration_minutes,
+                    'session_time' => $session->date_time,
+                    'duration' => $session->duration,
                     'status' => $session->status,
                     'meeting_link' => $session->meeting_link,
                     'coach_name' => $coach ? $coach->name : 'N/A',
@@ -160,7 +154,7 @@ class NewSessionController extends Controller
             return response()->json(['message' => 'Session cannot be completed'], 400);
         }
 
-        $sessionEndTime = Carbon::parse($session->session_time)->addMinutes($session->duration_minutes);
+        $sessionEndTime = Carbon::parse($session->date_time)->addMinutes($session->duration);
         if (Carbon::now()->lt($sessionEndTime)) {
             Log::warning('Session cannot be completed yet', [
                 'session_id' => $sessionId,
@@ -171,20 +165,6 @@ class NewSessionController extends Controller
 
         $session->status = 'completed';
         $session->save();
-
-        // تحديث حالة الطلب إذا كان كل الجلسات اكتملت
-        if ($session->mentorship_request_id) {
-            $mentorshipRequest = \App\Models\MentorshipRequest::find($session->mentorship_request_id);
-            if ($mentorshipRequest) {
-                $remainingSessions = NewSession::where('mentorship_request_id', $mentorshipRequest->id)
-                    ->whereIn('status', ['pending', 'upcoming'])
-                    ->count();
-                if ($remainingSessions == 0) {
-                    $mentorshipRequest->status = 'completed';
-                    $mentorshipRequest->save();
-                }
-            }
-        }
 
         Log::info('Session marked as completed', [
             'session_id' => $sessionId
@@ -230,20 +210,6 @@ class NewSessionController extends Controller
         $session->status = 'cancelled';
         $session->save();
 
-        // تحديث حالة الطلب إذا أُلغيت الجلسة
-        if ($session->mentorship_request_id) {
-            $mentorshipRequest = \App\Models\MentorshipRequest::find($session->mentorship_request_id);
-            if ($mentorshipRequest) {
-                $remainingSessions = NewSession::where('mentorship_request_id', $mentorshipRequest->id)
-                    ->whereIn('status', ['pending', 'upcoming'])
-                    ->count();
-                if ($remainingSessions == 0) {
-                    $mentorshipRequest->status = 'cancelled';
-                    $mentorshipRequest->save();
-                }
-            }
-        }
-
         Log::info('Session cancelled', [
             'session_id' => $sessionId
         ]);
@@ -285,6 +251,75 @@ class NewSessionController extends Controller
         return response()->json([
             'message' => 'Meeting link updated successfully!',
             'meeting_link' => $session->meeting_link
+        ]);
+    }
+
+    /**
+     * لما يحصل رفض لطلب Mentorship Request، يتم إلغاء الجلسات المرتبطة بيه
+     */
+    public function rejectMentorshipRequest($mentorshipRequestId)
+    {
+        $user = Auth::user();
+
+        // التأكد إن المستخدم هو الكوتش بتاع الطلب
+        $mentorshipRequest = \App\Models\MentorshipRequest::findOrFail($mentorshipRequestId);
+
+        // التأكد إن المستخدم هو الكوتش بتاع الطلب
+        if ($mentorshipRequest->coach_id != $user->User_ID || $user->role_profile !== 'Coach') {
+            Log::warning('Unauthorized attempt to reject mentorship request', [
+                'user_id' => $user->User_ID,
+                'mentorship_request_id' => $mentorshipRequestId
+            ]);
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        // التأكد إن الطلب مرفوض بالفعل (لأن ده بيحصل في MentorshipRequestController)
+        if ($mentorshipRequest->status !== 'rejected') {
+            Log::warning('Mentorship request is not rejected yet', [
+                'mentorship_request_id' => $mentorshipRequestId,
+                'status' => $mentorshipRequest->status
+            ]);
+            return response()->json(['message' => 'Mentorship request must be rejected first'], 400);
+        }
+
+        // التأكد إن الدفع لسه ما اكتملش (خاص بـ Group Mentorship)
+        $pendingPayment = \App\Models\PendingPayment::where('mentorship_request_id', $mentorshipRequestId)->first();
+        if ($pendingPayment) {
+            $payment = \App\Models\Payment::where('mentorship_request_id', $mentorshipRequestId)
+                ->where('payment_status', 'completed')
+                ->first();
+            if ($payment) {
+                Log::warning('Cannot cancel sessions, payment already completed', [
+                    'mentorship_request_id' => $mentorshipRequestId
+                ]);
+                return response()->json(['message' => 'Cannot cancel sessions, payment already completed'], 400);
+            }
+        }
+
+        // جلب الجلسات المرتبطة بالطلب
+        $sessions = NewSession::where('mentorship_request_id', $mentorshipRequestId)
+            ->whereIn('status', ['pending', 'upcoming'])
+            ->get();
+
+        // تحديث حالة الجلسات لـ cancelled
+        foreach ($sessions as $session) {
+            $session->status = 'cancelled';
+            $session->save();
+
+            Log::info('Session cancelled due to mentorship request rejection', [
+                'session_id' => $session->id,
+                'mentorship_request_id' => $mentorshipRequestId
+            ]);
+        }
+
+        Log::info('Associated sessions cancelled after mentorship request rejection', [
+            'mentorship_request_id' => $mentorshipRequestId,
+            'sessions_count' => $sessions->count()
+        ]);
+
+        return response()->json([
+            'message' => 'Associated sessions cancelled successfully!',
+            'cancelled_sessions_count' => $sessions->count()
         ]);
     }
 }
