@@ -19,6 +19,8 @@ class NewSession extends Model
         'status',
         'service_id',
         'meeting_link',
+        'coach_id', // أضفناه
+        'trainee_id', // أضفناه
         'mentorship_request_id', // أضفناه عشان الربط مع MentorshipRequest
     ];
 
@@ -26,6 +28,8 @@ class NewSession extends Model
         'date_time' => 'datetime',
         'duration' => 'integer',
         'service_id' => 'integer',
+        'coach_id' => 'integer',
+        'trainee_id' => 'integer',
         'mentorship_request_id' => 'integer',
     ];
 
@@ -39,7 +43,7 @@ class NewSession extends Model
      * الـ Default Attributes
      */
     protected $attributes = [
-        'status' => self::STATUS_PENDING, // الجلسة هتبدأ دايمًا كـ Pending
+        'status' => self::STATUS_PENDING, // الجلسة هتبقى دايمًا كـ Pending
     ];
 
     /**
