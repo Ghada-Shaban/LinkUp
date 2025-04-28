@@ -3,182 +3,222 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\GroupMentorship;
 use App\Models\MentorshipRequest;
 use App\Models\NewSession;
 use App\Models\PendingPayment;
+use App\Models\Payment;
+use App\Models\GroupMentorship;
+use App\Models\Service;
+use App\Models\MentorshipPlan;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Carbon\Carbon;
 use Stripe\Stripe;
 use Stripe\PaymentIntent;
+use App\Models\Price;
 
 class PaymentController extends Controller
 {
     public function __construct()
     {
-        // Set Stripe API key
-        Stripe::setApiKey(env('STRIPE_SECRET'));
+        Stripe::setApiKey(env('STRIPE_SECRET_KEY'));
     }
 
     public function initiatePayment(Request $request, $type, $id)
     {
+        // Validate the type
+        if ($type !== 'mentorship_request') {
+            return response()->json(['message' => 'Invalid type'], 400);
+        }
+
+        // Find the mentorship request
+        $mentorshipRequest = MentorshipRequest::find($id);
+        if (!$mentorshipRequest) {
+            return response()->json(['message' => 'Mentorship request not found'], 404);
+        }
+
+        // Check if the user is authorized to make this payment
+        if ($mentorshipRequest->trainee_id !== Auth::user()->User_ID) {
+            return response()->json(['message' => 'This mentorship request does not belong to you.'], 403);
+        }
+
+        // Check if the mentorship request is accepted
+        if ($mentorshipRequest->status !== 'accepted') {
+            return response()->json(['message' => 'Request must be accepted to proceed with payment'], 400);
+        }
+
+        // Check if the mentorship request has already been paid
+        $existingPayment = Payment::where('mentorship_request_id', $mentorshipRequest->id)->first();
+        if ($existingPayment) {
+            return response()->json(['message' => 'This mentorship request has already been paid'], 400);
+        }
+
+        // Check for a pending payment
+        $pendingPayment = PendingPayment::where('mentorship_request_id', $mentorshipRequest->id)->first();
+        if (!$pendingPayment) {
+            return response()->json(['message' => 'No pending payment found for this request'], 404);
+        }
+
+        // Get the requestable entity (Service, GroupMentorship, or MentorshipPlan)
+        $requestable = $mentorshipRequest->requestable;
+        if (!$requestable) {
+            return response()->json(['message' => 'Requestable entity not found'], 404);
+        }
+
+        $amount = 0;
+        $currency = 'usd';
+        $description = '';
+
+        if ($mentorshipRequest->requestable_type === 'App\\Models\\Service') {
+            $service = $requestable;
+            $priceEntry = Price::where('service_id', $service->service_id)->first();
+            $amount = $priceEntry ? $priceEntry->price * 100 : 0;
+            $description = "Payment for Service ID: {$requestable->id}";
+        } elseif ($mentorshipRequest->requestable_type === 'App\\Models\\GroupMentorship') {
+            $groupMentorship = $requestable;
+            $priceEntry = Price::where('service_id', $groupMentorship->service_id)->first();
+            $amount = $priceEntry ? $priceEntry->price * 100 : 0;
+            $description = "Payment for Group Mentorship ID: {$requestable->id}";
+        } elseif ($mentorshipRequest->requestable_type === 'App\\Models\\MentorshipPlan') {
+            // For MentorshipPlan, calculate the amount based on the sessions
+            $mentorshipPlan = $requestable;
+            $service = $mentorshipPlan->service;
+            $priceEntry = Price::where('service_id', $service->service_id)->first();
+            if (!$priceEntry) {
+                return response()->json(['message' => 'Price not found for this mentorship plan'], 400);
+            }
+
+            // Get all sessions associated with this mentorship request
+            $sessions = NewSession::where('mentorship_request_id', $mentorshipRequest->id)
+                ->where('status', 'pending')
+                ->get();
+
+            if ($sessions->isEmpty()) {
+                return response()->json(['message' => 'No pending sessions found for this mentorship plan'], 400);
+            }
+
+            // Calculate the total amountrossed out the amount based on the number of sessions and price per session
+            $amount = $sessions->count() * $priceEntry->price * 100; // Amount in cents
+            $description = "Payment for Mentorship Plan ID: {$mentorshipPlan->id}";
+        } else {
+            return response()->json(['message' => 'Invalid requestable type'], 400);
+        }
+
+        if ($amount <= 0) {
+            return response()->json(['message' => 'Invalid amount'], 400);
+        }
+
+        // Validate the payment method
         $request->validate([
             'payment_method_id' => 'required|string',
         ]);
 
-        $user = Auth::user();
-        $amount = 0;
-        $description = '';
-        $metadata = [];
-
-        DB::beginTransaction();
-
         try {
-            if ($type === 'mentorship_request') {
-                // Handle Mentorship Request payment
-                $mentorshipRequest = MentorshipRequest::findOrFail($id);
-
-                // Check if the mentorship request belongs to the authenticated trainee
-                if ($mentorshipRequest->trainee_id !== $user->User_ID) {
-                    return response()->json(['message' => 'This mentorship request does not belong to you.'], 403);
-                }
-
-                // Check if the mentorship request is accepted
-                if ($mentorshipRequest->status !== 'accepted') {
-                    return response()->json(['message' => 'Mentorship request must be accepted to proceed with payment.'], 400);
-                }
-
-                // Get sessions associated with this mentorship request
-                $sessions = NewSession::where('mentorship_request_id', $id)
-                    ->where('status', 'pending')
-                    ->get();
-
-                if ($sessions->isEmpty()) {
-                    return response()->json(['message' => 'No pending sessions found for this mentorship request.'], 400);
-                }
-
-                // Calculate total amount based on sessions
-                $sessionCount = $sessions->count();
-                $pricePerSession = $mentorshipRequest->requestable->price_per_session;
-                $amount = $sessionCount * $pricePerSession;
-
-                $description = "Payment for Mentorship Request #{$id}";
-                $metadata = [
-                    'type' => 'mentorship_request',
-                    'mentorship_request_id' => $id,
-                    'trainee_id' => $user->User_ID,
-                    'coach_id' => $mentorshipRequest->coach_id,
-                ];
-
-                // Check if there's a pending payment entry
-                $pendingPayment = PendingPayment::where('mentorship_request_id', $id)
-                    ->where('trainee_id', $user->User_ID)
-                    ->first();
-
-                if (!$pendingPayment) {
-                    return response()->json(['message' => 'No pending payment found for this mentorship request.'], 400);
-                }
-
-            } elseif ($type === 'group_mentorship') {
-                // Handle Group Mentorship payment
-                $groupMentorship = GroupMentorship::findOrFail($id);
-
-                // Check if the group mentorship is still active and has capacity
-                if ($groupMentorship->current_participants >= $groupMentorship->max_participants) {
-                    return response()->json(['message' => 'Group mentorship is already full.'], 400);
-                }
-
-                // Check if the user is already a participant
-                $isParticipant = DB::table('group_mentorship_participants')
-                    ->where('group_mentorship_id', $id)
-                    ->where('trainee_id', $user->User_ID)
-                    ->exists();
-
-                if ($isParticipant) {
-                    return response()->json(['message' => 'You are already a participant in this group mentorship.'], 400);
-                }
-
-                $amount = $groupMentorship->price;
-                $description = "Payment for Group Mentorship #{$id}";
-                $metadata = [
-                    'type' => 'group_mentorship',
-                    'group_mentorship_id' => $id,
-                    'trainee_id' => $user->User_ID,
-                    'coach_id' => $groupMentorship->coach_id,
-                ];
-
-            } else {
-                return response()->json(['message' => 'Invalid payment type'], 400);
-            }
-
-            // Create Payment Intent with Stripe
+            // Create a Payment Intent with Stripe
             $paymentIntent = PaymentIntent::create([
-                'amount' => $amount * 100, // Amount in cents
-                'currency' => 'usd',
-                'payment_method' => $request->payment_method_id,
+                'amount' => $amount,
+                'currency' => $currency,
                 'description' => $description,
-                'metadata' => $metadata,
-                'confirmation_method' => 'manual',
+                'metadata' => [
+                    'mentorship_request_id' => $mentorshipRequest->id,
+                    'trainee_id' => $mentorshipRequest->trainee_id,
+                    'coach_id' => $mentorshipRequest->coach_id,
+                ],
+                'payment_method' => $request->input('payment_method_id'),
                 'confirm' => true,
+                'automatic_payment_methods' => [
+                    'enabled' => true,
+                    'allow_redirects' => 'never',
+                ],
             ]);
 
-            if ($paymentIntent->status === 'succeeded') {
-                if ($type === 'mentorship_request') {
-                    // Update sessions status to 'upcoming'
-                    foreach ($sessions as $session) {
-                        $session->update([
-                            'status' => 'upcoming',
-                            'payment_status' => 'Completed',
-                        ]);
-                    }
+            if ($paymentIntent->status !== 'succeeded') {
+                Log::error('Payment failed with status', [
+                    'status' => $paymentIntent->status,
+                    'mentorship_request_id' => $mentorshipRequest->id,
+                ]);
+                return response()->json(['message' => 'Payment failed: ' . $paymentIntent->status], 400);
+            }
 
-                    // Remove the pending payment entry
-                    $pendingPayment->delete();
+            // Record the payment in the payments table
+            $payment = Payment::create([
+                'mentorship_request_id' => $mentorshipRequest->id,
+                'amount' => $amount / 100,
+                'payment_method' => 'Credit_Card',
+                'payment_status' => 'Completed',
+                'date_time' => Carbon::now(),
+            ]);
 
-                } elseif ($type === 'group_mentorship') {
-                    // Add the trainee as a participant
-                    DB::table('group_mentorship_participants')->insert([
-                        'group_mentorship_id' => $id,
-                        'trainee_id' => $user->User_ID,
-                        'created_at' => now(),
-                        'updated_at' => now(),
-                    ]);
-
-                    // Increment the current participants count
-                    $groupMentorship->increment('current_participants');
+            if ($mentorshipRequest->requestable_type === 'App\\Models\\GroupMentorship') {
+                $groupMentorship = $requestable;
+                $startDateTime = Carbon::parse($groupMentorship->day . ' ' . $groupMentorship->start_time);
+                if ($startDateTime->lt(Carbon::now())) {
+                    $startDateTime->addWeek();
                 }
 
-                DB::commit();
-                Log::info('Payment processed successfully', [
-                    'type' => $type,
-                    'id' => $id,
-                    'trainee_id' => $user->User_ID,
-                    'amount' => $amount,
+                $newSession = NewSession::create([
+                    'coach_id' => $mentorshipRequest->coach_id,
+                    'trainee_id' => $mentorshipRequest->trainee_id,
+                    'date_time' => $startDateTime,
+                    'duration' => $groupMentorship->duration_minutes,
+                    'status' => NewSession::STATUS_SCHEDULED,
+                    'payment_status' => 'Completed',
+                    'meeting_link' => null,
+                    'service_id' => $groupMentorship->service_id,
+                    'mentorship_request_id' => $mentorshipRequest->id,
                 ]);
 
-                return response()->json(['message' => 'Payment processed successfully.'], 200);
-            } else {
-                DB::rollBack();
-                return response()->json(['message' => 'Payment failed.'], 400);
+                if (!$newSession) {
+                    Log::error('Failed to create new session', [
+                        'mentorship_request_id' => $mentorshipRequest->id,
+                    ]);
+                    return response()->json(['message' => 'Payment succeeded but failed to create session'], 500);
+                }
+
+                // Update the trainee_ids and current_participants
+                $traineeIds = json_decode($groupMentorship->trainee_ids, true) ?? [];
+                if (!in_array($mentorshipRequest->trainee_id, $traineeIds)) {
+                    $traineeIds[] = $mentorshipRequest->trainee_id;
+                    $groupMentorship->trainee_ids = json_encode($traineeIds);
+                    $groupMentorship->current_participants = count($traineeIds);
+                    $groupMentorship->save();
+                }
+
+                if ($groupMentorship->current_participants > $groupMentorship->max_participants) {
+                    Log::warning('Group Mentorship is full', [
+                        'group_mentorship_id' => $groupMentorship->id,
+                    ]);
+                    return response()->json(['message' => 'Group Mentorship is full'], 400);
+                }
+            } elseif ($mentorshipRequest->requestable_type === 'App\\Models\\MentorshipPlan') {
+                // Update the status of all sessions to 'upcoming'
+                foreach ($sessions as $session) {
+                    $session->update([
+                        'status' => 'upcoming',
+                        'payment_status' => 'Completed',
+                    ]);
+                }
             }
 
+            // Delete the pending payment record
+            $pendingPayment->delete();
+
+            return response()->json([
+                'message' => 'Payment processed successfully',
+                'entity' => $mentorshipRequest
+            ], 200);
         } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error('Payment initiation failed', [
-                'type' => $type,
-                'id' => $id,
+            Log::error('Payment failed', [
                 'error' => $e->getMessage(),
+                'mentorship_request_id' => $mentorshipRequest->id,
             ]);
-            return response()->json(['message' => 'Payment initiation failed: ' . $e->getMessage()], 500);
+            return response()->json(['message' => 'Payment failed: ' . $e->getMessage()], 500);
         }
     }
 
     public function confirmPayment(Request $request, $type, $id)
     {
-        // This method can be used if you need to confirm a payment intent separately
-        // For now, we're confirming directly in initiatePayment
-        return response()->json(['message' => 'Payment confirmation not required.'], 200);
+        return response()->json(['message' => 'Not implemented'], 501);
     }
 }
