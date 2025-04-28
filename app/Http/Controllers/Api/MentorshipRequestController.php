@@ -54,13 +54,9 @@ class MentorshipRequestController extends Controller
         // Load trainee data for the response
         $trainee = User::findOrFail(Auth::user()->User_ID);
 
-        // تعديل شكل الـ request يدويًا عشان نضيف requestable_type
-        $requestData = $mentorshipRequest->toArray();
-        $requestData['requestable_type'] = $mentorshipRequest->requestable_type;
-
         return response()->json([
             'message' => 'Mentorship request sent successfully.',
-            'request' => $requestData,
+            'request' => $mentorshipRequest,
             'trainee' => [
                 'name' => $trainee->full_name,
                 'email' => $trainee->email,
