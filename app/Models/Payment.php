@@ -8,16 +8,26 @@ use Illuminate\Database\Eloquent\Model;
 class Payment extends Model
 {
     use HasFactory;
+
     protected $table = 'payments';
+    protected $primaryKey = 'payment_id';
 
     protected $fillable = [
+        'mentorship_request_id',
         'amount',
         'payment_method',
         'payment_status',
-        'date_time'
+        'date_time',
     ];
-    public function cart()
+
+    protected $casts = [
+        'date_time' => 'datetime',
+        'amount' => 'decimal:2',
+    ];
+
+    // علاقة مع MentorshipRequest
+    public function mentorshipRequest()
     {
-        return $this->hasOne(Cart::class, 'payment_id'); 
+        return $this->belongsTo(MentorshipRequest::class, 'mentorship_request_id', 'id');
     }
 }
