@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\MentorshipRequest;
 use App\Models\NewSession;
 use App\Models\PendingPayment;
+use App\Models\Payment;
 use App\Models\GroupMentorship;
 use App\Models\Service;
 use App\Models\MentorshipPlan;
@@ -38,6 +39,11 @@ class PaymentController extends Controller
             return response()->json(['message' => 'Request must be accepted to proceed with payment'], 400);
         }
 
+        $existingPayment = Payment::where('mentorship_request_id', $mentorshipRequest->id)->first();
+        if ($existingPayment) {
+            return response()->json(['message' => 'This mentorship request has already been paid'], 400);
+        }
+
         $pendingPayment = PendingPayment::where('mentorship_request_id', $mentorshipRequest->id)->first();
         if (!$pendingPayment) {
             return response()->json(['message' => 'No pending payment found for this request'], 404);
@@ -58,7 +64,6 @@ class PaymentController extends Controller
             $amount = $priceEntry ? $priceEntry->price * 100 : 0;
             $description = "Payment for Service ID: {$requestable->id}";
         } elseif ($mentorshipRequest->requestable_type === 'App\\Models\\GroupMentorship') {
-            // التعديل هنا: بدل ما نجيب service_id من العلاقة، هنستخدم service_id مباشرة من GroupMentorship
             $priceEntry = Price::where('service_id', $requestable->service_id)->first();
             $amount = $priceEntry ? $priceEntry->price * 100 : 0;
             $description = "Payment for Group Mentorship ID: {$requestable->id}";
@@ -73,7 +78,6 @@ class PaymentController extends Controller
             return response()->json(['message' => 'Invalid amount'], 400);
         }
 
-        // Validate payment_method_id
         $request->validate([
             'payment_method_id' => 'required|string',
         ]);
@@ -96,33 +100,55 @@ class PaymentController extends Controller
                 ],
             ]);
 
-            if ($paymentIntent->status === 'succeeded') {
-                $pendingPayment->delete();
-
-                if ($mentorshipRequest->requestable_type === 'App\\Models\\GroupMentorship') {
-                    $groupMentorship = $requestable;
-                    $startDateTime = Carbon::parse($groupMentorship->day . ' ' . $groupMentorship->start_time);
-                    if ($startDateTime->lt(Carbon::now())) {
-                        $startDateTime->addWeek();
-                    }
-
-                    NewSession::create([
-                        'mentorship_request_id' => $mentorshipRequest->id,
-                        'trainee_id' => $mentorshipRequest->trainee_id,
-                        'coach_id' => $mentorshipRequest->coach_id,
-                        'session_time' => $startDateTime,
-                        'duration' => $groupMentorship->duration_minutes,
-                        'status' => 'Scheduled',
-                    ]);
-                }
-
-                return response()->json([
-                    'message' => 'Payment processed successfully',
-                    'entity' => $mentorshipRequest
-                ], 200);
-            } else {
+            if ($paymentIntent->status !== 'succeeded') {
+                Log::error('Payment failed with status', [
+                    'status' => $paymentIntent->status,
+                    'mentorship_request_id' => $mentorshipRequest->id,
+                ]);
                 return response()->json(['message' => 'Payment failed: ' . $paymentIntent->status], 400);
             }
+
+            // لو الدفع نجح، سجّل الدفع في جدول payments
+            $payment = Payment::create([
+                'amount' => $amount / 100,
+                'payment_method' => $request->input('payment_method_id'),
+                'payment_status' => 'succeeded',
+                'date_time' => Carbon::now(),
+                'mentorship_request_id' => $mentorshipRequest->id,
+            ]);
+
+            // لو الدفع اتسجل بنجاح، نكمّل باقي العمليات
+            if ($mentorshipRequest->requestable_type === 'App\\Models\\GroupMentorship') {
+                $groupMentorship = $requestable;
+                $startDateTime = Carbon::parse($groupMentorship->day . ' ' . $groupMentorship->start_time);
+                if ($startDateTime->lt(Carbon::now())) {
+                    $startDateTime->addWeek();
+                }
+
+                $newSession = NewSession::create([
+                    'date_time' => $startDateTime,
+                    'duration' => $groupMentorship->duration_minutes,
+                    'status' => 'Scheduled',
+                    'payment_status' => 'succeeded',
+                    'mentorship_request_id' => $mentorshipRequest->id,
+                    'service_id' => $requestable->service_id,
+                ]);
+
+                if (!$newSession) {
+                    Log::error('Failed to create new session', [
+                        'mentorship_request_id' => $mentorshipRequest->id,
+                    ]);
+                    return response()->json(['message' => 'Payment succeeded but failed to create session'], 500);
+                }
+            }
+
+            // لو كل حاجة اكتملت بنجاح، امسح السجل من pending_payments
+            $pendingPayment->delete();
+
+            return response()->json([
+                'message' => 'Payment processed successfully',
+                'entity' => $mentorshipRequest
+            ], 200);
         } catch (\Exception $e) {
             Log::error('Payment failed', [
                 'error' => $e->getMessage(),
