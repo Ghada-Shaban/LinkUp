@@ -17,6 +17,7 @@ class NewSession extends Model
         'date_time',
         'duration',
         'status',
+        'payment_status', // أضفنا payment_status هنا
         'service_id',
         'meeting_link',
         'coach_id', // أضفناه
