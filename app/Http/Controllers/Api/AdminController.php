@@ -229,6 +229,17 @@ public function handleCoachRequest(Request $request, $coachId)
         // 2. Number of Completed Sessions
         $completedSessions = NewSession::where('status', 'Completed')
             ->count();
+         $averageRating = Coach::has('reviews')
+            ->with('reviews')
+            ->get()
+            ->avg('average_rating');
+
+        // Return the response
+        return response()->json([
+            'revenue_20_percent' => round($revenue20Percent, 2),
+            'completed_sessions' => $completedSessions,
+            'average_rating' => round($averageRating, 2),
+        ], 200);
     }
 }
         
