@@ -155,21 +155,40 @@ class MentorshipRequestController extends Controller
         $user = auth()->user();
 
         if ($user->role_profile !== 'Coach') {
+            Log::warning('Unauthorized attempt to reject mentorship request', [
+                'user_id' => $user->User_ID,
+                'request_id' => $id,
+                'role' => $user->role_profile
+            ]);
             return response()->json(['message' => 'Only coaches can reject requests.'], 403);
         }
 
         $request = MentorshipRequest::find($id);
 
         if (!$request) {
+            Log::warning('Mentorship request not found', [
+                'request_id' => $id,
+                'user_id' => $user->User_ID
+            ]);
             return response()->json(['message' => 'Request not found.'], 404);
         }
 
         if ($request->coach_id !== $user->User_ID) {
+            Log::warning('Unauthorized attempt to reject mentorship request', [
+                'user_id' => $user->User_ID,
+                'request_id' => $id,
+                'coach_id' => $request->coach_id
+            ]);
             return response()->json(['message' => 'This request does not belong to you.'], 403);
         }
 
         $request->status = 'rejected';
         $request->save();
+
+        Log::info('Mentorship request rejected successfully', [
+            'request_id' => $id,
+            'user_id' => $user->User_ID
+        ]);
 
         return response()->json(['message' => 'Request rejected successfully.']);
     }
