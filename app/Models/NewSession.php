@@ -55,12 +55,8 @@ class NewSession extends Model
 
     public function trainees()
     {  
-        return $this->belongsToMany(  
-            User::class,
-            'books',  
-            'session_id',  
-            'trainee_id'  
-        )->where('role_profile', 'Trainee');
+        return $this->belongsTo(User::class, 'trainee_id', 'User_ID')
+                    ->where('role_profile', 'Trainee');
     }
 
     public function attendees()
@@ -80,7 +76,7 @@ class NewSession extends Model
 
     public function coach()
     {
-        return $this->belongsTo(Coach::class, 'coach_id', 'User_ID'); // تغيير من User إلى Coach
+        return $this->belongsTo(Coach::class, 'coach_id', 'User_ID');
     }
 
     public function isPending()
