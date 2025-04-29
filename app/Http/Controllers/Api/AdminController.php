@@ -252,6 +252,50 @@ public function handleCoachRequest(Request $request, $coachId)
             'average_rating' => round($averageRating, 2),
         ], 200);
     }
+
+    public function getAllTrainees(Request $request)
+    {
+        // Get all trainees with details from users and trainees tables
+        $trainees = Trainee::with(['user' => function ($query) {
+                $query->select('User_ID', 'full_name', 'email', 'linkedin_link', 'role_profile', 'photo', 'created_at', 'updated_at');
+            }])
+            ->get()
+            ->map(function ($trainee) {
+                return [
+                    // From users table
+                    'user_id' => $trainee->User_ID,
+                    'full_name' => $trainee->user->full_name,
+                    'email' => $trainee->user->email,
+                    'linkedin_link' => $trainee->user->linkedin_link,
+                    'photo' => $trainee->user->photo,
+                  
+                    // From trainees table
+                    'education_level' => $trainee->Education_Level,
+                    'institution_or_school' => $trainee->Institution_Or_School,
+                    'field_of_study' => $trainee->Field_Of_Study,
+                    'current_role' => $trainee->Current_Role,
+                    'story' => $trainee->Story,
+                    'years_of_professional_experience' => $trainee->Years_Of_Professional_Experience,
+                    
+                ];
+            });
+
+        // Return the response (without the count)
+        return response()->json([
+            'trainees' => $trainees,
+        ], 200);
+    }
+
+    public function getTraineesCount(Request $request)
+    {
+        // Get count of trainees
+        $traineesCount = Trainee::count();
+
+        // Return the response
+        return response()->json([
+            'trainees_count' => $traineesCount,
+        ], 200);
+    }
 }
         
            
