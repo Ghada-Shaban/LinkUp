@@ -7,6 +7,7 @@ use App\Models\CoachAvailability;
 use App\Models\NewSession;
 use App\Models\Service;
 use App\Models\MentorshipRequest;
+use App\Models\GroupMentorship;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -43,19 +44,23 @@ class BookingController extends Controller
         // Fetch coach's availability
         $availabilities = CoachAvailability::where('coach_id', $coachId)->get();
 
-        // Fetch booked sessions for the month
+        // Fetch booked sessions for the month (exclude Group Mentorship sessions)
         $bookedSessions = NewSession::where('coach_id', $coachId)
-            ->whereIn('status', ['pending', 'upcoming'])
+            ->whereIn('status', ['Pending', 'Scheduled']) // Updated to match current statuses
             ->whereBetween('session_time', [$startOfMonth, $endOfMonth])
+            ->whereDoesntHave('mentorshipRequest', function ($query) {
+                $query->where('requestable_type', 'App\\Models\\GroupMentorship');
+            })
             ->get()
             ->groupBy(function ($session) {
                 return Carbon::parse($session->session_time)->toDateString();
             });
 
+        // Duration should be 60 minutes for Mentorship Plan sessions
+        $durationMinutes = 60;
+
         // Generate list of dates for the month
         $dates = [];
-        $durationMinutes = 30; // Assuming 30-minute sessions as per screenshot
-
         for ($date = $startOfMonth->copy(); $date->lte($endOfMonth); $date->addDay()) {
             $dayOfWeek = $date->format('l');
             $dateString = $date->toDateString();
@@ -72,7 +77,6 @@ class BookingController extends Controller
 
             // Check if the coach is available on this day
             $availability = $availabilities->firstWhere('Day_Of_Week', $dayOfWeek);
-
             if (!$availability) {
                 $dates[] = [
                     'date' => $dateString,
@@ -149,15 +153,18 @@ class BookingController extends Controller
             return response()->json(['message' => 'No availability on this day'], 400);
         }
 
-        // Fetch booked sessions for the date
+        // Fetch booked sessions for the date (exclude Group Mentorship sessions)
         $bookedSessions = NewSession::where('coach_id', $coachId)
-            ->whereIn('status', ['pending', 'upcoming'])
+            ->whereIn('status', ['Pending', 'Scheduled'])
             ->whereDate('session_time', $selectedDate->toDateString())
+            ->whereDoesntHave('mentorshipRequest', function ($query) {
+                $query->where('requestable_type', 'App\\Models\\GroupMentorship');
+            })
             ->get();
 
-        // Generate time slots (30-minute intervals)
+        // Generate time slots (60-minute intervals for Mentorship Plan)
         $slots = [];
-        $durationMinutes = 30; // Assuming 30-minute sessions as per screenshot
+        $durationMinutes = 60; // Fixed duration for Mentorship Plan sessions
 
         foreach ($availabilities as $availability) {
             $startTime = Carbon::parse($availability->Start_Time);
@@ -169,8 +176,8 @@ class BookingController extends Controller
                     break; // Don't include partial slots
                 }
 
-                $slotStartFormatted = $startTime->format('H:i:s');
-                $slotEndFormatted = $slotEnd->format('H:i:s');
+                $slotStartFormatted = $startTime->format('h:i A'); // Format like screenshot (e.g., 7:30 AM)
+                $slotEndFormatted = $slotEnd->format('h:i A');
 
                 // Check if this slot is booked
                 $isBooked = $bookedSessions->filter(function ($session) use ($startTime, $slotEnd) {
@@ -194,12 +201,11 @@ class BookingController extends Controller
 
     public function bookService(Request $request, $coachId)
     {
+        // Validate the request (remove weeks and duration_minutes since they are fixed)
         $request->validate([
             'service_id' => 'required|exists:services,service_id',
             'start_time' => 'required|date_format:H:i:s',
             'start_date' => 'required|date|after:now',
-            'weeks' => 'required|integer|min:1',
-            'duration_minutes' => 'required|integer|min:30',
             'mentorship_request_id' => 'required|exists:mentorship_requests,id',
         ]);
 
@@ -211,23 +217,28 @@ class BookingController extends Controller
         $mentorshipRequestId = $request->mentorship_request_id;
         $mentorshipRequest = MentorshipRequest::findOrFail($mentorshipRequestId);
 
+        // Verify the mentorship request belongs to the authenticated user
         if ($mentorshipRequest->trainee_id !== Auth::user()->User_ID) {
             return response()->json(['message' => 'This mentorship request does not belong to you.'], 403);
         }
 
+        // Verify the mentorship request is accepted
         if ($mentorshipRequest->status !== 'accepted') {
             return response()->json(['message' => 'Mentorship request must be accepted to book sessions.'], 400);
         }
 
+        // Verify the mentorship request is for a Mentorship Plan
         if ($mentorshipRequest->requestable_type !== \App\Models\MentorshipPlan::class) {
             return response()->json(['message' => 'Mentorship request must be for a Mentorship Plan to book sessions this way.'], 400);
         }
 
+        // Verify the service matches the mentorship request
         if ($mentorshipRequest->requestable->service_id !== $service->service_id) {
             return response()->json(['message' => 'Service does not match the mentorship request.'], 400);
         }
 
-        $sessionCount = $mentorshipRequest->requestable->session_count;
+        // Check the number of sessions to book (fixed at 4 for Mentorship Plan)
+        $sessionCount = 4; // Fixed for Mentorship Plan (as per your requirement)
         $bookedSessionsCount = NewSession::where('mentorship_request_id', $mentorshipRequestId)->count();
         $remainingSessions = $sessionCount - $bookedSessionsCount;
 
@@ -235,23 +246,24 @@ class BookingController extends Controller
             return response()->json(['message' => 'You have already booked the maximum number of sessions for this Mentorship Plan.'], 400);
         }
 
-        $weeks = $request->weeks;
-        if ($weeks > $remainingSessions) {
-            return response()->json(['message' => "You can only book $remainingSessions more session(s) for this Mentorship Plan."], 400);
+        if ($remainingSessions < $sessionCount) {
+            return response()->json(['message' => 'Mentorship Plan requires exactly 4 sessions to be booked at once.'], 400);
         }
 
         $startDate = Carbon::parse($request->start_date);
         $startTime = Carbon::parse($request->start_time);
-        $durationMinutes = $request->duration_minutes;
+        $durationMinutes = 60; // Fixed duration for Mentorship Plan sessions
 
         $sessionsToBook = [];
         $dayOfWeek = $startDate->format('l');
 
-        for ($i = 0; $i < $weeks; $i++) {
+        // Book 4 sessions (one per week)
+        for ($i = 0; $i < $sessionCount; $i++) {
             $sessionDate = $startDate->copy()->addWeeks($i);
             $sessionDateTime = $sessionDate->setTime($startTime->hour, $startTime->minute, $startTime->second);
             $slotEnd = $sessionDateTime->copy()->addMinutes($durationMinutes);
 
+            // Check if the coach is available at this time
             $availability = CoachAvailability::where('coach_id', (int)$coachId)
                 ->where('Day_Of_Week', $dayOfWeek)
                 ->where('Start_Time', '<=', $sessionDateTime->format('H:i:s'))
@@ -270,9 +282,13 @@ class BookingController extends Controller
                 return response()->json(['message' => "Selected slot is not available on {$sessionDateTime->toDateString()}"], 400);
             }
 
+            // Check for conflicts with existing sessions (exclude Group Mentorship sessions)
             $conflictingSessions = NewSession::where('coach_id', (int)$coachId)
-                ->whereIn('status', ['pending', 'upcoming'])
+                ->whereIn('status', ['Pending', 'Scheduled'])
                 ->whereDate('session_time', $sessionDateTime->toDateString())
+                ->whereDoesntHave('mentorshipRequest', function ($query) {
+                    $query->where('requestable_type', 'App\\Models\\GroupMentorship');
+                })
                 ->get()
                 ->filter(function ($existingSession) use ($sessionDateTime, $slotEnd) {
                     $reqStart = Carbon::parse($existingSession->session_time);
@@ -306,35 +322,27 @@ class BookingController extends Controller
                     'coach_id' => $coachId,
                     'session_time' => $sessionData['session_time'],
                     'duration_minutes' => $sessionData['duration_minutes'],
-                    'status' => 'pending',
+                    'status' => 'Pending',
                     'service_id' => $service->service_id,
                     'mentorship_request_id' => $mentorshipRequestId,
                 ]);
                 $createdSessions[] = $session;
             }
 
-            $bookedSessionsCount = NewSession::where('mentorship_request_id', $mentorshipRequestId)->count();
-            if ($bookedSessionsCount == $mentorshipRequest->requestable->session_count) {
-                \App\Models\PendingPayment::create([
-                    'mentorship_request_id' => $mentorshipRequestId,
-                    'trainee_id' => Auth::user()->User_ID,
-                    'coach_id' => $coachId,
-                    'payment_due_at' => now()->addHours(24),
-                ]);
-            }
-
-            $message = $bookedSessionsCount < $mentorshipRequest->requestable->session_count
-                ? 'Sessions booked successfully. Book the remaining sessions to proceed to payment.'
-                : 'Sessions booked successfully. Proceed to payment using /api/payment/initiate/mentorship_request/' . $mentorshipRequestId;
+            // Create a pending payment since all 4 sessions are booked
+            \App\Models\PendingPayment::create([
+                'mentorship_request_id' => $mentorshipRequestId,
+                'payment_due_at' => now()->addHours(24),
+            ]);
 
             DB::commit();
-            Log::info('Sessions booked for Mentorship Plan, awaiting payment', [
+            Log::info('All sessions booked for Mentorship Plan, awaiting payment', [
                 'mentorship_request_id' => $mentorshipRequestId,
                 'sessions' => $createdSessions,
             ]);
 
             return response()->json([
-                'message' => $message,
+                'message' => 'All sessions booked successfully. Proceed to payment using /api/payment/initiate/mentorship_request/' . $mentorshipRequestId,
                 'sessions' => $createdSessions,
             ]);
         } catch (\Exception $e) {
