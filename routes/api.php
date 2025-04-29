@@ -115,3 +115,8 @@ Route::middleware('auth:sanctum')->group(function () {
 Route::get('/admin/coach-requests', [AdminController::class, 'getPendingCoachRequests']);
 Route::post('/admin/coach-requests/{coachId}/handle', [AdminController::class, 'handleCoachRequest']);
 Route::get('/admin/top-coaches', [AdminController::class, 'getTopCoaches']);
+Route::get('/admin/Approved-coaches', [AdminController::class, 'getApprovedCoaches']);
+Route::get('/admin/Approved-coaches', [AdminController::class, 'getApprovedCoachesCount']);
+
+
+
