@@ -75,7 +75,11 @@ class NewSessionController extends Controller
                     ]);
                     
                     // تحديد الـ session_type بناءً على الـ service_type
-                    $sessionType = strtolower(str_replace('_', ' ', $service->service_type)); // تحويل "Group_Mentorship" إلى "group mentorship"
+                    if ($service->service_type === 'Mentorship') {
+                        $sessionType = 'mentorship sessions'; // تعديل ليبقى "mentorship sessions"
+                    } else {
+                        $sessionType = strtolower(str_replace('_', ' ', $service->service_type)); // مثل "group mentorship"
+                    }
 
                     // تحديد الـ service_title بناءً على الجداول الفرعية
                     if ($service->service_type === 'Mentorship') {
@@ -145,7 +149,7 @@ class NewSessionController extends Controller
                 return [
                     'new_session_id' => $session->new_session_id,
                     'session_type' => $sessionType, // عرض الـ service_type
-                    'title' => $serviceTitle, // عرض التفاصيل (مثل "Technical Interview (Mid-Level)")
+                    'title' => $serviceTitle, // عرض التفاصيل (مثل "Weekly Coding Bootcamp3")
                     'date' => $date,
                     'time_range' => $timeRange,
                     'status' => $session->status,
@@ -208,7 +212,11 @@ class NewSessionController extends Controller
                     ]);
                     
                     // تحديد الـ session_type بناءً على الـ service_type
-                    $sessionType = strtolower(str_replace('_', ' ', $service->service_type)); // تحويل "Group_Mentorship" إلى "group mentorship"
+                    if ($service->service_type === 'Mentorship') {
+                        $sessionType = 'mentorship sessions'; // تعديل ليبقى "mentorship sessions"
+                    } else {
+                        $sessionType = strtolower(str_replace('_', ' ', $service->service_type)); // مثل "group mentorship"
+                    }
 
                     // تحديد الـ service_title بناءً على الجداول الفرعية
                     if ($service->service_type === 'Mentorship') {
@@ -278,7 +286,7 @@ class NewSessionController extends Controller
                 return [
                     'new_session_id' => $session->new_session_id,
                     'session_type' => $sessionType, // عرض الـ service_type
-                    'title' => $serviceTitle, // عرض التفاصيل (مثل "Technical Interview (Mid-Level)")
+                    'title' => $serviceTitle, // عرض التفاصيل (مثل "Weekly Coding Bootcamp3")
                     'date' => $date,
                     'time_range' => $timeRange,
                     'status' => $session->status,
