@@ -73,13 +73,29 @@ class NewSessionController extends Controller
                         'service' => $service->toArray()
                     ]);
                     if ($service->service_type === 'Mentorships') {
-                        if ($service->mentorship_type === 'Mentorship Sessions') {
-                            $serviceName = $service->sub_type;
-                        } elseif ($service->mentorship_type === 'Mentorship Plan') {
+                        // جلب mentorship_type من العلاقات الفرعية
+                        $mentorship = $service->mentorship;
+                        $groupMentorship = $service->groupMentorship;
+                        $linkedinOptimization = $service->linkedinOptimization;
+                        $cvReview = $service->cvReview;
+                        $projectEvaluation = $service->projectEvaluation;
+
+                        if ($mentorship && $mentorship->mentorship_type === 'Mentorship Sessions') {
+                            // تحديد sub_type بناءً على العلاقة المناسبة
+                            if ($linkedinOptimization) {
+                                $serviceName = 'LinkedIn Optimization';
+                            } elseif ($cvReview) {
+                                $serviceName = 'CV Review';
+                            } elseif ($projectEvaluation) {
+                                $serviceName = 'Project Assessment';
+                            }
+                        } elseif ($mentorship && $mentorship->mentorship_type === 'Mentorship Plan') {
                             $serviceName = 'Mentorship Plan';
-                        } elseif ($service->mentorship_type === 'Group Mentorship') {
+                        } elseif ($groupMentorship) {
                             $serviceName = 'Group Mentorship';
                         }
+                    } elseif ($service->service_type === 'Mock Interview') {
+                        $serviceName = 'Mock Interview';
                     } else {
                         $serviceName = $service->title;
                     }
@@ -127,7 +143,7 @@ class NewSessionController extends Controller
                 'sessions' => $sessions->toArray()
             ]);
         } elseif ($user->role_profile === 'Trainee') {
-            $query = NewSession::with(['service', 'coach'])
+            $query = NewSession::with(['service', 'coach.user']) // جلب user مع الـ coach
                 ->where('trainee_id', $user->User_ID)
                 ->whereIn('status', $statuses);
 
@@ -138,16 +154,27 @@ class NewSessionController extends Controller
             $sessions = $query->get()->map(function ($session) {
                 // جلب الـ coach من العلاقة
                 $coach = $session->coach;
-                if (!$coach) {
+                $coachName = 'N/A';
+                if ($coach) {
+                    // جلب الـ user الخاص بالـ coach للحصول على الـ name
+                    $coachUser = $coach->user;
+                    if ($coachUser) {
+                        $coachName = $coachUser->name;
+                        Log::info('Coach found for session', [
+                            'session_id' => $session->new_session_id,
+                            'coach_id' => $session->coach_id,
+                            'coach_name' => $coachName
+                        ]);
+                    } else {
+                        Log::warning('Coach user not found for session', [
+                            'session_id' => $session->new_session_id,
+                            'coach_id' => $session->coach_id
+                        ]);
+                    }
+                } else {
                     Log::warning('Coach not found for session', [
                         'session_id' => $session->new_session_id,
                         'coach_id' => $session->coach_id
-                    ]);
-                } else {
-                    Log::info('Coach found for session', [
-                        'session_id' => $session->new_session_id,
-                        'coach_id' => $session->coach_id,
-                        'coach' => $coach->toArray()
                     ]);
                 }
                 
@@ -162,13 +189,29 @@ class NewSessionController extends Controller
                         'service' => $service->toArray()
                     ]);
                     if ($service->service_type === 'Mentorships') {
-                        if ($service->mentorship_type === 'Mentorship Sessions') {
-                            $serviceName = $service->sub_type;
-                        } elseif ($service->mentorship_type === 'Mentorship Plan') {
+                        // جلب mentorship_type من العلاقات الفرعية
+                        $mentorship = $service->mentorship;
+                        $groupMentorship = $service->groupMentorship;
+                        $linkedinOptimization = $service->linkedinOptimization;
+                        $cvReview = $service->cvReview;
+                        $projectEvaluation = $service->projectEvaluation;
+
+                        if ($mentorship && $mentorship->mentorship_type === 'Mentorship Sessions') {
+                            // تحديد sub_type بناءً على العلاقة المناسبة
+                            if ($linkedinOptimization) {
+                                $serviceName = 'LinkedIn Optimization';
+                            } elseif ($cvReview) {
+                                $serviceName = 'CV Review';
+                            } elseif ($projectEvaluation) {
+                                $serviceName = 'Project Assessment';
+                            }
+                        } elseif ($mentorship && $mentorship->mentorship_type === 'Mentorship Plan') {
                             $serviceName = 'Mentorship Plan';
-                        } elseif ($service->mentorship_type === 'Group Mentorship') {
+                        } elseif ($groupMentorship) {
                             $serviceName = 'Group Mentorship';
                         }
+                    } elseif ($service->service_type === 'Mock Interview') {
+                        $serviceName = 'Mock Interview';
                     } else {
                         $serviceName = $service->title;
                     }
@@ -205,7 +248,7 @@ class NewSessionController extends Controller
                     'time_range' => $timeRange,
                     'status' => $session->status,
                     'meeting_link' => $session->meeting_link,
-                    'coach_name' => $coach ? $coach->name : 'N/A',
+                    'coach_name' => $coachName,
                     'service_name' => $serviceName,
                 ];
             });
