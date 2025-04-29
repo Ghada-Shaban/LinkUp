@@ -54,10 +54,10 @@ class NewSessionController extends Controller
 
             $sessions = $query->get()->map(function ($session) {
                 // جلب الـ trainee من العلاقة
-                $trainee = $session->trainees;
+                $trainee = $session->trainees; // العلاقة هترجّع كائن User أو null
                 $traineeName = 'N/A';
                 if ($trainee) {
-                    $traineeName = $trainee->full_name ?? 'N/A'; // استخدام full_name بدلاً من name
+                    $traineeName = $trainee->full_name ?? 'N/A';
                     Log::info('Trainee found for session', [
                         'session_id' => $session->new_session_id,
                         'trainee_id' => $session->trainee_id,
