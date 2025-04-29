@@ -46,14 +46,14 @@ class BookingController extends Controller
 
         // Fetch booked sessions for the month (exclude Group Mentorship sessions)
         $bookedSessions = NewSession::where('coach_id', $coachId)
-            ->whereIn('status', ['Pending', 'Scheduled']) // Updated to match current statuses
-            ->whereBetween('session_time', [$startOfMonth, $endOfMonth])
+            ->whereIn('status', ['Pending', 'Scheduled'])
+            ->whereBetween('date_time', [$startOfMonth, $endOfMonth])
             ->whereDoesntHave('mentorshipRequest', function ($query) {
                 $query->where('requestable_type', 'App\\Models\\GroupMentorship');
             })
             ->get()
             ->groupBy(function ($session) {
-                return Carbon::parse($session->session_time)->toDateString();
+                return Carbon::parse($session->date_time)->toDateString();
             });
 
         // Duration should be 60 minutes for Mentorship Plan sessions
@@ -156,7 +156,7 @@ class BookingController extends Controller
         // Fetch booked sessions for the date (exclude Group Mentorship sessions)
         $bookedSessions = NewSession::where('coach_id', $coachId)
             ->whereIn('status', ['Pending', 'Scheduled'])
-            ->whereDate('session_time', $selectedDate->toDateString())
+            ->whereDate('date_time', $selectedDate->toDateString())
             ->whereDoesntHave('mentorshipRequest', function ($query) {
                 $query->where('requestable_type', 'App\\Models\\GroupMentorship');
             })
@@ -164,7 +164,7 @@ class BookingController extends Controller
 
         // Generate time slots (60-minute intervals for Mentorship Plan)
         $slots = [];
-        $durationMinutes = 60; // Fixed duration for Mentorship Plan sessions
+        $durationMinutes = 60;
 
         foreach ($availabilities as $availability) {
             $startTime = Carbon::parse($availability->Start_Time);
@@ -176,12 +176,12 @@ class BookingController extends Controller
                     break; // Don't include partial slots
                 }
 
-                $slotStartFormatted = $startTime->format('h:i A'); // Format like screenshot (e.g., 7:30 AM)
+                $slotStartFormatted = $startTime->format('h:i A');
                 $slotEndFormatted = $slotEnd->format('h:i A');
 
                 // Check if this slot is booked
                 $isBooked = $bookedSessions->filter(function ($session) use ($startTime, $slotEnd) {
-                    $sessionStart = Carbon::parse($session->session_time);
+                    $sessionStart = Carbon::parse($session->date_time);
                     $sessionEnd = $sessionStart->copy()->addMinutes($session->duration_minutes);
                     return $startTime->lt($sessionEnd) && $slotEnd->gt($sessionStart);
                 })->isNotEmpty();
@@ -201,7 +201,7 @@ class BookingController extends Controller
 
     public function bookService(Request $request, $coachId)
     {
-        // Validate the request (remove weeks and duration_minutes since they are fixed)
+        // Validate the request
         $request->validate([
             'service_id' => 'required|exists:services,service_id',
             'start_time' => 'required|date_format:H:i:s',
@@ -238,7 +238,7 @@ class BookingController extends Controller
         }
 
         // Check the number of sessions to book (fixed at 4 for Mentorship Plan)
-        $sessionCount = 4; // Fixed for Mentorship Plan (as per your requirement)
+        $sessionCount = 4;
         $bookedSessionsCount = NewSession::where('mentorship_request_id', $mentorshipRequestId)->count();
         $remainingSessions = $sessionCount - $bookedSessionsCount;
 
@@ -252,7 +252,7 @@ class BookingController extends Controller
 
         $startDate = Carbon::parse($request->start_date);
         $startTime = Carbon::parse($request->start_time);
-        $durationMinutes = 60; // Fixed duration for Mentorship Plan sessions
+        $durationMinutes = 60;
 
         $sessionsToBook = [];
         $dayOfWeek = $startDate->format('l');
@@ -285,13 +285,13 @@ class BookingController extends Controller
             // Check for conflicts with existing sessions (exclude Group Mentorship sessions)
             $conflictingSessions = NewSession::where('coach_id', (int)$coachId)
                 ->whereIn('status', ['Pending', 'Scheduled'])
-                ->whereDate('session_time', $sessionDateTime->toDateString())
+                ->whereDate('date_time', $sessionDateTime->toDateString())
                 ->whereDoesntHave('mentorshipRequest', function ($query) {
                     $query->where('requestable_type', 'App\\Models\\GroupMentorship');
                 })
                 ->get()
                 ->filter(function ($existingSession) use ($sessionDateTime, $slotEnd) {
-                    $reqStart = Carbon::parse($existingSession->session_time);
+                    $reqStart = Carbon::parse($existingSession->date_time);
                     $reqEnd = $reqStart->copy()->addMinutes($existingSession->duration_minutes);
                     return $sessionDateTime < $reqEnd && $slotEnd > $reqStart;
                 });
@@ -308,7 +308,7 @@ class BookingController extends Controller
             }
 
             $sessionsToBook[] = [
-                'session_time' => $sessionDateTime->toDateTimeString(),
+                'date_time' => $sessionDateTime->toDateTimeString(),
                 'duration_minutes' => $durationMinutes,
             ];
         }
@@ -320,7 +320,7 @@ class BookingController extends Controller
                 $session = NewSession::create([
                     'trainee_id' => Auth::user()->User_ID,
                     'coach_id' => $coachId,
-                    'session_time' => $sessionData['session_time'],
+                    'date_time' => $sessionData['date_time'],
                     'duration_minutes' => $sessionData['duration_minutes'],
                     'status' => 'Pending',
                     'service_id' => $service->service_id,
