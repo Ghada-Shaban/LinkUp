@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
+use Ramsey\Uuid\Uuid;
 
 class BookingController extends Controller
 {
@@ -56,7 +57,7 @@ class BookingController extends Controller
                 return Carbon::parse($session->date_time)->toDateString();
             });
 
-        // Duration should be 60 minutes for Mentorship Plan sessions
+        // Duration should be 60 minutes for all sessions
         $durationMinutes = 60;
 
         // Generate list of dates for the month
@@ -187,7 +188,7 @@ class BookingController extends Controller
 
         // Generate time slots for the entire day (from 01:00 to 23:00)
         $slots = [];
-        $durationMinutes = 60; // Fixed duration for Mentorship Plan sessions
+        $durationMinutes = 60; // Fixed duration for all sessions
 
         // Start from 01:00 of the selected date
         $startOfDay = Carbon::parse($date)->startOfDay()->addHour(1); // Start at 01:00
@@ -264,7 +265,7 @@ class BookingController extends Controller
             'service_id' => 'required|exists:services,service_id',
             'start_time' => 'required|date_format:H:i:s',
             'start_date' => 'required|date|after:now',
-            'mentorship_request_id' => 'required|exists:mentorship_requests,id',
+            'mentorship_request_id' => 'nullable|exists:mentorship_requests,id', // Optional for regular services
         ]);
 
         $service = Service::findOrFail($request->service_id);
@@ -273,139 +274,196 @@ class BookingController extends Controller
         }
 
         $mentorshipRequestId = $request->mentorship_request_id;
-        $mentorshipRequest = MentorshipRequest::findOrFail($mentorshipRequestId);
+        $mentorshipRequest = $mentorshipRequestId ? MentorshipRequest::findOrFail($mentorshipRequestId) : null;
 
-        // Verify the mentorship request belongs to the authenticated user
-        if ($mentorshipRequest->trainee_id !== Auth::user()->User_ID) {
-            return response()->json(['message' => 'This mentorship request does not belong to you.'], 403);
-        }
-
-        // Verify the mentorship request is accepted
-        if ($mentorshipRequest->status !== 'accepted') {
-            return response()->json(['message' => 'Mentorship request must be accepted to book sessions.'], 400);
-        }
-
-        // Verify the mentorship request is for a Mentorship Plan
-        if ($mentorshipRequest->requestable_type !== \App\Models\MentorshipPlan::class) {
-            return response()->json(['message' => 'Mentorship request must be for a Mentorship Plan to book sessions this way.'], 400);
-        }
-
-        // Verify the service matches the mentorship request
-        if ($mentorshipRequest->requestable->service_id !== $service->service_id) {
-            return response()->json(['message' => 'Service does not match the mentorship request.'], 400);
-        }
-
-        // Check the number of sessions to book (fixed at 4 for Mentorship Plan)
-        $sessionCount = 4;
-        $bookedSessionsCount = NewSession::where('mentorship_request_id', $mentorshipRequestId)->count();
-        $remainingSessions = $sessionCount - $bookedSessionsCount;
-
-        if ($remainingSessions <= 0) {
-            return response()->json(['message' => 'You have already booked the maximum number of sessions for this Mentorship Plan.'], 400);
-        }
-
-        if ($remainingSessions < $sessionCount) {
-            return response()->json(['message' => 'Mentorship Plan requires exactly 4 sessions to be booked at once.'], 400);
-        }
-
+        $durationMinutes = 60; // Fixed duration for all sessions
         $startDate = Carbon::parse($request->start_date);
         $startTime = Carbon::parse($request->start_time);
-        $durationMinutes = 60;
-
-        $sessionsToBook = [];
         $dayOfWeek = $startDate->format('l');
+        $sessionDateTime = $startDate->setTime($startTime->hour, $startTime->minute, $startTime->second);
+        $slotEnd = $sessionDateTime->copy()->addMinutes($durationMinutes);
 
-        // Book 4 sessions (one per week)
-        for ($i = 0; $i < $sessionCount; $i++) {
-            $sessionDate = $startDate->copy()->addWeeks($i);
-            $sessionDateTime = $sessionDate->setTime($startTime->hour, $startTime->minute, $startTime->second);
-            $slotEnd = $sessionDateTime->copy()->addMinutes($durationMinutes);
+        // Check if the coach is available at this time
+        $availability = CoachAvailability::where('coach_id', (int)$coachId)
+            ->where('Day_Of_Week', $dayOfWeek)
+            ->where('Start_Time', '<=', $sessionDateTime->format('H:i:s'))
+            ->where('End_Time', '>=', $slotEnd->format('H:i:s'))
+            ->first();
 
-            // Check if the coach is available at this time
-            $availability = CoachAvailability::where('coach_id', (int)$coachId)
-                ->where('Day_Of_Week', $dayOfWeek)
-                ->where('Start_Time', '<=', $sessionDateTime->format('H:i:s'))
-                ->where('End_Time', '>=', $slotEnd->format('H:i:s'))
-                ->first();
-
-            if (!$availability) {
-                Log::warning('Selected slot is not available', [
-                    'trainee_id' => Auth::id(),
-                    'coach_id' => $coachId,
-                    'date' => $sessionDateTime->toDateString(),
-                    'day_of_week' => $dayOfWeek,
-                    'start_time' => $sessionDateTime->format('H:i'),
-                    'duration' => $durationMinutes,
-                ]);
-                return response()->json(['message' => "Selected slot is not available on {$sessionDateTime->toDateString()}"], 400);
-            }
-
-            // Check for conflicts with existing sessions (exclude Group Mentorship sessions)
-            $conflictingSessions = NewSession::where('coach_id', (int)$coachId)
-                ->whereIn('status', ['Pending', 'Scheduled'])
-                ->whereDate('date_time', $sessionDateTime->toDateString())
-                ->whereDoesntHave('mentorshipRequest', function ($query) {
-                    $query->where('requestable_type', 'App\\Models\\GroupMentorship');
-                })
-                ->get()
-                ->filter(function ($existingSession) use ($sessionDateTime, $slotEnd) {
-                    $reqStart = Carbon::parse($existingSession->date_time);
-                    $reqEnd = $reqStart->copy()->addMinutes($existingSession->duration);
-                    return $sessionDateTime < $reqEnd && $slotEnd > $reqStart;
-                });
-
-            if ($conflictingSessions->isNotEmpty()) {
-                Log::warning('Slot conflicts with existing sessions', [
-                    'trainee_id' => Auth::id(),
-                    'coach_id' => $coachId,
-                    'date' => $sessionDateTime->toDateString(),
-                    'day_of_week' => $dayOfWeek,
-                    'start_time' => $sessionDateTime->format('H:i'),
-                ]);
-                return response()->json(['message' => "Selected slot is already reserved on {$sessionDateTime->toDateString()}"], 400);
-            }
-
-            $sessionsToBook[] = [
-                'date_time' => $sessionDateTime->toDateTimeString(),
-                'duration' => $durationMinutes, // Changed from duration_minutes to duration to match database field
-            ];
+        if (!$availability) {
+            Log::warning('Selected slot is not available', [
+                'trainee_id' => Auth::id(),
+                'coach_id' => $coachId,
+                'date' => $sessionDateTime->toDateString(),
+                'day_of_week' => $dayOfWeek,
+                'start_time' => $sessionDateTime->format('H:i'),
+                'duration' => $durationMinutes,
+            ]);
+            return response()->json(['message' => "Selected slot is not available on {$sessionDateTime->toDateString()}"], 400);
         }
+
+        // Check for conflicts with existing sessions (exclude Group Mentorship sessions)
+        $conflictingSessions = NewSession::where('coach_id', (int)$coachId)
+            ->whereIn('status', ['Pending', 'Scheduled'])
+            ->whereDate('date_time', $sessionDateTime->toDateString())
+            ->whereDoesntHave('mentorshipRequest', function ($query) {
+                $query->where('requestable_type', 'App\\Models\\GroupMentorship');
+            })
+            ->get()
+            ->filter(function ($existingSession) use ($sessionDateTime, $slotEnd) {
+                $reqStart = Carbon::parse($existingSession->date_time);
+                $reqEnd = $reqStart->copy()->addMinutes($existingSession->duration);
+                return $sessionDateTime < $reqEnd && $slotEnd > $reqStart;
+            });
+
+        if ($conflictingSessions->isNotEmpty()) {
+            Log::warning('Slot conflicts with existing sessions', [
+                'trainee_id' => Auth::id(),
+                'coach_id' => $coachId,
+                'date' => $sessionDateTime->toDateString(),
+                'day_of_week' => $dayOfWeek,
+                'start_time' => $sessionDateTime->format('H:i'),
+            ]);
+            return response()->json(['message' => "Selected slot is already reserved on {$sessionDateTime->toDateString()}"], 400);
+        }
+
+        // Determine the type of booking based on the service and mentorship request
+        $isMentorshipPlanBooking = $mentorshipRequest && $mentorshipRequest->requestable_type === \App\Models\MentorshipPlan::class;
 
         DB::beginTransaction();
         try {
-            $createdSessions = [];
-            foreach ($sessionsToBook as $sessionData) {
-                $session = NewSession::create([
+            if ($isMentorshipPlanBooking) {
+                // Handle Mentorship Plan booking (4 sessions, pending payment)
+                // Verify the mentorship request belongs to the authenticated user
+                if ($mentorshipRequest->trainee_id !== Auth::user()->User_ID) {
+                    return response()->json(['message' => 'This mentorship request does not belong to you.'], 403);
+                }
+
+                // Verify the mentorship request is accepted
+                if ($mentorshipRequest->status !== 'accepted') {
+                    return response()->json(['message' => 'Mentorship request must be accepted to book sessions.'], 400);
+                }
+
+                // Verify the service matches the mentorship request
+                if ($mentorshipRequest->requestable->service_id !== $service->service_id) {
+                    return response()->json(['message' => 'Service does not match the mentorship request.'], 400);
+                }
+
+                // Check the number of sessions to book (fixed at 4 for Mentorship Plan)
+                $sessionCount = 4;
+                $bookedSessionsCount = NewSession::where('mentorship_request_id', $mentorshipRequestId)->count();
+                $remainingSessions = $sessionCount - $bookedSessionsCount;
+
+                if ($remainingSessions <= 0) {
+                    return response()->json(['message' => 'You have already booked the maximum number of sessions for this Mentorship Plan.'], 400);
+                }
+
+                if ($remainingSessions < $sessionCount) {
+                    return response()->json(['message' => 'Mentorship Plan requires exactly 4 sessions to be booked at once.'], 400);
+                }
+
+                $sessionsToBook = [];
+                for ($i = 0; $i < $sessionCount; $i++) {
+                    $sessionDate = $startDate->copy()->addWeeks($i);
+                    $sessionDateTime = $sessionDate->setTime($startTime->hour, $startTime->minute, $startTime->second);
+                    $slotEnd = $sessionDateTime->copy()->addMinutes($durationMinutes);
+
+                    // Check availability for each session
+                    $availability = CoachAvailability::where('coach_id', (int)$coachId)
+                        ->where('Day_Of_Week', $sessionDate->format('l'))
+                        ->where('Start_Time', '<=', $sessionDateTime->format('H:i:s'))
+                        ->where('End_Time', '>=', $slotEnd->format('H:i:s'))
+                        ->first();
+
+                    if (!$availability) {
+                        return response()->json(['message' => "Selected slot is not available on {$sessionDateTime->toDateString()}"], 400);
+                    }
+
+                    // Check for conflicts
+                    $conflictingSessions = NewSession::where('coach_id', (int)$coachId)
+                        ->whereIn('status', ['Pending', 'Scheduled'])
+                        ->whereDate('date_time', $sessionDateTime->toDateString())
+                        ->whereDoesntHave('mentorshipRequest', function ($query) {
+                            $query->where('requestable_type', 'App\\Models\\GroupMentorship');
+                        })
+                        ->get()
+                        ->filter(function ($existingSession) use ($sessionDateTime, $slotEnd) {
+                            $reqStart = Carbon::parse($existingSession->date_time);
+                            $reqEnd = $reqStart->copy()->addMinutes($existingSession->duration);
+                            return $sessionDateTime < $reqEnd && $slotEnd > $reqStart;
+                        });
+
+                    if ($conflictingSessions->isNotEmpty()) {
+                        return response()->json(['message' => "Selected slot is already reserved on {$sessionDateTime->toDateString()}"], 400);
+                    }
+
+                    $sessionsToBook[] = [
+                        'date_time' => $sessionDateTime->toDateTimeString(),
+                        'duration' => $durationMinutes,
+                    ];
+                }
+
+                $createdSessions = [];
+                foreach ($sessionsToBook as $sessionData) {
+                    $session = NewSession::create([
+                        'trainee_id' => Auth::user()->User_ID,
+                        'coach_id' => $coachId,
+                        'date_time' => $sessionData['date_time'],
+                        'duration' => $sessionData['duration'],
+                        'status' => 'Pending',
+                        'service_id' => $service->service_id,
+                        'mentorship_request_id' => $mentorshipRequestId,
+                    ]);
+                    $createdSessions[] = $session;
+                }
+
+                // Create a pending payment for Mentorship Plan
+                \App\Models\PendingPayment::create([
+                    'mentorship_request_id' => $mentorshipRequestId,
+                    'payment_due_at' => now()->addHours(24),
+                ]);
+
+                DB::commit();
+                Log::info('All sessions booked for Mentorship Plan, awaiting payment', [
+                    'mentorship_request_id' => $mentorshipRequestId,
+                    'sessions' => $createdSessions,
+                ]);
+
+                return response()->json([
+                    'message' => 'All sessions booked successfully. Proceed to payment using /api/payment/initiate/mentorship_request/' . $mentorshipRequestId,
+                    'sessions' => $createdSessions,
+                ]);
+            } else {
+                // Handle regular service booking (Mock Interview, LinkedIn Optimization, CV Review, Project Assessment)
+                // Generate a temporary session ID to use in payment
+                $tempSessionId = Uuid::uuid4()->toString();
+
+                // Prepare session data to pass to the payment endpoint
+                $sessionData = [
+                    'temp_session_id' => $tempSessionId,
                     'trainee_id' => Auth::user()->User_ID,
                     'coach_id' => $coachId,
-                    'date_time' => $sessionData['date_time'],
-                    'duration' => $sessionData['duration'], // Changed from duration_minutes to duration to match database field
-                    'status' => 'Pending',
                     'service_id' => $service->service_id,
-                    'mentorship_request_id' => $mentorshipRequestId,
+                    'date_time' => $sessionDateTime->toDateTimeString(),
+                    'duration' => $durationMinutes,
+                ];
+
+                DB::commit();
+                Log::info('Regular service booking initiated, awaiting payment', [
+                    'temp_session_id' => $tempSessionId,
+                    'service_id' => $service->service_id,
+                    'trainee_id' => Auth::user()->User_ID,
                 ]);
-                $createdSessions[] = $session;
+
+                return response()->json([
+                    'message' => 'Booking initiated successfully. Proceed to payment.',
+                    'payment_url' => "/api/payment/initiate/session/{$tempSessionId}",
+                    'session_data' => $sessionData,
+                ]);
             }
-
-            // Create a pending payment since all 4 sessions are booked
-            \App\Models\PendingPayment::create([
-                'mentorship_request_id' => $mentorshipRequestId,
-                'payment_due_at' => now()->addHours(24),
-            ]);
-
-            DB::commit();
-            Log::info('All sessions booked for Mentorship Plan, awaiting payment', [
-                'mentorship_request_id' => $mentorshipRequestId,
-                'sessions' => $createdSessions,
-            ]);
-
-            return response()->json([
-                'message' => 'All sessions booked successfully. Proceed to payment using /api/payment/initiate/mentorship_request/' . $mentorshipRequestId,
-                'sessions' => $createdSessions,
-            ]);
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Failed to book sessions', [
+            Log::error('Failed to initiate booking', [
                 'coach_id' => $coachId,
                 'error' => $e->getMessage(),
             ]);
