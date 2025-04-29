@@ -157,12 +157,16 @@ class BookingController extends Controller
         if ($availabilities->isEmpty()) {
             $availabilityRanges = [];
         } else {
-            // Collect all availability ranges for the day
+            // Collect all availability ranges for the day (only hours and minutes)
             $availabilityRanges = [];
             foreach ($availabilities as $availability) {
+                $start = Carbon::parse($availability->Start_Time);
+                $end = Carbon::parse($availability->End_Time);
                 $availabilityRanges[] = [
-                    'start' => Carbon::parse($availability->Start_Time),
-                    'end' => Carbon::parse($availability->End_Time),
+                    'start_hour' => $start->hour,
+                    'start_minute' => $start->minute,
+                    'end_hour' => $end->hour,
+                    'end_minute' => $end->minute,
                 ];
             }
         }
@@ -206,10 +210,21 @@ class BookingController extends Controller
                 return $currentTime->lt($sessionEnd) && $slotEnd->gt($sessionStart);
             })->isNotEmpty();
 
-            // Check if this slot falls within the coach's availability
+            // Check if this slot falls within the coach's availability (compare hours and minutes only)
             $isWithinAvailability = false;
             foreach ($availabilityRanges as $range) {
-                if ($currentTime->gte($range['start']) && $slotEnd->lte($range['end'])) {
+                $currentHour = $currentTime->hour;
+                $currentMinute = $currentTime->minute;
+                $slotEndHour = $slotEnd->hour;
+                $slotEndMinute = $slotEnd->minute;
+
+                // Convert times to minutes for easier comparison
+                $currentTotalMinutes = ($currentHour * 60) + $currentMinute;
+                $slotEndTotalMinutes = ($slotEndHour * 60) + $slotEndMinute;
+                $rangeStartTotalMinutes = ($range['start_hour'] * 60) + $range['start_minute'];
+                $rangeEndTotalMinutes = ($range['end_hour'] * 60) + $range['end_minute'];
+
+                if ($currentTotalMinutes >= $rangeStartTotalMinutes && $slotEndTotalMinutes <= $rangeEndTotalMinutes) {
                     $isWithinAvailability = true;
                     break;
                 }
@@ -299,7 +314,7 @@ class BookingController extends Controller
             $sessionDateTime = $sessionDate->setTime($startTime->hour, $startTime->minute, $startTime->second);
             $slotEnd = $sessionDateTime->copy()->addMinutes($durationMinutes);
 
-            // Check if the coach is available at this time
+            // Check if the coach is available at Mississippi time
             $availability = CoachAvailability::where('coach_id', (int)$coachId)
                 ->where('Day_Of_Week', $dayOfWeek)
                 ->where('Start_Time', '<=', $sessionDateTime->format('H:i:s'))
