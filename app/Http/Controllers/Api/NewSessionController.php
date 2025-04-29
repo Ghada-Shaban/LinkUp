@@ -44,7 +44,8 @@ class NewSessionController extends Controller
         $sessions = collect();
 
         if ($user->role_profile === 'Coach') {
-            $query = NewSession::where('coach_id', $user->User_ID)
+            $query = NewSession::with(['service', 'trainees'])
+                ->where('coach_id', $user->User_ID)
                 ->whereIn('status', $statuses);
 
             if ($timeCondition) {
@@ -52,11 +53,11 @@ class NewSessionController extends Controller
             }
 
             $sessions = $query->get()->map(function ($session) {
-                // جلب الـ trainee مباشرة من جدول users
-                $trainee = User::where('User_ID', $session->trainee_id)->first();
+                // جلب الـ trainee من العلاقة
+                $trainee = $session->trainees->first();
                 
-                // جلب الـ service
-                $service = Service::where('service_id', $session->service_id)->first();
+                // جلب الـ service من العلاقة
+                $service = $session->service;
                 $serviceName = 'N/A';
 
                 if ($service) {
@@ -110,7 +111,8 @@ class NewSessionController extends Controller
                 'sessions' => $sessions->toArray()
             ]);
         } elseif ($user->role_profile === 'Trainee') {
-            $query = NewSession::where('trainee_id', $user->User_ID)
+            $query = NewSession::with(['service', 'coach'])
+                ->where('trainee_id', $user->User_ID)
                 ->whereIn('status', $statuses);
 
             if ($timeCondition) {
@@ -118,11 +120,11 @@ class NewSessionController extends Controller
             }
 
             $sessions = $query->get()->map(function ($session) {
-                // جلب الـ coach مباشرة من جدول users
-                $coach = User::where('User_ID', $session->coach_id)->first();
+                // جلب الـ coach من العلاقة
+                $coach = $session->coach;
                 
-                // جلب الـ service
-                $service = Service::where('service_id', $session->service_id)->first();
+                // جلب الـ service من العلاقة
+                $service = $session->service;
                 $serviceName = 'N/A';
 
                 if ($service) {
