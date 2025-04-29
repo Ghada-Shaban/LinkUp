@@ -91,14 +91,14 @@ class PaymentController extends Controller
 
             // Get all sessions associated with this mentorship request
             $sessions = NewSession::where('mentorship_request_id', $mentorshipRequest->id)
-                ->where('status', 'pending')
+                ->where('status', 'Pending')
                 ->get();
 
             if ($sessions->isEmpty()) {
                 return response()->json(['message' => 'No pending sessions found for this mentorship plan'], 400);
             }
 
-            // Calculate the total amountrossed out the amount based on the number of sessions and price per session
+            // Calculate the total amount based on the number of sessions and price per session
             $amount = $sessions->count() * $priceEntry->price * 100; // Amount in cents
             $description = "Payment for Mentorship Plan ID: {$mentorshipPlan->id}";
         } else {
@@ -192,10 +192,10 @@ class PaymentController extends Controller
                     return response()->json(['message' => 'Group Mentorship is full'], 400);
                 }
             } elseif ($mentorshipRequest->requestable_type === 'App\\Models\\MentorshipPlan') {
-                // Update the status of all sessions to 'upcoming'
+                // Update the status of all sessions to 'Scheduled'
                 foreach ($sessions as $session) {
                     $session->update([
-                        'status' => 'upcoming',
+                        'status' => 'Scheduled',
                         'payment_status' => 'Completed',
                     ]);
                 }
