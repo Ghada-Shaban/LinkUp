@@ -225,6 +225,12 @@ class BookingController extends Controller
                 $rangeStartTotalMinutes = ($range['start_hour'] * 60) + $range['start_minute'];
                 $rangeEndTotalMinutes = ($range['end_hour'] * 60) + $range['end_minute'];
 
+                // Handle the edge case for the last slot (23:00 to 00:00)
+                if ($slotEndHour == 0 && $slotEndMinute == 0) {
+                    $slotEndTotalMinutes = 1440; // 24:00 in minutes
+                }
+
+                // Check if the slot falls within the availability range
                 if ($currentTotalMinutes >= $rangeStartTotalMinutes && $slotEndTotalMinutes <= $rangeEndTotalMinutes) {
                     $isWithinAvailability = true;
                     break;
