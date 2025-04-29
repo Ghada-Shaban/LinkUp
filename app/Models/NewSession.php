@@ -80,7 +80,7 @@ class NewSession extends Model
 
     public function coach()
     {
-        return $this->belongsTo(User::class, 'coach_id', 'User_ID'); // نزلنا الشرط where('role_profile', 'Coach')
+        return $this->belongsTo(Coach::class, 'coach_id', 'User_ID'); // تغيير من User إلى Coach
     }
 
     public function isPending()
