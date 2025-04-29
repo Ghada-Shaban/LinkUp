@@ -97,7 +97,7 @@ class BookingController extends Controller
 
                 $bookedMinutes = 0;
                 foreach ($sessionsOnDate as $session) {
-                    $bookedMinutes += $session->duration_minutes;
+                    $bookedMinutes += $session->duration;
                 }
 
                 $bookedSlots = $bookedMinutes / $durationMinutes;
@@ -207,7 +207,7 @@ class BookingController extends Controller
             // Check if this slot is booked
             $isBooked = $bookedSessions->filter(function ($session) use ($currentTime, $slotEnd) {
                 $sessionStart = Carbon::parse($session->date_time);
-                $sessionEnd = $sessionStart->copy()->addMinutes($session->duration_minutes);
+                $sessionEnd = $sessionStart->copy()->addMinutes($session->duration);
                 return $currentTime->lt($sessionEnd) && $slotEnd->gt($sessionStart);
             })->isNotEmpty();
 
@@ -350,7 +350,7 @@ class BookingController extends Controller
                 ->get()
                 ->filter(function ($existingSession) use ($sessionDateTime, $slotEnd) {
                     $reqStart = Carbon::parse($existingSession->date_time);
-                    $reqEnd = $reqStart->copy()->addMinutes($existingSession->duration_minutes);
+                    $reqEnd = $reqStart->copy()->addMinutes($existingSession->duration);
                     return $sessionDateTime < $reqEnd && $slotEnd > $reqStart;
                 });
 
@@ -367,7 +367,7 @@ class BookingController extends Controller
 
             $sessionsToBook[] = [
                 'date_time' => $sessionDateTime->toDateTimeString(),
-                'duration_minutes' => $durationMinutes,
+                'duration' => $durationMinutes, // Changed from duration_minutes to duration to match database field
             ];
         }
 
@@ -379,7 +379,7 @@ class BookingController extends Controller
                     'trainee_id' => Auth::user()->User_ID,
                     'coach_id' => $coachId,
                     'date_time' => $sessionData['date_time'],
-                    'duration_minutes' => $sessionData['duration_minutes'],
+                    'duration' => $sessionData['duration'], // Changed from duration_minutes to duration to match database field
                     'status' => 'Pending',
                     'service_id' => $service->service_id,
                     'mentorship_request_id' => $mentorshipRequestId,
