@@ -163,6 +163,60 @@ public function handleCoachRequest(Request $request, $coachId)
             'top_coaches' => $topCoaches,
         ], 200);
     }
+
+    public function getApprovedCoaches(Request $request)
+    {
+        // Get all approved coaches with details from users and coaches tables
+        $approvedCoaches = Coach::where('status', 'approved')
+            ->with(['user' => function ($query) {
+                $query->select('User_ID', 'full_name', 'email', 'linkedin_link', 'role_profile', 'photo', 'created_at', 'updated_at');
+            }])
+            ->withCount('reviews')
+            ->withAvg('reviews', 'rating')
+            ->get()
+            ->map(function ($coach) {
+                return [
+                    // From users table
+                    'user_id' => $coach->User_ID,
+                    'full_name' => $coach->user->full_name,
+                    'email' => $coach->user->email,
+                    'linkedin_link' => $coach->user->linkedin_link,
+                    'photo' => $coach->user->photo,
+                  
+
+                    // From coaches table
+                    'title' => $coach->Title,
+                    'company_or_school' => $coach->Company_or_School,
+                    'bio' => $coach->Bio,
+                    'years_of_experience' => $coach->Years_Of_Experience,
+                    'months_of_experience' => $coach->Months_Of_Experience,
+                 
+
+                    // Additional calculated fields
+                    'average_rating' => $coach->reviews_avg_rating ? round($coach->reviews_avg_rating, 2) : 0,
+                    'total_reviews' => $coach->reviews_count,
+                ];
+            });
+
+        // Get count of approved coaches
+        $approvedCoachesCount = $approvedCoaches->count();
+
+        // Return the response
+        return response()->json([
+            'approved_coaches' => $approvedCoaches,
+          
+        ], 200);
+    }
+    public function getApprovedCoachesCount(Request $request)
+    {
+        // Get count of approved coaches
+        $approvedCoachesCount = Coach::where('status', 'approved')->count();
+
+        // Return the response
+        return response()->json([
+            'approved_coaches_count' => $approvedCoachesCount,
+        ], 200);
+    }
 }
         
            
