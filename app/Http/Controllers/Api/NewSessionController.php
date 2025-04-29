@@ -55,23 +55,39 @@ class NewSessionController extends Controller
             $sessions = $query->get()->map(function ($session) {
                 // جلب الـ trainee من العلاقة
                 $trainee = $session->trainees->first();
+                if (!$trainee) {
+                    Log::warning('Trainee not found for session', [
+                        'session_id' => $session->new_session_id,
+                        'trainee_id' => $session->trainee_id
+                    ]);
+                }
                 
                 // جلب الـ service من العلاقة
                 $service = $session->service;
                 $serviceName = 'N/A';
 
                 if ($service) {
+                    Log::info('Service found for session', [
+                        'session_id' => $session->new_session_id,
+                        'service_id' => $session->service_id,
+                        'service' => $service->toArray()
+                    ]);
                     if ($service->service_type === 'Mentorships') {
                         if ($service->mentorship_type === 'Mentorship Sessions') {
-                            $serviceName = $service->sub_type; // LinkedIn Optimization, Project Assessment, CV Review
+                            $serviceName = $service->sub_type;
                         } elseif ($service->mentorship_type === 'Mentorship Plan') {
                             $serviceName = 'Mentorship Plan';
                         } elseif ($service->mentorship_type === 'Group Mentorship') {
                             $serviceName = 'Group Mentorship';
                         }
                     } else {
-                        $serviceName = $service->title; // Mock Interview
+                        $serviceName = $service->title;
                     }
+                } else {
+                    Log::warning('Service not found for session', [
+                        'session_id' => $session->new_session_id,
+                        'service_id' => $session->service_id
+                    ]);
                 }
 
                 // حساب وقت النهاية بناءً على المدة
@@ -122,23 +138,45 @@ class NewSessionController extends Controller
             $sessions = $query->get()->map(function ($session) {
                 // جلب الـ coach من العلاقة
                 $coach = $session->coach;
+                if (!$coach) {
+                    Log::warning('Coach not found for session', [
+                        'session_id' => $session->new_session_id,
+                        'coach_id' => $session->coach_id
+                    ]);
+                } else {
+                    Log::info('Coach found for session', [
+                        'session_id' => $session->new_session_id,
+                        'coach_id' => $session->coach_id,
+                        'coach' => $coach->toArray()
+                    ]);
+                }
                 
                 // جلب الـ service من العلاقة
                 $service = $session->service;
                 $serviceName = 'N/A';
 
                 if ($service) {
+                    Log::info('Service found for session', [
+                        'session_id' => $session->new_session_id,
+                        'service_id' => $session->service_id,
+                        'service' => $service->toArray()
+                    ]);
                     if ($service->service_type === 'Mentorships') {
                         if ($service->mentorship_type === 'Mentorship Sessions') {
-                            $serviceName = $service->sub_type; // LinkedIn Optimization, Project Assessment, CV Review
+                            $serviceName = $service->sub_type;
                         } elseif ($service->mentorship_type === 'Mentorship Plan') {
                             $serviceName = 'Mentorship Plan';
                         } elseif ($service->mentorship_type === 'Group Mentorship') {
                             $serviceName = 'Group Mentorship';
                         }
                     } else {
-                        $serviceName = $service->title; // Mock Interview
+                        $serviceName = $service->title;
                     }
+                } else {
+                    Log::warning('Service not found for session', [
+                        'session_id' => $session->new_session_id,
+                        'service_id' => $session->service_id
+                    ]);
                 }
 
                 // حساب وقت النهاية بناءً على المدة
