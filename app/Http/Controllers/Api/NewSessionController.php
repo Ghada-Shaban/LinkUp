@@ -73,31 +73,46 @@ class NewSessionController extends Controller
                         'service' => $service->toArray()
                     ]);
                     if ($service->service_type === 'Mentorships') {
-                        // جلب mentorship_type من العلاقات الفرعية
+                        // جلب العلاقات الفرعية
                         $mentorship = $service->mentorship;
                         $groupMentorship = $service->groupMentorship;
                         $linkedinOptimization = $service->linkedinOptimization;
                         $cvReview = $service->cvReview;
                         $projectEvaluation = $service->projectEvaluation;
 
-                        if ($mentorship && $mentorship->mentorship_type === 'Mentorship Sessions') {
-                            // تحديد sub_type بناءً على العلاقة المناسبة
-                            if ($linkedinOptimization) {
-                                $serviceName = 'LinkedIn Optimization';
-                            } elseif ($cvReview) {
-                                $serviceName = 'CV Review';
-                            } elseif ($projectEvaluation) {
-                                $serviceName = 'Project Assessment';
+                        if ($mentorship) {
+                            Log::info('Mentorship found for service', [
+                                'service_id' => $service->service_id,
+                                'mentorship' => $mentorship->toArray()
+                            ]);
+                            if ($mentorship->mentorship_type === 'Mentorship Sessions') {
+                                if ($linkedinOptimization) {
+                                    $serviceName = 'LinkedIn Optimization';
+                                } elseif ($cvReview) {
+                                    $serviceName = 'CV Review';
+                                } elseif ($projectEvaluation) {
+                                    $serviceName = 'Project Assessment';
+                                } else {
+                                    $serviceName = 'Mentorship Session';
+                                }
+                            } elseif ($mentorship->mentorship_type === 'Mentorship Plan') {
+                                $serviceName = 'Mentorship Plan';
                             }
-                        } elseif ($mentorship && $mentorship->mentorship_type === 'Mentorship Plan') {
-                            $serviceName = 'Mentorship Plan';
                         } elseif ($groupMentorship) {
+                            Log::info('Group Mentorship found for service', [
+                                'service_id' => $service->service_id,
+                                'group_mentorship' => $groupMentorship->toArray()
+                            ]);
                             $serviceName = 'Group Mentorship';
+                        } else {
+                            Log::warning('No mentorship or group mentorship found for service', [
+                                'service_id' => $service->service_id
+                            ]);
                         }
                     } elseif ($service->service_type === 'Mock Interview') {
                         $serviceName = 'Mock Interview';
                     } else {
-                        $serviceName = $service->title;
+                        $serviceName = $service->title ?? 'N/A';
                     }
                 } else {
                     Log::warning('Service not found for session', [
@@ -156,23 +171,24 @@ class NewSessionController extends Controller
                 $coach = $session->coach;
                 $coachName = 'N/A';
                 if ($coach) {
-                    // جلب الـ user الخاص بالـ coach للحصول على الـ name
+                    // جلب الـ user الخاص بالـ coach للحصول على الـ name من جدول users
                     $coachUser = $coach->user;
                     if ($coachUser) {
-                        $coachName = $coachUser->name;
+                        $coachName = $coachUser->name ?? 'N/A';
                         Log::info('Coach found for session', [
                             'session_id' => $session->new_session_id,
                             'coach_id' => $session->coach_id,
-                            'coach_name' => $coachName
+                            'coach_name' => $coachName,
+                            'user_data' => $coachUser->toArray()
                         ]);
                     } else {
-                        Log::warning('Coach user not found for session', [
+                        Log::warning('Coach user not found in users table for session', [
                             'session_id' => $session->new_session_id,
                             'coach_id' => $session->coach_id
                         ]);
                     }
                 } else {
-                    Log::warning('Coach not found for session', [
+                    Log::warning('Coach not found in coaches table for session', [
                         'session_id' => $session->new_session_id,
                         'coach_id' => $session->coach_id
                     ]);
@@ -189,31 +205,46 @@ class NewSessionController extends Controller
                         'service' => $service->toArray()
                     ]);
                     if ($service->service_type === 'Mentorships') {
-                        // جلب mentorship_type من العلاقات الفرعية
+                        // جلب العلاقات الفرعية
                         $mentorship = $service->mentorship;
                         $groupMentorship = $service->groupMentorship;
                         $linkedinOptimization = $service->linkedinOptimization;
                         $cvReview = $service->cvReview;
                         $projectEvaluation = $service->projectEvaluation;
 
-                        if ($mentorship && $mentorship->mentorship_type === 'Mentorship Sessions') {
-                            // تحديد sub_type بناءً على العلاقة المناسبة
-                            if ($linkedinOptimization) {
-                                $serviceName = 'LinkedIn Optimization';
-                            } elseif ($cvReview) {
-                                $serviceName = 'CV Review';
-                            } elseif ($projectEvaluation) {
-                                $serviceName = 'Project Assessment';
+                        if ($mentorship) {
+                            Log::info('Mentorship found for service', [
+                                'service_id' => $service->service_id,
+                                'mentorship' => $mentorship->toArray()
+                            ]);
+                            if ($mentorship->mentorship_type === 'Mentorship Sessions') {
+                                if ($linkedinOptimization) {
+                                    $serviceName = 'LinkedIn Optimization';
+                                } elseif ($cvReview) {
+                                    $serviceName = 'CV Review';
+                                } elseif ($projectEvaluation) {
+                                    $serviceName = 'Project Assessment';
+                                } else {
+                                    $serviceName = 'Mentorship Session';
+                                }
+                            } elseif ($mentorship->mentorship_type === 'Mentorship Plan') {
+                                $serviceName = 'Mentorship Plan';
                             }
-                        } elseif ($mentorship && $mentorship->mentorship_type === 'Mentorship Plan') {
-                            $serviceName = 'Mentorship Plan';
                         } elseif ($groupMentorship) {
+                            Log::info('Group Mentorship found for service', [
+                                'service_id' => $service->service_id,
+                                'group_mentorship' => $groupMentorship->toArray()
+                            ]);
                             $serviceName = 'Group Mentorship';
+                        } else {
+                            Log::warning('No mentorship or group mentorship found for service', [
+                                'service_id' => $service->service_id
+                            ]);
                         }
                     } elseif ($service->service_type === 'Mock Interview') {
                         $serviceName = 'Mock Interview';
                     } else {
-                        $serviceName = $service->title;
+                        $serviceName = $service->title ?? 'N/A';
                     }
                 } else {
                     Log::warning('Service not found for session', [
@@ -434,7 +465,7 @@ class NewSessionController extends Controller
         // التأكد إن الدفع لسه ما اكتملش (خاص بـ Group Mentorship)
         $pendingPayment = \App\Models\PendingPayment::where('mentorship_request_id', $mentorshipRequestId)->first();
         if ($pendingPayment) {
-            $payment = \App\Models\Payment::where('mentorship_request_id', $mentorshipRequestId)
+            $payment = \App\Models\Payment::where('mentorship_request_id', $mentorship_request_id)
                 ->where('payment_status', 'completed')
                 ->first();
             if ($payment) {
