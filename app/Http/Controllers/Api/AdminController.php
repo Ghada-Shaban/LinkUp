@@ -219,6 +219,17 @@ public function handleCoachRequest(Request $request, $coachId)
             'approved_coaches_count' => $approvedCoachesCount,
         ], 200);
     }
+
+    public function getPendingCoachesCount(Request $request)
+    {
+        // Get count of pending coaches
+        $pendingCoachesCount = Coach::where('status', 'pending')->count();
+
+        // Return the response
+        return response()->json([
+            'pending_coaches_count' => $pendingCoachesCount,
+        ], 200);
+    }
      public function getDashboardStats(Request $request)
     {
         // 1. Revenue (20%)
