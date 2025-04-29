@@ -10,19 +10,19 @@ class NewSession extends Model
     use HasFactory;
     
     protected $table = 'new_sessions';
-    protected $primaryKey = 'new_session_id'; // الـ primary key الصحيح
+    protected $primaryKey = 'new_session_id';
 
     protected $fillable = [
-        'new_session_id', // أضفناه عشان يتعامل مع الـ primary key
+        'new_session_id',
         'date_time',
         'duration',
         'status',
-        'payment_status', // أضفنا payment_status هنا
+        'payment_status',
         'service_id',
         'meeting_link',
-        'coach_id', // أضفناه
-        'trainee_id', // أضفناه
-        'mentorship_request_id', // أضفناه عشان الربط مع MentorshipRequest
+        'coach_id',
+        'trainee_id',
+        'mentorship_request_id',
     ];
 
     protected $casts = [
@@ -34,51 +34,35 @@ class NewSession extends Model
         'mentorship_request_id' => 'integer',
     ];
 
-    // تعريف الحالات الممكنة للـ status كثوابت (Constants)
     const STATUS_PENDING = 'Pending';
     const STATUS_SCHEDULED = 'Scheduled';
     const STATUS_COMPLETED = 'Completed';
     const STATUS_CANCELLED = 'Cancelled';
 
-    /**
-     * الـ Default Attributes
-     */
     protected $attributes = [
-        'status' => self::STATUS_PENDING, // الجلسة هتبقى دايمًا كـ Pending
+        'status' => self::STATUS_PENDING,
     ];
 
-    /**
-     * علاقة مع الـ Service
-     */
     public function service()
     {
         return $this->belongsTo(Service::class, 'service_id');
     }
 
-    /**
-     * علاقة مع الـ MentorshipRequest
-     */
     public function mentorshipRequest()
     {
         return $this->belongsTo(MentorshipRequest::class, 'mentorship_request_id', 'id');
     }
 
-    /**
-     * علاقة مع الـ Trainees (المتدربين)
-     */
     public function trainees()
     {  
         return $this->belongsToMany(  
-            User::class,  // هنربط بالـ User لأنه هو اللي عنده الـ role_profile كـ Trainee
+            User::class,
             'books',  
             'session_id',  
             'trainee_id'  
-        )->where('role_profile', 'Trainee'); // هنجيب بس اللي الـ role بتاعه Trainee
+        )->where('role_profile', 'Trainee');
     }
 
-    /**
-     * علاقة مع الـ Attendees (الحاضرين)
-     */
     public function attendees()
     {
         return $this->belongsToMany(
@@ -89,34 +73,21 @@ class NewSession extends Model
         );
     }
 
-    /**
-     * علاقة مع الـ Books (الحجوزات)
-     */
     public function books()
     {
         return $this->hasMany(Book::class, 'session_id', 'new_session_id');
     }
 
-    /**
-     * علاقة مع الـ Coach
-     */
     public function coach()
     {
-        return $this->belongsTo(User::class, 'coach_id', 'User_ID')
-            ->where('role_profile', 'Coach'); // الكوتش برضه جزء من الـ Users
+        return $this->belongsTo(User::class, 'coach_id', 'User_ID'); // نزلنا الشرط where('role_profile', 'Coach')
     }
 
-    /**
-     * دالة مساعدة للتحقق إذا كانت الجلسة Pending
-     */
     public function isPending()
     {
         return $this->status === self::STATUS_PENDING;
     }
 
-    /**
-     * دالة مساعدة للتحقق إذا كانت الجلسة Scheduled
-     */
     public function isScheduled()
     {
         return $this->status === self::STATUS_SCHEDULED;
