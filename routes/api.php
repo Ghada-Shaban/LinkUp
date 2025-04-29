@@ -117,6 +117,7 @@ Route::post('/admin/coach-requests/{coachId}/handle', [AdminController::class, '
 Route::get('/admin/top-coaches', [AdminController::class, 'getTopCoaches']);
 Route::get('/admin/Approved-coaches', [AdminController::class, 'getApprovedCoaches']);
 Route::get('/admin/Approved-coaches-count', [AdminController::class, 'getApprovedCoachesCount']);
+Route::get('/admin/Pending-coaches-count', [AdminController::class, 'getPendingCoachesCount']);
 Route::get('/admin/DashboardStats', [AdminController::class, 'getDashboardStats']);
 
 
