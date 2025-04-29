@@ -185,13 +185,13 @@ class BookingController extends Controller
             'booked_sessions' => $bookedSessions->toArray(),
         ]);
 
-        // Generate time slots for the entire day (from 12:00 AM to 11:59 PM)
+        // Generate time slots for the entire day (from 01:00 to 23:00)
         $slots = [];
         $durationMinutes = 60; // Fixed duration for Mentorship Plan sessions
 
-        // Start from 12:00 AM of the selected date
-        $startOfDay = Carbon::parse($date)->startOfDay();
-        $endOfDay = Carbon::parse($date)->endOfDay();
+        // Start from 01:00 of the selected date
+        $startOfDay = Carbon::parse($date)->startOfDay()->addHour(1); // Start at 01:00
+        $endOfDay = Carbon::parse($date)->startOfDay()->addHours(24); // End at 00:00 next day
 
         $currentTime = $startOfDay->copy();
         while ($currentTime->lt($endOfDay)) {
@@ -200,8 +200,9 @@ class BookingController extends Controller
                 break; // Don't include partial slots at the end of the day
             }
 
-            $slotStartFormatted = $currentTime->format('h:i A');
-            $slotEndFormatted = $slotEnd->format('h:i A');
+            // Use 24-hour format (H:i)
+            $slotStartFormatted = $currentTime->format('H:i');
+            $slotEndFormatted = $slotEnd->format('H:i');
 
             // Check if this slot is booked
             $isBooked = $bookedSessions->filter(function ($session) use ($currentTime, $slotEnd) {
@@ -314,7 +315,7 @@ class BookingController extends Controller
             $sessionDateTime = $sessionDate->setTime($startTime->hour, $startTime->minute, $startTime->second);
             $slotEnd = $sessionDateTime->copy()->addMinutes($durationMinutes);
 
-            // Check if the coach is available at Mississippi time
+            // Check if the coach is available at this time
             $availability = CoachAvailability::where('coach_id', (int)$coachId)
                 ->where('Day_Of_Week', $dayOfWeek)
                 ->where('Start_Time', '<=', $sessionDateTime->format('H:i:s'))
