@@ -25,7 +25,7 @@ class NewSessionController extends Controller
         $timeCondition = null;
 
         if ($type === 'upcoming') {
-            $statuses = ['upcoming'];
+            $statuses = ['Scheduled']; // تغيير من 'upcoming' إلى 'Scheduled'
             $timeCondition = ['date_time', '>=', now()];
         } elseif ($type === 'pending') {
             $statuses = ['pending'];
@@ -60,10 +60,30 @@ class NewSessionController extends Controller
                     $serviceName = $service ? $service->title : 'N/A';
                 }
 
+                // حساب وقت النهاية بناءً على المدة
+                $endTime = Carbon::parse($session->date_time)->addMinutes($session->duration);
+                
+                // تنسيق التاريخ والوقت بالشكل المطلوب
+                $date = Carbon::parse($session->date_time)->format('D, M d');
+                $startTimeFormatted = Carbon::parse($session->date_time)->format('h:i A');
+                $endTimeFormatted = $endTime->format('h:i A');
+                $timeRange = "$startTimeFormatted - $endTimeFormatted";
+
+                // تحديد نوع الجلسة بناءً على الحالة
+                $sessionType = 'N/A';
+                if ($session->status === 'Scheduled') {
+                    $sessionType = 'Mentorship session';
+                } elseif ($session->status === 'completed') {
+                    $sessionType = 'completed session';
+                } elseif ($session->status === 'cancelled') {
+                    $sessionType = 'cancelled session';
+                }
+
                 return [
-                    'new_session_id' => $session->id,
-                    'session_time' => $session->date_time,
-                    'duration' => $session->duration,
+                    'new_session_id' => $session->new_session_id,
+                    'session_type' => $sessionType,
+                    'date' => $date,
+                    'time_range' => $timeRange,
                     'status' => $session->status,
                     'meeting_link' => $session->meeting_link,
                     'trainee_name' => $trainee ? $trainee->name : 'N/A',
@@ -93,10 +113,30 @@ class NewSessionController extends Controller
                     $serviceName = $service ? $service->title : 'N/A';
                 }
 
+                // حساب وقت النهاية بناءً على المدة
+                $endTime = Carbon::parse($session->date_time)->addMinutes($session->duration);
+                
+                // تنسيق التاريخ والوقت بالشكل المطلوب
+                $date = Carbon::parse($session->date_time)->format('D, M d');
+                $startTimeFormatted = Carbon::parse($session->date_time)->format('h:i A');
+                $endTimeFormatted = $endTime->format('h:i A');
+                $timeRange = "$startTimeFormatted - $endTimeFormatted";
+
+                // تحديد نوع الجلسة بناءً على الحالة
+                $sessionType = 'N/A';
+                if ($session->status === 'Scheduled') {
+                    $sessionType = 'Mentorship session';
+                } elseif ($session->status === 'completed') {
+                    $sessionType = 'completed session';
+                } elseif ($session->status === 'cancelled') {
+                    $sessionType = 'cancelled session';
+                }
+
                 return [
-                    'new_session_id' => $session->id,
-                    'session_time' => $session->date_time,
-                    'duration' => $session->duration,
+                    'new_session_id' => $session->new_session_id,
+                    'session_type' => $sessionType,
+                    'date' => $date,
+                    'time_range' => $timeRange,
                     'status' => $session->status,
                     'meeting_link' => $session->meeting_link,
                     'coach_name' => $coach ? $coach->name : 'N/A',
@@ -146,7 +186,7 @@ class NewSessionController extends Controller
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        if ($session->status !== 'upcoming') {
+        if ($session->status !== 'Scheduled') { // تغيير من 'upcoming' إلى 'Scheduled'
             Log::warning('Session cannot be completed', [
                 'session_id' => $sessionId,
                 'status' => $session->status
@@ -199,7 +239,7 @@ class NewSessionController extends Controller
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        if ($session->status !== 'upcoming' && $session->status !== 'pending') {
+        if ($session->status !== 'Scheduled' && $session->status !== 'pending') { // تغيير من 'upcoming' إلى 'Scheduled'
             Log::warning('Session cannot be cancelled', [
                 'session_id' => $sessionId,
                 'status' => $session->status
@@ -298,7 +338,7 @@ class NewSessionController extends Controller
 
         // جلب الجلسات المرتبطة بالطلب
         $sessions = NewSession::where('mentorship_request_id', $mentorshipRequestId)
-            ->whereIn('status', ['pending', 'upcoming'])
+            ->whereIn('status', ['pending', 'Scheduled']) // تغيير من 'upcoming' إلى 'Scheduled'
             ->get();
 
         // تحديث حالة الجلسات لـ cancelled
