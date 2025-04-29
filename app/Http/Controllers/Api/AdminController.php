@@ -9,6 +9,8 @@ use App\Models\Coach;
 use App\Models\CoachLanguage;
 use App\Models\CoachSkill;
 use App\Models\Review;
+use App\Models\Payment;
+use App\Models\NewSession;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -216,6 +218,17 @@ public function handleCoachRequest(Request $request, $coachId)
         return response()->json([
             'approved_coaches_count' => $approvedCoachesCount,
         ], 200);
+    }
+     public function getDashboardStats(Request $request)
+    {
+        // 1. Revenue (20%)
+        $totalRevenue = Payment::where('payment_status', 'Completed')
+            ->sum('amount');
+        $revenue20Percent = $totalRevenue * 0.2;
+
+        // 2. Number of Completed Sessions
+        $completedSessions = NewSession::where('status', 'Completed')
+            ->count();
     }
 }
         
