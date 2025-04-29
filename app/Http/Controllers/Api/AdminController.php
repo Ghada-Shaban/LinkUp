@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Models\Coach;
 use App\Models\CoachLanguage;
 use App\Models\CoachSkill;
+use App\Models\Review;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -136,6 +137,31 @@ public function handleCoachRequest(Request $request, $coachId)
         ], 500);
     }
 }
+    public function getTopCoaches(Request $request)
+    {
+        // Get top coaches based on average rating
+        $topCoaches = Coach::select('coaches.*')
+            ->with(['user' => function ($query) {
+                $query->select('User_ID', 'full_name');
+            }])
+            ->withCount('reviews')
+            ->withAvg('reviews', 'rating')
+            ->orderByDesc('reviews_avg_rating')
+            ->take(5) // Top 5 coaches
+            ->get()
+            ->map(function ($coach) {
+                return [
+                    'full_name' => $coach->user->full_name,
+                    'average_rating' => round($coach->reviews_avg_rating, 2),
+                    'total_reviews' => $coach->reviews_count,
+                ];
+            });
+
+        // Return the response
+        return response()->json([
+            'top_coaches' => $topCoaches,
+        ], 200);
+    }
 }
         
            
