@@ -119,6 +119,10 @@ Route::get('/admin/Approved-coaches', [AdminController::class, 'getApprovedCoach
 Route::get('/admin/Approved-coaches-count', [AdminController::class, 'getApprovedCoachesCount']);
 Route::get('/admin/Pending-coaches-count', [AdminController::class, 'getPendingCoachesCount']);
 Route::get('/admin/DashboardStats', [AdminController::class, 'getDashboardStats']);
+Route::get('/admin/trainees', [AdminController::class, 'getAllTrainees']);
+Route::get('/admin/trainees-count', [AdminController::class, 'getTraineesCount']);
+
+
 
 
 
