@@ -25,7 +25,7 @@ class NewSessionController extends Controller
         $timeCondition = null;
 
         if ($type === 'upcoming') {
-            $statuses = ['Scheduled']; // تغيير من 'upcoming' إلى 'Scheduled'
+            $statuses = ['Scheduled'];
             $timeCondition = ['date_time', '>=', now()];
         } elseif ($type === 'pending') {
             $statuses = ['pending'];
@@ -44,8 +44,7 @@ class NewSessionController extends Controller
         $sessions = collect();
 
         if ($user->role_profile === 'Coach') {
-            $query = NewSession::with(['trainee'])
-                ->where('coach_id', $user->User_ID)
+            $query = NewSession::where('coach_id', $user->User_ID)
                 ->whereIn('status', $statuses);
 
             if ($timeCondition) {
@@ -53,11 +52,25 @@ class NewSessionController extends Controller
             }
 
             $sessions = $query->get()->map(function ($session) {
-                $trainee = $session->trainee;
+                // جلب الـ trainee مباشرة من جدول users
+                $trainee = User::where('User_ID', $session->trainee_id)->first();
+                
+                // جلب الـ service
+                $service = Service::where('service_id', $session->service_id)->first();
                 $serviceName = 'N/A';
-                if ($session->service_id) {
-                    $service = Service::find($session->service_id);
-                    $serviceName = $service ? $service->title : 'N/A';
+
+                if ($service) {
+                    if ($service->service_type === 'Mentorships') {
+                        if ($service->mentorship_type === 'Mentorship Sessions') {
+                            $serviceName = $service->sub_type; // LinkedIn Optimization, Project Assessment, CV Review
+                        } elseif ($service->mentorship_type === 'Mentorship Plan') {
+                            $serviceName = 'Mentorship Plan';
+                        } elseif ($service->mentorship_type === 'Group Mentorship') {
+                            $serviceName = 'Group Mentorship';
+                        }
+                    } else {
+                        $serviceName = $service->title; // Mock Interview
+                    }
                 }
 
                 // حساب وقت النهاية بناءً على المدة
@@ -97,8 +110,7 @@ class NewSessionController extends Controller
                 'sessions' => $sessions->toArray()
             ]);
         } elseif ($user->role_profile === 'Trainee') {
-            $query = NewSession::with(['coach'])
-                ->where('trainee_id', $user->User_ID)
+            $query = NewSession::where('trainee_id', $user->User_ID)
                 ->whereIn('status', $statuses);
 
             if ($timeCondition) {
@@ -106,11 +118,25 @@ class NewSessionController extends Controller
             }
 
             $sessions = $query->get()->map(function ($session) {
-                $coach = $session->coach;
+                // جلب الـ coach مباشرة من جدول users
+                $coach = User::where('User_ID', $session->coach_id)->first();
+                
+                // جلب الـ service
+                $service = Service::where('service_id', $session->service_id)->first();
                 $serviceName = 'N/A';
-                if ($session->service_id) {
-                    $service = Service::find($session->service_id);
-                    $serviceName = $service ? $service->title : 'N/A';
+
+                if ($service) {
+                    if ($service->service_type === 'Mentorships') {
+                        if ($service->mentorship_type === 'Mentorship Sessions') {
+                            $serviceName = $service->sub_type; // LinkedIn Optimization, Project Assessment, CV Review
+                        } elseif ($service->mentorship_type === 'Mentorship Plan') {
+                            $serviceName = 'Mentorship Plan';
+                        } elseif ($service->mentorship_type === 'Group Mentorship') {
+                            $serviceName = 'Group Mentorship';
+                        }
+                    } else {
+                        $serviceName = $service->title; // Mock Interview
+                    }
                 }
 
                 // حساب وقت النهاية بناءً على المدة
@@ -186,7 +212,7 @@ class NewSessionController extends Controller
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        if ($session->status !== 'Scheduled') { // تغيير من 'upcoming' إلى 'Scheduled'
+        if ($session->status !== 'Scheduled') {
             Log::warning('Session cannot be completed', [
                 'session_id' => $sessionId,
                 'status' => $session->status
@@ -239,7 +265,7 @@ class NewSessionController extends Controller
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        if ($session->status !== 'Scheduled' && $session->status !== 'pending') { // تغيير من 'upcoming' إلى 'Scheduled'
+        if ($session->status !== 'Scheduled' && $session->status !== 'pending') {
             Log::warning('Session cannot be cancelled', [
                 'session_id' => $sessionId,
                 'status' => $session->status
@@ -338,7 +364,7 @@ class NewSessionController extends Controller
 
         // جلب الجلسات المرتبطة بالطلب
         $sessions = NewSession::where('mentorship_request_id', $mentorshipRequestId)
-            ->whereIn('status', ['pending', 'Scheduled']) // تغيير من 'upcoming' إلى 'Scheduled'
+            ->whereIn('status', ['pending', 'Scheduled'])
             ->get();
 
         // تحديث حالة الجلسات لـ cancelled
