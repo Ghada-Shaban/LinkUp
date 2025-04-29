@@ -151,6 +151,7 @@ public function handleCoachRequest(Request $request, $coachId)
             ->get()
             ->map(function ($coach) {
                 return [
+                    'user_id' => $coach->User_ID,
                     'full_name' => $coach->user->full_name,
                     'average_rating' => round($coach->reviews_avg_rating, 2),
                     'total_reviews' => $coach->reviews_count,
