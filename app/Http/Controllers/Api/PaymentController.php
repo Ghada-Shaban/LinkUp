@@ -141,7 +141,7 @@ class PaymentController extends Controller
                 return response()->json(['message' => 'Payment failed: ' . $paymentIntent->status], 400);
             }
 
-            // Record the payment in the payments table
+            // Step 1: Record the payment in the payments table
             $payment = Payment::create([
                 'mentorship_request_id' => $mentorshipRequest->id,
                 'amount' => $amount / 100,
@@ -150,6 +150,14 @@ class PaymentController extends Controller
                 'date_time' => Carbon::now(),
             ]);
 
+            if (!$payment) {
+                Log::error('Failed to record payment in payments table', [
+                    'mentorship_request_id' => $mentorshipRequest->id,
+                ]);
+                return response()->json(['message' => 'Payment succeeded but failed to record in payments table'], 500);
+            }
+
+            // Step 2: Handle the sessions and update new_sessions
             if ($mentorshipRequest->requestable_type === 'App\\Models\\GroupMentorship') {
                 $groupMentorship = $requestable;
                 $startDateTime = Carbon::parse($groupMentorship->day . ' ' . $groupMentorship->start_time);
@@ -192,17 +200,30 @@ class PaymentController extends Controller
                     return response()->json(['message' => 'Group Mentorship is full'], 400);
                 }
             } elseif ($mentorshipRequest->requestable_type === 'App\\Models\\MentorshipPlan') {
-                // Update the status of all sessions to 'Scheduled'
-                foreach ($sessions as $session) {
-                    $session->update([
+                // Update the status of all sessions to 'Scheduled' and payment_status to 'Completed'
+                $updated = NewSession::where('mentorship_request_id', $mentorshipRequest->id)
+                    ->where('status', 'Pending')
+                    ->update([
                         'status' => 'Scheduled',
                         'payment_status' => 'Completed',
+                        'updated_at' => Carbon::now(),
                     ]);
+
+                if ($updated === 0) {
+                    Log::warning('No sessions were updated', [
+                        'mentorship_request_id' => $mentorshipRequest->id,
+                    ]);
+                    return response()->json(['message' => 'Payment succeeded but no sessions were updated'], 500);
                 }
             }
 
-            // Delete the pending payment record
+            // Step 3: Delete the pending payment record
             $pendingPayment->delete();
+
+            Log::info('Payment processed successfully', [
+                'mentorship_request_id' => $mentorshipRequest->id,
+                'amount' => $amount / 100,
+            ]);
 
             return response()->json([
                 'message' => 'Payment processed successfully',
