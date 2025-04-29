@@ -64,7 +64,8 @@ class NewSessionController extends Controller
                 
                 // جلب الـ service من العلاقة
                 $service = $session->service;
-                $serviceName = 'N/A';
+                $sessionType = 'N/A'; // سيتم استخدامه لـ service_type
+                $serviceTitle = 'N/A'; // حقل جديد للـ title
 
                 if ($service) {
                     Log::info('Service found for session', [
@@ -73,7 +74,10 @@ class NewSessionController extends Controller
                         'service' => $service->toArray()
                     ]);
                     
-                    // تحديد الـ service_name بناءً على الـ service_type والجداول الفرعية
+                    // تحديد الـ session_type بناءً على الـ service_type
+                    $sessionType = strtolower(str_replace('_', ' ', $service->service_type)); // تحويل "Group_Mentorship" إلى "group mentorship"
+
+                    // تحديد الـ service_title بناءً على الجداول الفرعية
                     if ($service->service_type === 'Mentorship') {
                         $mentorship = $service->mentorship;
                         if ($mentorship) {
@@ -85,12 +89,12 @@ class NewSessionController extends Controller
                                 // تحقق من جدول mentorship_sessions
                                 $mentorshipSession = $service->mentorshipSession;
                                 if ($mentorshipSession) {
-                                    $serviceName = $mentorshipSession->session_type; // مثل "CV Review"
+                                    $serviceTitle = $mentorshipSession->session_type; // مثل "CV Review"
                                 } else {
-                                    $serviceName = 'Mentorship Session';
+                                    $serviceTitle = 'Mentorship Session';
                                 }
                             } elseif ($mentorship->mentorship_type === 'Mentorship plan') {
-                                $serviceName = 'Mentorship Plan';
+                                $serviceTitle = 'Mentorship Plan';
                             }
                         } else {
                             Log::warning('No mentorship found for service', [
@@ -104,9 +108,9 @@ class NewSessionController extends Controller
                                 'service_id' => $service->service_id,
                                 'mock_interview' => $mockInterview->toArray()
                             ]);
-                            $serviceName = $mockInterview->interview_type . ' (' . $mockInterview->interview_level . ')';
+                            $serviceTitle = $mockInterview->interview_type . ' (' . $mockInterview->interview_level . ')';
                         } else {
-                            $serviceName = 'Mock Interview';
+                            $serviceTitle = 'Mock Interview';
                         }
                     } elseif ($service->service_type === 'Group_Mentorship') {
                         $groupMentorship = $service->groupMentorship;
@@ -115,12 +119,12 @@ class NewSessionController extends Controller
                                 'service_id' => $service->service_id,
                                 'group_mentorship' => $groupMentorship->toArray()
                             ]);
-                            $serviceName = $groupMentorship->title; // مثل "Weekly Coding Bootcamp3"
+                            $serviceTitle = $groupMentorship->title; // مثل "Weekly Coding Bootcamp3"
                         } else {
-                            $serviceName = 'Group Mentorship';
+                            $serviceTitle = 'Group Mentorship';
                         }
                     } else {
-                        $serviceName = $service->title ?? 'N/A';
+                        $serviceTitle = $service->title ?? 'N/A';
                     }
                 } else {
                     Log::warning('Service not found for session', [
@@ -138,25 +142,15 @@ class NewSessionController extends Controller
                 $endTimeFormatted = $endTime->format('h:i A');
                 $timeRange = "$startTimeFormatted - $endTimeFormatted";
 
-                // تحديد نوع الجلسة بناءً على الحالة
-                $sessionType = 'N/A';
-                if ($session->status === 'Scheduled') {
-                    $sessionType = 'Mentorship session';
-                } elseif ($session->status === 'completed') {
-                    $sessionType = 'completed session';
-                } elseif ($session->status === 'cancelled') {
-                    $sessionType = 'cancelled session';
-                }
-
                 return [
                     'new_session_id' => $session->new_session_id,
-                    'session_type' => $sessionType,
+                    'session_type' => $sessionType, // عرض الـ service_type
+                    'title' => $serviceTitle, // عرض التفاصيل (مثل "Technical Interview (Mid-Level)")
                     'date' => $date,
                     'time_range' => $timeRange,
                     'status' => $session->status,
                     'meeting_link' => $session->meeting_link,
                     'trainee_name' => $trainee ? $trainee->name : 'N/A',
-                    'service_name' => $serviceName,
                 ];
             });
 
@@ -181,7 +175,7 @@ class NewSessionController extends Controller
                 if ($coach) {
                     $coachUser = $coach->user;
                     if ($coachUser) {
-                        $coachName = $coachUser->full_name ?? 'N/A'; // استخدام full_name بدلاً من name
+                        $coachName = $coachUser->full_name ?? 'N/A';
                         Log::info('Coach found for session', [
                             'session_id' => $session->new_session_id,
                             'coach_id' => $session->coach_id,
@@ -203,7 +197,8 @@ class NewSessionController extends Controller
                 
                 // جلب الـ service من العلاقة
                 $service = $session->service;
-                $serviceName = 'N/A';
+                $sessionType = 'N/A'; // سيتم استخدامه لـ service_type
+                $serviceTitle = 'N/A'; // حقل جديد للـ title
 
                 if ($service) {
                     Log::info('Service found for session', [
@@ -212,7 +207,10 @@ class NewSessionController extends Controller
                         'service' => $service->toArray()
                     ]);
                     
-                    // تحديد الـ service_name بناءً على الـ service_type والجداول الفرعية
+                    // تحديد الـ session_type بناءً على الـ service_type
+                    $sessionType = strtolower(str_replace('_', ' ', $service->service_type)); // تحويل "Group_Mentorship" إلى "group mentorship"
+
+                    // تحديد الـ service_title بناءً على الجداول الفرعية
                     if ($service->service_type === 'Mentorship') {
                         $mentorship = $service->mentorship;
                         if ($mentorship) {
@@ -224,12 +222,12 @@ class NewSessionController extends Controller
                                 // تحقق من جدول mentorship_sessions
                                 $mentorshipSession = $service->mentorshipSession;
                                 if ($mentorshipSession) {
-                                    $serviceName = $mentorshipSession->session_type; // مثل "CV Review"
+                                    $serviceTitle = $mentorshipSession->session_type; // مثل "CV Review"
                                 } else {
-                                    $serviceName = 'Mentorship Session';
+                                    $serviceTitle = 'Mentorship Session';
                                 }
                             } elseif ($mentorship->mentorship_type === 'Mentorship plan') {
-                                $serviceName = 'Mentorship Plan';
+                                $serviceTitle = 'Mentorship Plan';
                             }
                         } else {
                             Log::warning('No mentorship found for service', [
@@ -243,9 +241,9 @@ class NewSessionController extends Controller
                                 'service_id' => $service->service_id,
                                 'mock_interview' => $mockInterview->toArray()
                             ]);
-                            $serviceName = $mockInterview->interview_type . ' (' . $mockInterview->interview_level . ')';
+                            $serviceTitle = $mockInterview->interview_type . ' (' . $mockInterview->interview_level . ')';
                         } else {
-                            $serviceName = 'Mock Interview';
+                            $serviceTitle = 'Mock Interview';
                         }
                     } elseif ($service->service_type === 'Group_Mentorship') {
                         $groupMentorship = $service->groupMentorship;
@@ -254,12 +252,12 @@ class NewSessionController extends Controller
                                 'service_id' => $service->service_id,
                                 'group_mentorship' => $groupMentorship->toArray()
                             ]);
-                            $serviceName = $groupMentorship->title; // مثل "Weekly Coding Bootcamp3"
+                            $serviceTitle = $groupMentorship->title; // مثل "Weekly Coding Bootcamp3"
                         } else {
-                            $serviceName = 'Group Mentorship';
+                            $serviceTitle = 'Group Mentorship';
                         }
                     } else {
-                        $serviceName = $service->title ?? 'N/A';
+                        $serviceTitle = $service->title ?? 'N/A';
                     }
                 } else {
                     Log::warning('Service not found for session', [
@@ -277,25 +275,15 @@ class NewSessionController extends Controller
                 $endTimeFormatted = $endTime->format('h:i A');
                 $timeRange = "$startTimeFormatted - $endTimeFormatted";
 
-                // تحديد نوع الجلسة بناءً على الحالة
-                $sessionType = 'N/A';
-                if ($session->status === 'Scheduled') {
-                    $sessionType = 'Mentorship session';
-                } elseif ($session->status === 'completed') {
-                    $sessionType = 'completed session';
-                } elseif ($session->status === 'cancelled') {
-                    $sessionType = 'cancelled session';
-                }
-
                 return [
                     'new_session_id' => $session->new_session_id,
-                    'session_type' => $sessionType,
+                    'session_type' => $sessionType, // عرض الـ service_type
+                    'title' => $serviceTitle, // عرض التفاصيل (مثل "Technical Interview (Mid-Level)")
                     'date' => $date,
                     'time_range' => $timeRange,
                     'status' => $session->status,
                     'meeting_link' => $session->meeting_link,
                     'coach_name' => $coachName,
-                    'service_name' => $serviceName,
                 ];
             });
 
