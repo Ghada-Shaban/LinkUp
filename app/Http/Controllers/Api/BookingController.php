@@ -149,8 +149,12 @@ class BookingController extends Controller
             ->where('Day_Of_Week', $dayOfWeek)
             ->get();
 
+        // Log the availabilities for debugging
+        Log::info('Coach Availabilities for coach_id: ' . $coachId . ', day: ' . $dayOfWeek, [
+            'availabilities' => $availabilities->toArray(),
+        ]);
+
         if ($availabilities->isEmpty()) {
-            // If no availability, all slots will be unavailable, but we'll still generate them
             $availabilityRanges = [];
         } else {
             // Collect all availability ranges for the day
@@ -172,6 +176,11 @@ class BookingController extends Controller
             })
             ->get();
 
+        // Log the booked sessions for debugging
+        Log::info('Booked Sessions for coach_id: ' . $coachId . ', date: ' . $selectedDate->toDateString(), [
+            'booked_sessions' => $bookedSessions->toArray(),
+        ]);
+
         // Generate time slots for the entire day (from 12:00 AM to 11:59 PM)
         $slots = [];
         $durationMinutes = 60; // Fixed duration for Mentorship Plan sessions
@@ -190,6 +199,13 @@ class BookingController extends Controller
             $slotStartFormatted = $currentTime->format('h:i A');
             $slotEndFormatted = $slotEnd->format('h:i A');
 
+            // Check if this slot is booked
+            $isBooked = $bookedSessions->filter(function ($session) use ($currentTime, $slotEnd) {
+                $sessionStart = Carbon::parse($session->date_time);
+                $sessionEnd = $sessionStart->copy()->addMinutes($session->duration_minutes);
+                return $currentTime->lt($sessionEnd) && $slotEnd->gt($sessionStart);
+            })->isNotEmpty();
+
             // Check if this slot falls within the coach's availability
             $isWithinAvailability = false;
             foreach ($availabilityRanges as $range) {
@@ -199,20 +215,12 @@ class BookingController extends Controller
                 }
             }
 
-            // Check if this slot is booked
-            $isBooked = false;
-            if ($isWithinAvailability) {
-                $isBooked = $bookedSessions->filter(function ($session) use ($currentTime, $slotEnd) {
-                    $sessionStart = Carbon::parse($session->date_time);
-                    $sessionEnd = $sessionStart->copy()->addMinutes($session->duration_minutes);
-                    return $currentTime->lt($sessionEnd) && $slotEnd->gt($sessionStart);
-                })->isNotEmpty();
-            }
-
             // Determine the status
             $status = 'unavailable'; // Default status
-            if ($isWithinAvailability) {
-                $status = $isBooked ? 'booked' : 'available';
+            if ($isBooked) {
+                $status = 'booked';
+            } elseif ($isWithinAvailability) {
+                $status = 'available';
             }
 
             $slots[] = [
