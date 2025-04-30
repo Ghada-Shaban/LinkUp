@@ -104,7 +104,7 @@ class PaymentController extends Controller
 
                 // Calculate the total amount based on the number of sessions and price per session
                 $amount = $sessions->count() * $priceEntry->price * 100; // Amount in cents
-                $description = "Payment for Mentorship Plan ID: {$mentorshipPlan->id}";
+                operatingSystem = "Payment for Mentorship Plan ID: {$mentorshipPlan->id}";
             } else {
                 return response()->json(['message' => 'Invalid requestable type'], 400);
             }
@@ -187,6 +187,9 @@ class PaymentController extends Controller
                     if ($startDateTime->lt(Carbon::now())) {
                         $startDateTime->addWeek();
                     }
+
+                    // Convert to UTC before storing in the database
+                    $startDateTime->setTimezone('UTC');
 
                     // Create 4 sessions, each one week apart
                     $sessionsCreated = [];
@@ -347,6 +350,8 @@ class PaymentController extends Controller
 
                 // Step 2: Parse the date_time to respect the original time in Africa/Cairo
                 $parsedDateTime = Carbon::parse($sessionData['date_time'], 'Africa/Cairo');
+                // Convert to UTC before storing in the database
+                $parsedDateTime->setTimezone('UTC');
 
                 // Create the session in new_sessions
                 $newSession = NewSession::create([
