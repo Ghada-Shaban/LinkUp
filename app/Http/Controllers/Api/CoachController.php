@@ -28,6 +28,9 @@ class CoachController extends Controller
 
         $coachesQuery = User::with(['coach', 'services.price', 'services.sessions', 'skills', 'reviewsAsCoach'])
             ->where('role_profile', 'Coach') // Only fetch users with role 'Coach'
+            ->whereHas('coach', function ($query) {
+                $query->where('status', 'approved'); // Only fetch coaches with status 'approved'
+            })
             ->when($search, function ($query, $search) {
                 $query->where(function ($q) use ($search) {
                     // السيرش في full_name (من جدول users)
