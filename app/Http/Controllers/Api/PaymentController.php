@@ -167,7 +167,7 @@ class PaymentController extends Controller
                     $groupMentorship = $requestable;
 
                     // Check current_participants before proceeding
-                    $traineeIds = json_decode($groupMentorship->trainee_ids, true) ?? [];
+                    $traineeIds = $groupMentorship->trainee_ids ?? [];
                     $currentParticipants = count($traineeIds);
                     if (!in_array($mentorshipRequest->trainee_id, $traineeIds)) {
                         $currentParticipants++; // Simulate adding the new trainee
@@ -218,7 +218,7 @@ class PaymentController extends Controller
                     // Update the trainee_ids and current_participants
                     if (!in_array($mentorshipRequest->trainee_id, $traineeIds)) {
                         $traineeIds[] = $mentorshipRequest->trainee_id;
-                        $groupMentorship->trainee_ids = json_encode($traineeIds);
+                        $groupMentorship->trainee_ids = $traineeIds; // Laravel will handle encoding to JSON
                         $groupMentorship->current_participants = count($traineeIds);
                         $groupMentorship->save();
                     }
