@@ -165,44 +165,61 @@ class PaymentController extends Controller
                 // Step 2: Handle the sessions and update new_sessions
                 if ($mentorshipRequest->requestable_type === 'App\\Models\\GroupMentorship') {
                     $groupMentorship = $requestable;
+
+                    // Check current_participants before proceeding
+                    $traineeIds = json_decode($groupMentorship->trainee_ids, true) ?? [];
+                    $currentParticipants = count($traineeIds);
+                    if (!in_array($mentorshipRequest->trainee_id, $traineeIds)) {
+                        $currentParticipants++; // Simulate adding the new trainee
+                    }
+
+                    if ($currentParticipants > $groupMentorship->max_participants) {
+                        Log::warning('Group Mentorship is full', [
+                            'group_mentorship_id' => $groupMentorship->id,
+                            'current_participants' => $currentParticipants,
+                            'max_participants' => $groupMentorship->max_participants,
+                        ]);
+                        return response()->json(['message' => 'Group Mentorship is full'], 400);
+                    }
+
                     $startDateTime = Carbon::parse($groupMentorship->day . ' ' . $groupMentorship->start_time);
                     if ($startDateTime->lt(Carbon::now())) {
                         $startDateTime->addWeek();
                     }
 
-                    $newSession = NewSession::create([
-                        'coach_id' => $mentorshipRequest->coach_id,
-                        'trainee_id' => $mentorshipRequest->trainee_id,
-                        'date_time' => $startDateTime,
-                        'duration' => $groupMentorship->duration_minutes,
-                        'status' => NewSession::STATUS_SCHEDULED,
-                        'payment_status' => 'Completed',
-                        'meeting_link' => null,
-                        'service_id' => $groupMentorship->service_id,
-                        'mentorship_request_id' => $mentorshipRequest->id,
-                    ]);
-
-                    if (!$newSession) {
-                        Log::error('Failed to create new session', [
+                    // Create 4 sessions, each one week apart
+                    $sessionsCreated = [];
+                    for ($i = 0; $i < 4; $i++) {
+                        $sessionDateTime = $startDateTime->copy()->addWeeks($i);
+                        $newSession = NewSession::create([
+                            'coach_id' => $mentorshipRequest->coach_id,
+                            'trainee_id' => $mentorshipRequest->trainee_id,
+                            'date_time' => $sessionDateTime,
+                            'duration' => $groupMentorship->duration_minutes,
+                            'status' => NewSession::STATUS_SCHEDULED,
+                            'payment_status' => 'Completed',
+                            'meeting_link' => null,
+                            'service_id' => $groupMentorship->service_id,
                             'mentorship_request_id' => $mentorshipRequest->id,
                         ]);
-                        return response()->json(['message' => 'Payment succeeded but failed to create session'], 500);
+
+                        if (!$newSession) {
+                            Log::error('Failed to create new session for Group Mentorship', [
+                                'mentorship_request_id' => $mentorshipRequest->id,
+                                'week' => $i + 1,
+                            ]);
+                            return response()->json(['message' => "Payment succeeded but failed to create session for week " . ($i + 1)], 500);
+                        }
+
+                        $sessionsCreated[] = $newSession;
                     }
 
                     // Update the trainee_ids and current_participants
-                    $traineeIds = json_decode($groupMentorship->trainee_ids, true) ?? [];
                     if (!in_array($mentorshipRequest->trainee_id, $traineeIds)) {
                         $traineeIds[] = $mentorshipRequest->trainee_id;
                         $groupMentorship->trainee_ids = json_encode($traineeIds);
                         $groupMentorship->current_participants = count($traineeIds);
                         $groupMentorship->save();
-                    }
-
-                    if ($groupMentorship->current_participants > $groupMentorship->max_participants) {
-                        Log::warning('Group Mentorship is full', [
-                            'group_mentorship_id' => $groupMentorship->id,
-                        ]);
-                        return response()->json(['message' => 'Group Mentorship is full'], 400);
                     }
                 } elseif ($mentorshipRequest->requestable_type === 'App\\Models\\MentorshipPlan') {
                     // Update the status of all sessions to 'Scheduled' and payment_status to 'Completed'
