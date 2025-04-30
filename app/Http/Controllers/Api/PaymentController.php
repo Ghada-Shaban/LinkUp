@@ -104,7 +104,7 @@ class PaymentController extends Controller
 
                 // Calculate the total amount based on the number of sessions and price per session
                 $amount = $sessions->count() * $priceEntry->price * 100; // Amount in cents
-                operatingSystem = "Payment for Mentorship Plan ID: {$mentorshipPlan->id}";
+                $description = "Payment for Mentorship Plan ID: {$mentorshipPlan->id}";
             } else {
                 return response()->json(['message' => 'Invalid requestable type'], 400);
             }
