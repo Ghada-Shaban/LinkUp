@@ -182,8 +182,8 @@ class PaymentController extends Controller
                         return response()->json(['message' => 'Group Mentorship is full'], 400);
                     }
 
-                    // Parse the day and time, assuming the time in the database is in UTC
-                    $startDateTime = Carbon::parse($groupMentorship->day . ' ' . $groupMentorship->start_time, 'UTC');
+                    // Parse the day and time, assuming the time in the database is in Africa/Cairo
+                    $startDateTime = Carbon::parse($groupMentorship->day . ' ' . $groupMentorship->start_time, 'Africa/Cairo');
                     if ($startDateTime->lt(Carbon::now())) {
                         $startDateTime->addWeek();
                     }
@@ -345,8 +345,8 @@ class PaymentController extends Controller
                     return response()->json(['message' => 'Payment succeeded but failed to record in payments table'], 500);
                 }
 
-                // Step 2: Parse the date_time to ensure it respects the original time (assuming UTC)
-                $parsedDateTime = Carbon::parse($sessionData['date_time'], 'UTC');
+                // Step 2: Parse the date_time to respect the original time in Africa/Cairo
+                $parsedDateTime = Carbon::parse($sessionData['date_time'], 'Africa/Cairo');
 
                 // Create the session in new_sessions
                 $newSession = NewSession::create([
