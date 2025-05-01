@@ -171,7 +171,24 @@ public function handleCoachRequest(Request $request, $coachId)
 
     public function getApprovedCoaches(Request $request)
     {
-        // Get all approved coaches with details from users and coaches tables
+         $completedSessionsPerCoach = Coach::where('status', 'approved')
+            ->with(['user' => function ($query) {
+                $query->select('User_ID', 'full_name');
+            }])
+            ->withCount(['sessions as completed_sessions_count' => function ($query) {
+                $query->where('status', NewSession::STATUS_COMPLETED);
+            }])
+            ->get()
+            ->map(function ($coach) {
+                return [
+                    'completed_sessions' => $coach->completed_sessions_count,
+                ];
+            })
+            ->filter(function ($coach) {
+                return $coach['completed_sessions'] > 0; // Only include coaches with completed sessions
+            })
+            ->values();
+
         $approvedCoaches = Coach::where('status', 'approved')
             ->with(['user' => function ($query) {
                 $query->select('User_ID', 'full_name', 'email', 'linkedin_link', 'role_profile', 'photo', 'created_at', 'updated_at');
@@ -186,6 +203,7 @@ public function handleCoachRequest(Request $request, $coachId)
                     'full_name' => $coach->user->full_name,
                     'email' => $coach->user->email,
                     'photo' => $coach->user->photo,
+                    'completed_sessions' => $completedSessionsPerCoach,
                   
 
                     // From coaches table
