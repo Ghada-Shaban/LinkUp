@@ -258,7 +258,7 @@ public function handleCoachRequest(Request $request, $coachId)
         $totalPaymentsCount = $completedPayments->count();
         $sessionsByService = $completedPayments
             ->groupBy(function ($payment) {
-                return $payment->session && $payment->session->service ? $payment->session->service->name : 'Unknown Service';
+                return $payment->session && $payment->session->service_type ? $payment->session->service->service_type : 'Unknown Service';
             })
             ->mapWithKeys(function ($payments, $serviceName) use ($totalPaymentsCount) {
                 $count = $payments->count();
@@ -269,7 +269,7 @@ public function handleCoachRequest(Request $request, $coachId)
         // 5. Revenue by Service (20% of each service's payments)
         $revenueByService = $completedPayments
             ->groupBy(function ($payment) {
-                return $payment->session && $payment->session->service ? $payment->session->service->name : 'Unknown Service';
+                return $payment->session && $payment->session->service ? $payment->session->service->service_type : 'Unknown Service';
             })
             ->mapWithKeys(function ($payments, $serviceName) {
                 $serviceRevenue = $payments->sum('amount') * 0.2;
