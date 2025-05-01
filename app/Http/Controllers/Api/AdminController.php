@@ -247,9 +247,13 @@ public function handleCoachRequest(Request $request, $coachId)
             ->with('reviews')
             ->get()
             ->avg('average_rating');
+         $totalUsers = User::count();
+
+     
 
         // Return the response
         return response()->json([
+            'number_of_users' => $totalUsers,
             'revenue_20_percent' => round($revenue20Percent, 2),
             'completed_sessions' => $completedSessions,
             'average_rating' => round($averageRating, 2),
