@@ -151,6 +151,9 @@ public function handleCoachRequest(Request $request, $coachId)
             }])
             ->withCount('reviews')
             ->withAvg('reviews', 'rating')
+            ->withCount(['sessions as completed_sessions_count' => function ($query) {
+                $query->where('status', NewSession::STATUS_COMPLETED);
+                }])
             ->orderByDesc('reviews_avg_rating')
             ->take(5) // Top 5 coaches
             ->get()
@@ -158,8 +161,12 @@ public function handleCoachRequest(Request $request, $coachId)
                 return [
                     'user_id' => $coach->User_ID,
                     'full_name' => $coach->user->full_name,
+                    'email' => $coach->user->email,
+                     'photo' => $coach->user->photo,
+                     'title' => $coach->Title,
+                   'completed_sessions' => $coach->completed_sessions_count,
                     'average_rating' => round($coach->reviews_avg_rating, 2),
-                    'total_reviews' => $coach->reviews_count,
+    
                 ];
             });
 
