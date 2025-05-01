@@ -245,6 +245,11 @@ public function handleCoachRequest(Request $request, $coachId)
         $totalRevenue = Payment::where('payment_status', 'Completed')
             ->sum('amount');
         $revenue20Percent = $totalRevenue * 0.2;
+
+              // 2. Number of Completed Sessions
+        $completedSessions = NewSession::where('status', 'Completed')
+            ->count();
+        
         // 3. Percentage of Completed Sessions by Service
         $sessionsByService = NewSession::where('status', NewSession::STATUS_COMPLETED)
             ->with('service')
@@ -266,9 +271,7 @@ public function handleCoachRequest(Request $request, $coachId)
                 return [$serviceName => round($serviceRevenue, 2)];
             });
 
-        // 2. Number of Completed Sessions
-        $completedSessions = NewSession::where('status', 'Completed')
-            ->count();
+  
          $averageRating = Coach::has('reviews')
             ->with('reviews')
             ->get()
