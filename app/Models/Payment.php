@@ -30,4 +30,8 @@ class Payment extends Model
     {
         return $this->belongsTo(MentorshipRequest::class, 'mentorship_request_id', 'id');
     }
+     public function session()
+    {
+        return $this->belongsTo(NewSession::class, 'session_id', 'new_session_id');
+    }
 }
