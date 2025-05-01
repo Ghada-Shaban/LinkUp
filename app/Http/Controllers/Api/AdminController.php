@@ -250,24 +250,29 @@ public function handleCoachRequest(Request $request, $coachId)
         $completedSessions = NewSession::where('status', 'Completed')
             ->count();
         
-        // 3. Percentage of Completed Sessions by Service
-        $sessionsByService = NewSession::where('status', NewSession::STATUS_COMPLETED)
-            ->with('service')
-            ->get()
-            ->groupBy('service.name')
-            ->mapWithKeys(function ($sessions, $serviceName) use ($completedSessions) {
-                $count = $sessions->count();
-                $percentage = $completedSessions > 0 ? ($count / $completedSessions) * 100 : 0;
+       $completedPayments = Payment::where('payment_status', 'Completed')
+            ->with(['session.service'])
+            ->get();
+
+        // 4. Percentage of Completed Sessions by Service (based on payments)
+        $totalPaymentsCount = $completedPayments->count();
+        $sessionsByService = $completedPayments
+            ->groupBy(function ($payment) {
+                return $payment->session && $payment->session->service ? $payment->session->service->name : 'Unknown Service';
+            })
+            ->mapWithKeys(function ($payments, $serviceName) use ($totalPaymentsCount) {
+                $count = $payments->count();
+                $percentage = $totalPaymentsCount > 0 ? ($count / $totalPaymentsCount) * 100 : 0;
                 return [$serviceName => round($percentage, 2)];
             });
 
-        // 4. Revenue by Service (20% of each service's payments)
-        $revenueByService = Payment::where('payment_status', 'Completed')
-            ->with(['session.service']) // Assuming Payment has a relationship with NewSession
-            ->get()
-            ->groupBy('session.service.name')
+        // 5. Revenue by Service (20% of each service's payments)
+        $revenueByService = $completedPayments
+            ->groupBy(function ($payment) {
+                return $payment->session && $payment->session->service ? $payment->session->service->name : 'Unknown Service';
+            })
             ->mapWithKeys(function ($payments, $serviceName) {
-                $serviceRevenue = $payments->sum('amount') * 0.2; // 20% of the payments for this service
+                $serviceRevenue = $payments->sum('amount') * 0.2;
                 return [$serviceName => round($serviceRevenue, 2)];
             });
 
