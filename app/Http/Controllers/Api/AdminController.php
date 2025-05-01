@@ -245,6 +245,26 @@ public function handleCoachRequest(Request $request, $coachId)
         $totalRevenue = Payment::where('payment_status', 'Completed')
             ->sum('amount');
         $revenue20Percent = $totalRevenue * 0.2;
+        // 3. Percentage of Completed Sessions by Service
+        $sessionsByService = NewSession::where('status', NewSession::STATUS_COMPLETED)
+            ->with('service')
+            ->get()
+            ->groupBy('service.name')
+            ->mapWithKeys(function ($sessions, $serviceName) use ($completedSessions) {
+                $count = $sessions->count();
+                $percentage = $completedSessions > 0 ? ($count / $completedSessions) * 100 : 0;
+                return [$serviceName => round($percentage, 2)];
+            });
+
+        // 4. Revenue by Service (20% of each service's payments)
+        $revenueByService = Payment::where('payment_status', 'Completed')
+            ->with(['session.service']) // Assuming Payment has a relationship with NewSession
+            ->get()
+            ->groupBy('session.service.name')
+            ->mapWithKeys(function ($payments, $serviceName) {
+                $serviceRevenue = $payments->sum('amount') * 0.2; // 20% of the payments for this service
+                return [$serviceName => round($serviceRevenue, 2)];
+            });
 
         // 2. Number of Completed Sessions
         $completedSessions = NewSession::where('status', 'Completed')
@@ -260,7 +280,9 @@ public function handleCoachRequest(Request $request, $coachId)
         // Return the response
         return response()->json([
             'number_of_users' => $totalUsers,
-            'revenue_20_percent' => round($revenue20Percent, 2),
+            'revenue' => round($revenue20Percent, 2),
+            'sessions_percentage_by_service' => $sessionsByService,
+            'revenue_by_service' => $revenueByService,
             'completed_sessions' => $completedSessions,
             'average_rating' => round($averageRating, 2),
         ], 200);
