@@ -180,6 +180,7 @@ public function handleCoachRequest(Request $request, $coachId)
             ->withAvg('reviews', 'rating')
             ->withCount(['sessions as completed_sessions_count' => function ($query) {
                 $query->where('status', NewSession::STATUS_COMPLETED);
+                }])
             ->get()
             ->map(function ($coach) {
                 return [
