@@ -75,6 +75,7 @@ class NewSessionController extends Controller
                 $service = $session->service;
                 $sessionType = 'N/A'; // سيتم استخدامه لـ service_type
                 $serviceTitle = 'N/A'; // حقل جديد للـ title
+                $currentParticipants = null; // لإضافة عدد المشاركين الحاليين في GroupMentorship
 
                 if ($service) {
                     Log::info('Service found for session', [
@@ -143,11 +144,13 @@ class NewSessionController extends Controller
                                 'group_mentorship' => $groupMentorship->toArray()
                             ]);
                             $serviceTitle = $groupMentorship->title; // مثل "Weekly Coding Bootcamp3"
+                            $currentParticipants = $groupMentorship->current_participants; // عدد المشاركين الحاليين
                         } else {
                             Log::warning('Group Mentorship not found for service', [
                                 'service_id' => $service->service_id
                             ]);
                             $serviceTitle = 'Group Mentorship';
+                            $currentParticipants = 0;
                         }
                     } else {
                         $serviceTitle = $service->title ?? 'N/A';
@@ -168,7 +171,7 @@ class NewSessionController extends Controller
                 $endTimeFormatted = $endTime->format('h:i A');
                 $timeRange = "$startTimeFormatted - $endTimeFormatted";
 
-                return [
+                $sessionData = [
                     'new_session_id' => $session->new_session_id,
                     'session_type' => $sessionType,
                     'title' => $serviceTitle,
@@ -178,6 +181,13 @@ class NewSessionController extends Controller
                     'meeting_link' => $session->meeting_link,
                     'trainee_name' => $traineeName,
                 ];
+
+                // إضافة current_participants إذا كان الـ session من نوع GroupMentorship
+                if ($service && $service->service_type === 'Group_Mentorship') {
+                    $sessionData['current_participants'] = $currentParticipants;
+                }
+
+                return $sessionData;
             });
 
             Log::info("Fetching $type sessions for Coach", [
@@ -225,6 +235,7 @@ class NewSessionController extends Controller
                 $service = $session->service;
                 $sessionType = 'N/A'; // سيتم استخدامه لـ service_type
                 $serviceTitle = 'N/A'; // حقل جديد للـ title
+                $currentParticipants = null; // لإضافة عدد المشاركين الحاليين في GroupMentorship
 
                 if ($service) {
                     Log::info('Service found for session', [
@@ -293,11 +304,13 @@ class NewSessionController extends Controller
                                 'group_mentorship' => $groupMentorship->toArray()
                             ]);
                             $serviceTitle = $groupMentorship->title; // مثل "Weekly Coding Bootcamp3"
+                            $currentParticipants = $groupMentorship->current_participants; // عدد المشاركين الحاليين
                         } else {
                             Log::warning('Group Mentorship not found for service', [
                                 'service_id' => $service->service_id
                             ]);
                             $serviceTitle = 'Group Mentorship';
+                            $currentParticipants = 0;
                         }
                     } else {
                         $serviceTitle = $service->title ?? 'N/A';
@@ -318,7 +331,7 @@ class NewSessionController extends Controller
                 $endTimeFormatted = $endTime->format('h:i A');
                 $timeRange = "$startTimeFormatted - $endTimeFormatted";
 
-                return [
+                $sessionData = [
                     'new_session_id' => $session->new_session_id,
                     'session_type' => $sessionType,
                     'title' => $serviceTitle,
@@ -328,6 +341,13 @@ class NewSessionController extends Controller
                     'meeting_link' => $session->meeting_link,
                     'coach_name' => $coachName,
                 ];
+
+                // إضافة current_participants إذا كان الـ session من نوع GroupMentorship
+                if ($service && $service->service_type === 'Group_Mentorship') {
+                    $sessionData['current_participants'] = $currentParticipants;
+                }
+
+                return $sessionData;
             });
 
             Log::info("Fetching $type sessions for Trainee", [
