@@ -270,11 +270,11 @@ public function handleCoachRequest(Request $request, $coachId)
     {
         // Get all trainees with details from users and trainees tables
         $trainees = Trainee::with(['user' => function ($query) {
-                $query->select('User_ID', 'full_name', 'email', 'linkedin_link', 'role_profile', 'photo', 'created_at', 'updated_at')
-                        ->withCount(['sessionsAsTrainee as completed_sessions_count' => function ($query) {
-                      $query->where('status', NewSession::STATUS_COMPLETED);
-                  }]);
-             }])
+               $query->select('User_ID', 'full_name', 'email', 'linkedin_link', 'role_profile', 'photo', 'created_at', 'updated_at');
+        }])
+            ->withCount(['sessionsAsTrainee as completed_sessions_count' => function ($query) {
+                $query->where('status', NewSession::STATUS_COMPLETED);
+            }])
             ->get()
             ->map(function ($trainee) {
                 return [
@@ -283,7 +283,7 @@ public function handleCoachRequest(Request $request, $coachId)
                     'full_name' => $trainee->user->full_name,
                     'email' => $trainee->user->email,
                     'photo' => $trainee->user->photo,
-                    'completed_sessions' => $trainee->user->completed_sessions_count,
+                    'completed_sessions' => $trainee->completed_sessions_count,
                   
                     // From trainees table
                
