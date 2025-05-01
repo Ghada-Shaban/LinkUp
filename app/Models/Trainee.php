@@ -57,4 +57,8 @@ use Illuminate\Database\Eloquent\Model;
     {
         return $this->hasMany(MentorshipRequest::class, 'trainee_id', 'User_ID');
     }
+         public function sessionsAsTrainee()
+    {
+        return $this->hasMany(NewSession::class, 'trainee_id', 'User_ID');
+    }
 }
