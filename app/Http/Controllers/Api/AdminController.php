@@ -268,15 +268,14 @@ public function handleCoachRequest(Request $request, $coachId)
                     'user_id' => $trainee->User_ID,
                     'full_name' => $trainee->user->full_name,
                     'email' => $trainee->user->email,
-                    'linkedin_link' => $trainee->user->linkedin_link,
                     'photo' => $trainee->user->photo,
                   
                     // From trainees table
-                    'education_level' => $trainee->Education_Level,
-                    'institution_or_school' => $trainee->Institution_Or_School,
-                    'field_of_study' => $trainee->Field_Of_Study,
+               
+            
+                   
                     'current_role' => $trainee->Current_Role,
-                    'story' => $trainee->Story,
+                   
                     'years_of_professional_experience' => $trainee->Years_Of_Professional_Experience,
                     
                 ];
