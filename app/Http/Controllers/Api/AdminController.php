@@ -249,8 +249,8 @@ public function handleCoachRequest(Request $request, $coachId)
               // 2. Number of Completed Sessions
         $completedSessions = NewSession::where('status', 'Completed')
             ->count();
-        
-       $completedPayments = Payment::where('payment_status', 'Completed')
+        // 3. Get all completed payments with their sessions and services
+        $completedPayments = Payment::where('payment_status', 'Completed')
             ->with(['session.service'])
             ->get();
 
@@ -258,12 +258,12 @@ public function handleCoachRequest(Request $request, $coachId)
         $totalPaymentsCount = $completedPayments->count();
         $sessionsByService = $completedPayments
             ->groupBy(function ($payment) {
-                return $payment->session && $payment->session->service_type ? $payment->session->service->service_type : 'Unknown Service';
+                return $payment->session && $payment->session->service ? $payment->session->service->service_type : 'Unknown Service';
             })
-            ->mapWithKeys(function ($payments, $serviceName) use ($totalPaymentsCount) {
+            ->mapWithKeys(function ($payments, $serviceType) use ($totalPaymentsCount) {
                 $count = $payments->count();
                 $percentage = $totalPaymentsCount > 0 ? ($count / $totalPaymentsCount) * 100 : 0;
-                return [$serviceName => round($percentage, 2)];
+                return [$serviceType => round($percentage, 2)];
             });
 
         // 5. Revenue by Service (20% of each service's payments)
@@ -271,10 +271,11 @@ public function handleCoachRequest(Request $request, $coachId)
             ->groupBy(function ($payment) {
                 return $payment->session && $payment->session->service ? $payment->session->service->service_type : 'Unknown Service';
             })
-            ->mapWithKeys(function ($payments, $serviceName) {
+            ->mapWithKeys(function ($payments, $serviceType) {
                 $serviceRevenue = $payments->sum('amount') * 0.2;
-                return [$serviceName => round($serviceRevenue, 2)];
+                return [$serviceType => round($serviceRevenue, 2)];
             });
+
 
   
          $averageRating = Coach::has('reviews')
