@@ -185,21 +185,16 @@ public function handleCoachRequest(Request $request, $coachId)
                     'user_id' => $coach->User_ID,
                     'full_name' => $coach->user->full_name,
                     'email' => $coach->user->email,
-                    'linkedin_link' => $coach->user->linkedin_link,
                     'photo' => $coach->user->photo,
                   
 
                     // From coaches table
                     'title' => $coach->Title,
-                    'company_or_school' => $coach->Company_or_School,
-                    'bio' => $coach->Bio,
+                   
+               
                     'years_of_experience' => $coach->Years_Of_Experience,
                     'months_of_experience' => $coach->Months_Of_Experience,
-                 
-
-                    // Additional calculated fields
-                    'average_rating' => $coach->reviews_avg_rating ? round($coach->reviews_avg_rating, 2) : 0,
-                    'total_reviews' => $coach->reviews_count,
+                   
                 ];
             });
 
