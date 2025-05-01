@@ -147,7 +147,7 @@ public function handleCoachRequest(Request $request, $coachId)
         // Get top coaches based on average rating
         $topCoaches = Coach::select('coaches.*')
             ->with(['user' => function ($query) {
-                $query->select('User_ID', 'full_name');
+                $query->select('User_ID', 'full_name','photo','email');
             }])
             ->withCount('reviews')
             ->withAvg('reviews', 'rating')
