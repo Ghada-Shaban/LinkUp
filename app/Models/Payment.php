@@ -34,4 +34,9 @@ class Payment extends Model
     {
         return $this->belongsTo(NewSession::class, 'session_id', 'new_session_id');
     }
+
+   // public function service()
+   //  {
+   //      return $this->belongsTo(Service::class, 'service_id', 'service_id');
+   //  }
 }
