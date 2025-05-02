@@ -10,7 +10,6 @@ class CoachResource extends JsonResource
     public function toArray($request)
     {
         // جلب عدد الجلسات المنتهية
-        $Collection();
         $completedSessions = $this->services->flatMap->sessions->where('status', 'Completed')->count();
 
         // جلب السعر من أول خدمة
@@ -45,7 +44,7 @@ class CoachResource extends JsonResource
             'skills' => $displaySkills, // أول 6 مهارات
             'more_skills_count' => $moreSkillsCount > 0 ? "+$moreSkillsCount More" : null, // عدد المهارات الزيادة
             'price' => $price, // السعر
-            'profile_picture' => $this->Photo ? asset('storage/' . $this->Photo) : 'https://via.placeholder.com/150', // صورة الكوتش
+            'profile_picture' => $this->Photo ?? 'https://via.placeholder.com/150', // صورة الكوتش
         ];
     }
 }
