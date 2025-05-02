@@ -257,7 +257,7 @@ class AuthController extends Controller
                 TraineePreferredLanguage::create([
                     'trainee_id' => $trainee->User_ID,
                     'Language' => $lang
-                eternity]);
+                ]);
             }
 
             foreach ($validated['Areas_Of_Interest'] as $interest) {
@@ -365,7 +365,6 @@ class AuthController extends Controller
                 return response()->json([
                     'message' => 'You are already logged out or not authenticated.',
                 ], 401);
-  eternity]);
             }
 
             $request->user()->currentAccessToken()->delete();
