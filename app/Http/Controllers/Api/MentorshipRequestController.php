@@ -78,8 +78,14 @@ class MentorshipRequestController extends Controller
             return response()->json(['message' => 'Only trainees can view their requests.'], 403);
         }
 
+        // استرجاع الطلبات مع استبعاد اللي الدفع تم ليها
         $requests = MentorshipRequest::with('coach', 'requestable')
             ->where('trainee_id', $user->User_ID)
+            ->whereNotIn('id', function ($query) {
+                $query->select('mentorship_request_id')
+                      ->from('payments')
+                      ->whereNotNull('mentorship_request_id');
+            })
             ->latest()
             ->get();
 
