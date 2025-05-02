@@ -123,3 +123,4 @@ Route::get('/admin/trainees', [AdminController::class, 'getAllTrainees']);
 Route::get('/admin/trainees-count', [AdminController::class, 'getTraineesCount']);
 Route::get('/admin/session-trends', [AdminController::class, 'getSessionCompletionTrends']);
 Route::delete('/admin/delete-users/{userId}', [AdminController::class, 'deleteUser']);
+Route::get('/admin/trainees/search', [AdminController::class, 'searchTrainees']);
