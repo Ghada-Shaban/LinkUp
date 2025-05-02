@@ -246,84 +246,7 @@ public function handleCoachRequest(Request $request, $coachId)
     }
 
 
-public function getDashboardStats(Request $request)
-{
-    $authAdmin = auth('admin-api')->user();
-    if (!$authAdmin) {
-        return response()->json(['message' => 'Unauthorized'], 401);
-    }
 
-    try {
-        // 1. Revenue (20%)
-        $totalRevenue = Payment::where('payment_status', 'Completed')
-            ->whereHas('mentorshipRequest', function ($query) {
-                $query->whereHas('requestable', function ($query) {
-                    $query->whereIn('service_type', ['Mentorship', 'Mock_Interview', 'Group_Mentorship'])
-                          ->whereNull('deleted_at');
-                });
-            })
-            ->sum('amount');
-        $revenue20Percent = $totalRevenue * 0.2;
-
-        // 2. Number of Completed Sessions (across all valid services)
-        $completedSessions = NewSession::where('status', NewSession::STATUS_COMPLETED)
-            ->whereHas('service', function ($query) {
-                $query->whereIn('service_type', ['Mentorship', 'Mock_Interview', 'Group_Mentorship'])
-                      ->whereNull('deleted_at');
-            })
-            ->count();
-
-        // 3. Get all completed payments with their sessions and services
-        $completedPayments = Payment::where('payment_status', 'Completed')
-            ->with(['mentorshipRequest.requestable' => function ($query) {
-                $query->whereIn('service_type', ['Mentorship', 'Mock_Interview', 'Group_Mentorship'])
-                      ->whereNull('deleted_at');
-            }])
-            ->get()
-            ->filter(function ($payment) {
-                return $payment->mentorshipRequest && $payment->mentorshipRequest->requestable;
-            });
-
-        // 4. Percentage of Completed Sessions by Service (based on payments)
-        $totalPaymentsCount = $completedPayments->count();
-        $sessionsByService = $completedPayments->groupBy(function ($payment) {
-            return $payment->mentorshipRequest->requestable->service_type ?? 'Unknown Service';
-        })->mapWithKeys(function ($payments, $serviceType) use ($totalPaymentsCount) {
-            $count = $payments->count();
-            $percentage = $totalPaymentsCount > 0 ? ($count / $totalPaymentsCount) * 100 : 0;
-            return [$serviceType => round($percentage, 2)];
-        });
-
-        // 5. Revenue by Service (20% of each service's payments)
-        $revenueByService = $completedPayments->groupBy(function ($payment) {
-            return $payment->mentorshipRequest->requestable->service_type ?? 'Unknown Service';
-        })->mapWithKeys(function ($payments, $serviceType) {
-            $serviceRevenue = $payments->sum('amount') * 0.2;
-            return [$serviceType => round($serviceRevenue, 2)];
-        });
-
-        $averageRating = Coach::has('reviews')->with('reviews')->get()->avg('average_rating');
-        $totalUsers = User::count();
-
-        return response()->json([
-            'number_of_users' => $totalUsers,
-            'revenue' => round($revenue20Percent, 2),
-            'completed_sessions' => $completedSessions,
-            'sessions_percentage_by_service' => $sessionsByService,
-            'revenue_by_service' => $revenueByService,
-            'average_rating' => round($averageRating, 2),
-        ], 200);
-    } catch (\Exception $e) {
-        \Log::error('Failed to retrieve dashboard stats', [
-            'error' => $e->getMessage(),
-            'trace' => $e->getTraceAsString(),
-        ]);
-        return response()->json([
-            'message' => 'Failed to retrieve dashboard stats',
-            'error' => $e->getMessage(),
-        ], 500);
-    }
-}
       
     public function getAllTrainees(Request $request)
     {
@@ -629,6 +552,117 @@ public function searchCoaches(Request $request)
         ]);
         return response()->json([
             'message' => 'Failed to search coaches',
+            'error' => $e->getMessage(),
+        ], 500);
+    }
+}
+    public function getDashboardStats(Request $request)
+{
+    $authAdmin = auth('admin-api')->user();
+    if (!$authAdmin) {
+        return response()->json(['message' => 'Unauthorized'], 401);
+    }
+
+    try {
+        // 1. Revenue (20%)
+        $totalRevenue = Payment::where('payment_status', 'Completed')
+            ->whereHas('mentorshipRequest', function ($query) {
+                $query->where(function ($q) {
+                    $q->where('requestable_type', 'App\Models\MentorshipPlan')
+                      ->whereExists(function ($q2) {
+                          $q2->select(DB::raw(1))
+                             ->from('mentorship_plans')
+                             ->join('services', 'mentorship_plans.service_id', '=', 'services.service_id')
+                             ->whereColumn('mentorship_requests.requestable_id', 'mentorship_plans.service_id')
+                             ->whereIn('services.service_type', ['Mentorship', 'Mock_Interview', 'Group_Mentorship'])
+                             ->whereNull('services.deleted_at');
+                      });
+                })->orWhere(function ($q) {
+                    $q->where('requestable_type', 'App\Models\GroupMentorship')
+                      ->whereExists(function ($q2) {
+                          $q2->select(DB::raw(1))
+                             ->from('group_mentorships')
+                             ->join('services', 'group_mentorships.service_id', '=', 'services.service_id')
+                             ->whereColumn('mentorship_requests.requestable_id', 'group_mentorships.service_id')
+                             ->whereIn('services.service_type', ['Mentorship', 'Mock_Interview', 'Group_Mentorship'])
+                             ->whereNull('services.deleted_at');
+                      });
+                });
+            })
+            ->sum('amount');
+        $revenue20Percent = $totalRevenue * 0.2;
+
+        // 2. Number of Completed Sessions (across all valid services)
+        $completedSessions = NewSession::where('status', NewSession::STATUS_COMPLETED)
+            ->whereHas('service', function ($query) {
+                $query->whereIn('service_type', ['Mentorship', 'Mock_Interview', 'Group_Mentorship'])
+                      ->whereNull('deleted_at');
+            })
+            ->count();
+
+        // 3. Get all completed payments with their mentorship requests and services
+        $completedPayments = Payment::where('payment_status', 'Completed')
+            ->with(['mentorshipRequest'])
+            ->get()
+            ->filter(function ($payment) {
+                return $payment->mentorshipRequest && $payment->mentorshipRequest->requestable;
+            });
+
+        // 4. Load services for each mentorship request manually
+        $completedPayments->each(function ($payment) {
+            if ($payment->mentorshipRequest->requestable_type === 'App\Models\MentorshipPlan') {
+                $service = Service::where('service_id', $payment->mentorshipRequest->requestable_id)
+                    ->whereIn('service_type', ['Mentorship', 'Mock_Interview', 'Group_Mentorship'])
+                    ->whereNull('deleted_at')
+                    ->first();
+                $payment->mentorshipRequest->service_type = $service ? $service->service_type : 'Unknown Service';
+            } elseif ($payment->mentorshipRequest->requestable_type === 'App\Models\GroupMentorship') {
+                $service = Service::where('service_id', $payment->mentorshipRequest->requestable_id)
+                    ->whereIn('service_type', ['Mentorship', 'Mock_Interview', 'Group_Mentorship'])
+                    ->whereNull('deleted_at')
+                    ->first();
+                $payment->mentorshipRequest->service_type = $service ? $service->service_type : 'Unknown Service';
+            } else {
+                $payment->mentorshipRequest->service_type = 'Unknown Service';
+            }
+        });
+
+        // 5. Percentage of Completed Sessions by Service (based on payments)
+        $totalPaymentsCount = $completedPayments->count();
+        $sessionsByService = $completedPayments->groupBy(function ($payment) {
+            return $payment->mentorshipRequest->service_type;
+        })->mapWithKeys(function ($payments, $serviceType) use ($totalPaymentsCount) {
+            $count = $payments->count();
+            $percentage = $totalPaymentsCount > 0 ? ($count / $totalPaymentsCount) * 100 : 0;
+            return [$serviceType => round($percentage, 2)];
+        });
+
+        // 6. Revenue by Service (20% of each service's payments)
+        $revenueByService = $completedPayments->groupBy(function ($payment) {
+            return $payment->mentorshipRequest->service_type;
+        })->mapWithKeys(function ($payments, $serviceType) {
+            $serviceRevenue = $payments->sum('amount') * 0.2;
+            return [$serviceType => round($serviceRevenue, 2)];
+        });
+
+        $averageRating = Coach::has('reviews')->with('reviews')->get()->avg('average_rating');
+        $totalUsers = User::count();
+
+        return response()->json([
+            'number_of_users' => $totalUsers,
+            'revenue' => round($revenue20Percent, 2),
+            'completed_sessions' => $completedSessions,
+            'sessions_percentage_by_service' => $sessionsByService,
+            'revenue_by_service' => $revenueByService,
+            'average_rating' => round($averageRating, 2),
+        ], 200);
+    } catch (\Exception $e) {
+        \Log::error('Failed to retrieve dashboard stats', [
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString(),
+        ]);
+        return response()->json([
+            'message' => 'Failed to retrieve dashboard stats',
             'error' => $e->getMessage(),
         ], 500);
     }
