@@ -258,9 +258,7 @@ public function getDashboardStats(Request $request)
         $totalRevenue = Payment::where('payment_status', 'Completed')
             ->whereHas('mentorshipRequest', function ($query) {
                 $query->whereHas('requestable', function ($query) {
-                    $query->where('service_type', 'Mentorship')
-                          ->orWhere('service_type', 'Mock_Interview')
-                          ->orWhere('service_type', 'Group_Mentorship')
+                    $query->whereIn('service_type', ['Mentorship', 'Mock_Interview', 'Group_Mentorship'])
                           ->whereNull('deleted_at');
                 });
             })
