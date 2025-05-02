@@ -4,7 +4,6 @@ namespace App\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
-use Illuminate\Support\Facades\Log;
 
 class CoachResource extends JsonResource
 {
@@ -15,6 +14,7 @@ class CoachResource extends JsonResource
 
         // جلب السعر من أول خدمة
         $service = $this->services->first();
+        // جلب كل الأسعار من كل الخدمات وتحديد أقل سعر مع إضافة العملة
         // جلب كل الأسعار من كل الخدمات مع التحقق من وجود العلاقة
         $prices = $this->services->flatMap(function ($service) {
             // التحقق من وجود العلاقة price
@@ -33,16 +33,9 @@ class CoachResource extends JsonResource
         $yearsOfExperience = $this->coach ? ($this->coach->Years_Of_Experience + floor($this->coach->Months_Of_Experience / 12)) : 0;
         $experienceText = $yearsOfExperience > 0 ? "$yearsOfExperience+ years of experience" : "Less than a year of experience";
 
-        // إضافة log للتحقق من البيانات
-        Log::info('CoachResource data check', [
-            'coach_id' => $this->User_ID,
-            'full_name' => $this->Full_Name,
-            'photo' => $this->Photo,
-        ]);
-
         return [
             'coach_id' => $this->User_ID,
-            'name' => $this->full_name, // استخدمنا Full_Name زي ما هو في جدول users
+            'name' => $this->full_name,
             'role' => $this->coach ? $this->coach->Title : 'N/A',
             'company' => $this->coach ? $this->coach->Company_or_School : 'N/A',
             'experience' => $experienceText, // سنين الخبرة
@@ -52,7 +45,7 @@ class CoachResource extends JsonResource
             'skills' => $displaySkills, // أول 6 مهارات
             'more_skills_count' => $moreSkillsCount > 0 ? "+$moreSkillsCount More" : null, // عدد المهارات الزيادة
             'price' => $price, // السعر
-            'profile_picture' => $this->Photo ?? 'https://via.placeholder.com/150', // صورة الكوتش
+            'profile_picture' => $this->photo ?? 'https://via.placeholder.com/150', // صورة الكوتش
         ];
     }
 }
