@@ -34,7 +34,7 @@ class CoachResource extends JsonResource
 
         return [
             'coach_id' => $this->User_ID,
-            'name' => $this->full_name,
+            'name' => $this->Full_Name, // صلحنا من full_name إلى Full_Name
             'role' => $this->coach ? $this->coach->Title : 'N/A',
             'company' => $this->coach ? $this->coach->Company_or_School : 'N/A',
             'experience' => $experienceText, // سنين الخبرة
