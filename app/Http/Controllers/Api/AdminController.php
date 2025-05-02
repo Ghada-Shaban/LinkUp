@@ -556,7 +556,7 @@ public function searchCoaches(Request $request)
         ], 500);
     }
 }
-  public function getDashboardStats(Request $request)
+ public function getDashboardStats(Request $request)
 {
     $authAdmin = auth('admin-api')->user();
     if (!$authAdmin) {
@@ -566,28 +566,9 @@ public function searchCoaches(Request $request)
     try {
         // 1. Revenue (20%)
         $totalRevenue = Payment::where('payment_status', 'Completed')
-            ->whereHas('mentorshipRequest', function ($query) {
-                $query->where(function ($q) {
-                    $q->where('requestable_type', 'App\Models\MentorshipPlan')
-                      ->whereExists(function ($q2) {
-                          $q2->select(DB::raw(1))
-                             ->from('mentorship_plans')
-                             ->join('services', 'mentorship_plans.service_id', '=', 'services.service_id')
-                             ->whereColumn('mentorship_requests.requestable_id', 'mentorship_plans.service_id')
-                             ->whereIn('services.service_type', ['Mentorship', 'Mock_Interview', 'Group_Mentorship'])
-                             ->whereNull('services.deleted_at');
-                      });
-                })->orWhere(function ($q) {
-                    $q->where('requestable_type', 'App\Models\GroupMentorship')
-                      ->whereExists(function ($q2) {
-                          $q2->select(DB::raw(1))
-                             ->from('group_mentorships')
-                             ->join('services', 'group_mentorships.service_id', '=', 'services.service_id')
-                             ->whereColumn('mentorship_requests.requestable_id', 'group_mentorships.service_id')
-                             ->whereIn('services.service_type', ['Mentorship', 'Mock_Interview', 'Group_Mentorship'])
-                             ->whereNull('services.deleted_at');
-                      });
-                });
+            ->whereHas('service', function ($query) {
+                $query->whereIn('service_type', ['Mentorship', 'Mock_Interview', 'Group_Mentorship'])
+                      ->whereNull('deleted_at');
             })
             ->sum('amount');
         $revenue20Percent = $totalRevenue * 0.2;
@@ -612,36 +593,20 @@ public function searchCoaches(Request $request)
             return [$serviceType => round($percentage, 2)];
         });
 
-        // 4. Get all completed payments with their mentorship requests and services
+        // 4. Get all completed payments with their services
         $completedPayments = Payment::where('payment_status', 'Completed')
-            ->with(['mentorshipRequest'])
-            ->get()
-            ->filter(function ($payment) {
-                return $payment->mentorshipRequest && $payment->mentorshipRequest->requestable;
-            });
+            ->whereHas('service', function ($query) {
+                $query->whereIn('service_type', ['Mentorship', 'Mock_Interview', 'Group_Mentorship'])
+                      ->whereNull('deleted_at');
+            })
+            ->with('service')
+            ->get();
 
-        // 5. Load services for each mentorship request manually
-        $completedPayments->each(function ($payment) {
-            if ($payment->mentorshipRequest->requestable_type === 'App\Models\MentorshipPlan') {
-                $service = Service::where('service_id', $payment->mentorshipRequest->requestable_id)
-                    ->whereIn('service_type', ['Mentorship', 'Mock_Interview', 'Group_Mentorship'])
-                    ->whereNull('deleted_at')
-                    ->first();
-                $payment->mentorshipRequest->service_type = $service ? $service->service_type : 'Unknown Service';
-            } elseif ($payment->mentorshipRequest->requestable_type === 'App\Models\GroupMentorship') {
-                $service = Service::where('service_id', $payment->mentorshipRequest->requestable_id)
-                    ->whereIn('service_type', ['Mentorship', 'Mock_Interview', 'Group_Mentorship'])
-                    ->whereNull('deleted_at')
-                    ->first();
-                $payment->mentorshipRequest->service_type = $service ? $service->service_type : 'Unknown Service';
-            } else {
-                $payment->mentorshipRequest->service_type = 'Unknown Service';
-            }
-        });
-
-        // 6. Revenue by Service (20% of each service's payments)
+        // 5. Revenue by Service (20% of each service's payments)
         $revenueByService = collect($allServiceTypes)->mapWithKeys(function ($serviceType) use ($completedPayments) {
-            $paymentsForService = $completedPayments->where('mentorshipRequest.service_type', $serviceType);
+            $paymentsForService = $completedPayments->filter(function ($payment) use ($serviceType) {
+                return $payment->service && $payment->service->service_type === $serviceType;
+            });
             $serviceRevenue = $paymentsForService->sum('amount') * 0.2;
             return [$serviceType => round($serviceRevenue, 2)];
         });
