@@ -18,6 +18,7 @@ use App\Models\Mentorship;
 use App\Models\MentorshipRequest;
 use App\Models\NewSession;
 use App\Models\Book;
+use App\Models\CoachAvailability;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
