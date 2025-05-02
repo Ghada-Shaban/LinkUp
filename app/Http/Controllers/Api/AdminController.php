@@ -15,6 +15,7 @@ use App\Models\Review;
 use App\Models\Payment;
 use App\Models\Service;
 use App\Models\Mentorship;
+use App\Models\MentorshipRequest;
 use App\Models\NewSession;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
