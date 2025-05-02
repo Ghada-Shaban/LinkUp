@@ -239,7 +239,7 @@ public function handleCoachRequest(Request $request, $coachId)
             'pending_coaches_count' => $pendingCoachesCount,
         ], 200);
     }
-    public function getDashboardStats(Request $request)
+   public function getDashboardStats(Request $request)
 {
     try {
         // 1. Revenue (20%) - فقط للدفعات المرتبطة بخدمات
@@ -279,6 +279,15 @@ public function handleCoachRequest(Request $request, $coachId)
                 continue; // استبعاد الدفعة
             }
 
+            // تسجيل الربط الناجح للتحقق
+            \Log::info('Payment linked to service', [
+                'payment_id' => $payment->payment_id,
+                'mentorship_request_id' => $payment->mentorship_request_id,
+                'session_id' => $session->new_session_id,
+                'service_id' => $session->service_id,
+                'service_type' => $session->service->service_type
+            ]);
+
             // إضافة الدفعة مع service_type إلى المجموعة
             $payment->service_type = $session->service->service_type;
             $linkedPayments->push($payment);
@@ -287,16 +296,16 @@ public function handleCoachRequest(Request $request, $coachId)
         // 3. حساب إجمالي الريفينيو للدفعات المرتبطة فقط
         $totalLinkedRevenue = $linkedPayments->sum('amount') * 0.2;
 
-        // 4. Revenue Share Revenue by Service with Percentage
+        // 4. Revenue by Service with Percentage (مع %)
         $revenueByService = $linkedPayments
             ->groupBy('service_type')
             ->mapWithKeys(function ($payments, $serviceType) use ($totalLinkedRevenue) {
-                $serviceRevenue = $payments->sum('amount') * 0.2 ;
-                $percentage = $totalLinkedRevenue > 0 ? ($serviceRevenue / $totalLinkedRevenue) * 100 : 0;
+                $serviceRevelation = $payments->sum('amount') * 0.2;
+                $percentage = $totalLinkedRevenue > 0 ? ($serviceRevelation / $totalLinkedRevenue) * 100 : 0;
                 return [
                     $serviceType => [
-                        'revenue' => round($serviceRevenue, 2) ,
-                        'percentage' => round($percentage, 2) . '%'
+                        'revenue' => round($serviceRevelation, 2),
+                        'percentage' => number_format($percentage, 2) . '%' // إضافة %
                     ]
                 ];
             });
