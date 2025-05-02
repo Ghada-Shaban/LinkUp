@@ -4,6 +4,7 @@ namespace App\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Facades\Log;
 
 class CoachResource extends JsonResource
 {
@@ -32,9 +33,15 @@ class CoachResource extends JsonResource
         $yearsOfExperience = $this->coach ? ($this->coach->Years_Of_Experience + floor($this->coach->Months_Of_Experience / 12)) : 0;
         $experienceText = $yearsOfExperience > 0 ? "$yearsOfExperience+ years of experience" : "Less than a year of experience";
 
+        // إضافة log للتحقق من قيمة Photo
+        Log::info('CoachResource photo check', [
+            'coach_id' => $this->User_ID,
+            'photo' => $this->Photo,
+        ]);
+
         return [
             'coach_id' => $this->User_ID,
-            'name' => $this->full_Name, // صلحنا من full_name إلى Full_Name
+            'name' => $this->full_name, // رجعنا لـ full_name زي ما كان
             'role' => $this->coach ? $this->coach->Title : 'N/A',
             'company' => $this->coach ? $this->coach->Company_or_School : 'N/A',
             'experience' => $experienceText, // سنين الخبرة
