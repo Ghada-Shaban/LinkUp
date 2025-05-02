@@ -295,7 +295,7 @@ public function handleCoachRequest(Request $request, $coachId)
                 $percentage = $totalLinkedRevenue > 0 ? ($serviceRevenue / $totalLinkedRevenue) * 100 : 0;
                 return [
                     $serviceType => [
-                        'revenue' => round($serviceRevenue, 2) ',
+                        'revenue' => round($serviceRevenue, 2) ,
                         'percentage' => round($percentage, 2) . '%'
                     ]
                 ];
