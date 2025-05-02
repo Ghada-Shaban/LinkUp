@@ -25,6 +25,12 @@ return new class extends Migration
                   ->on('mentorship_requests')
                   ->onDelete('set null') // تغيير من cascade إلى set null
                   ->onUpdate('cascade');
+
+            // $table->unsignedBigInteger('service_id')->after('mentorship_request_id')->nullable();
+            // $table->foreign('service_id')
+            //       ->references('service_id')
+            //       ->on('services')
+            //       ->onDelete('set null');
         });
     }
 
