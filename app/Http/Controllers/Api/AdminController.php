@@ -256,25 +256,36 @@ public function getDashboardStats(Request $request)
     try {
         // 1. Revenue (20%)
         $totalRevenue = Payment::where('payment_status', 'Completed')
-            ->whereHas('session', function ($query) {
-                $query->whereHas('service', function ($query) {
-                    $query->whereNull('deleted_at');
+            ->whereHas('mentorshipRequest', function ($query) {
+                $query->whereHas('requestable', function ($query) {
+                    $query->whereIn('service_type', ['Mentorship', 'Mock_Interview', 'Group_Mentorship']);
                 });
             })
             ->sum('amount');
         $revenue20Percent = $totalRevenue * 0.2;
 
-       
+        // 2. Number of Completed Sessions (across all valid services)
+        $completedSessions = NewSession::where('status', NewSession::STATUS_COMPLETED)
+            ->whereHas('service', function ($query) {
+                $query->whereIn('service_type', ['Mentorship', 'Mock_Interview', 'Group_Mentorship'])
+                      ->whereNull('deleted_at');
+            })
+            ->count();
 
         // 3. Get all completed payments with their sessions and services
         $completedPayments = Payment::where('payment_status', 'Completed')
-            ->with(['session.service'])
-            ->get();
+            ->with(['mentorshipRequest.requestable' => function ($query) {
+                $query->whereIn('service_type', ['Mentorship', 'Mock_Interview', 'Group_Mentorship']);
+            }])
+            ->get()
+            ->filter(function ($payment) {
+                return $payment->mentorshipRequest && $payment->mentorshipRequest->requestable;
+            });
 
         // 4. Percentage of Completed Sessions by Service (based on payments)
         $totalPaymentsCount = $completedPayments->count();
         $sessionsByService = $completedPayments->groupBy(function ($payment) {
-            return $payment->session && $payment->session->service ? $payment->session->service->service_type : 'Unknown Service';
+            return $payment->mentorshipRequest->requestable->service_type ?? 'Unknown Service';
         })->mapWithKeys(function ($payments, $serviceType) use ($totalPaymentsCount) {
             $count = $payments->count();
             $percentage = $totalPaymentsCount > 0 ? ($count / $totalPaymentsCount) * 100 : 0;
@@ -283,7 +294,7 @@ public function getDashboardStats(Request $request)
 
         // 5. Revenue by Service (20% of each service's payments)
         $revenueByService = $completedPayments->groupBy(function ($payment) {
-            return $payment->session && $payment->session->service ? $payment->session->service->service_type : 'Unknown Service';
+            return $payment->mentorshipRequest->requestable->service_type ?? 'Unknown Service';
         })->mapWithKeys(function ($payments, $serviceType) {
             $serviceRevenue = $payments->sum('amount') * 0.2;
             return [$serviceType => round($serviceRevenue, 2)];
@@ -295,9 +306,9 @@ public function getDashboardStats(Request $request)
         return response()->json([
             'number_of_users' => $totalUsers,
             'revenue' => round($revenue20Percent, 2),
+            'completed_sessions' => $completedSessions,
             'sessions_percentage_by_service' => $sessionsByService,
             'revenue_by_service' => $revenueByService,
-          
             'average_rating' => round($averageRating, 2),
         ], 200);
     } catch (\Exception $e) {
