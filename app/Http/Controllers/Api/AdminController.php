@@ -499,8 +499,7 @@ public function getDashboardStats(Request $request)
             // Delete trainee sessions
             NewSession::where('trainee_id', $userId)->forceDelete();
 
-            // Delete trainee performance reports
-            EmailPerformanceReport::where('trainee_id', $userId)->forceDelete();
+          
 
             // Delete trainee mentorship requests
             MentorshipRequest::where('trainee_id', $userId)->forceDelete();
@@ -516,14 +515,9 @@ public function getDashboardStats(Request $request)
         // Delete bookings
         Book::where('trainee_id', $userId)->forceDelete();
 
-        // Delete attended sessions (pivot table: attends)
-        $user->attendedSessions()->detach();
+     
 
-        // Delete viewed services (pivot table: views)
-        $user->viewedServices()->detach();
-
-        // Delete email notifications (pivot table: received_by)
-        $user->emailNotifications()->detach();
+      
 
         // Delete mentorship requests (polymorphic)
         MentorshipRequest::where('requestable_id', $userId)->where('requestable_type', User::class)->forceDelete();
