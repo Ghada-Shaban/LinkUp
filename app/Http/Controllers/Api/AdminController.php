@@ -240,11 +240,12 @@ public function handleCoachRequest(Request $request, $coachId)
             'pending_coaches_count' => $pendingCoachesCount,
         ], 200);
     }
- public function getDashboardStats(Request $request)
+public function getDashboardStats(Request $request)
 {
     try {
-        // 1. جلب جميع أنواع الخدمات الموجودة
+        // 1. جلب جميع أنواع الخدمات
         $validServiceTypes = Service::pluck('service_type')->toArray();
+        \Log::info('Valid service types', ['service_types' => $validServiceTypes]);
 
         // 2. Revenue (20%) - فقط للدفعات المرتبطة بخدمات
         $completedPayments = Payment::where('payment_status', 'Completed')->get();
@@ -252,77 +253,147 @@ public function handleCoachRequest(Request $request, $coachId)
 
         // 3. ربط الدفعات بخدمات
         foreach ($completedPayments as $payment) {
-            $session = null;
+            \Log::info('Processing payment', [
+                'payment_id' => $payment->payment_id,
+                'mentorship_request_id' => $payment->mentorship_request_id,
+                'amount' => $payment->amount,
+                'date_time' => $payment->date_time
+            ]);
 
-            // الخيار الأول: الربط عبر mentorship_request_id
+            $session = null;
+            $serviceType = null;
+            $mentorshipType = null;
+            $revenueKey = null;
+
+            // الخطوة الأولى: التعامل مع Mentorship plan وGroup_Mentorship عبر mentorship_request_id
             if ($payment->mentorship_request_id) {
                 $session = NewSession::where('mentorship_request_id', $payment->mentorship_request_id)
-                    ->with('service')
+                    ->with(['service', 'service.mentorship'])
                     ->first();
-                if ($session) {
+
+                if ($session && $session->service && in_array($session->service->service_type, $validServiceTypes)) {
+                    $serviceType = $session->service->service_type;
+                    $mentorshipType = $session->service->mentorship ? $session->service->mentorship->mentorship_type : null;
+
+                    // تحديد مفتاح الإيرادات بناءً على service_type وmentorship_type
+                    if ($serviceType === 'Group_Mentorship') {
+                        $revenueKey = 'Group_Mentorship';
+                    } elseif ($serviceType === 'Mentorship' && $mentorshipType === 'Mentorship plan') {
+                        $revenueKey = 'Mentorship plan';
+                    } else {
+                        \Log::warning('Unexpected service_type or mentorship_type for mentorship_request_id', [
+                            'payment_id' => $payment->payment_id,
+                            'mentorship_request_id' => $payment->mentorship_request_id,
+                            'service_type' => $serviceType,
+                            'mentorship_type' => $mentorshipType
+                        ]);
+                        continue; // استبعاد الدفعة
+                    }
+
                     \Log::info('Payment linked via mentorship_request_id', [
                         'payment_id' => $payment->payment_id,
                         'mentorship_request_id' => $payment->mentorship_request_id,
                         'session_id' => $session->new_session_id,
-                        'service_id' => $session->service_id ?? null,
-                        'service_type' => $session->service->service_type ?? null
+                        'service_id' => $session->service_id,
+                        'service_type' => $serviceType,
+                        'mentorship_type' => $mentorshipType,
+                        'revenue_key' => $revenueKey
                     ]);
+                } else {
+                    \Log::warning('No valid session or service for mentorship_request_id', [
+                        'payment_id' => $payment->payment_id,
+                        'mentorship_request_id' => $payment->mentorship_request_id,
+                        'session_id' => $session ? $session->new_session_id : null
+                    ]);
+                    continue; // استبعاد الدفعة
                 }
-            }
+            } else {
+                \Log::warning('Payment missing mentorship_request_id, checking for Mentorship session or Mock_Interview', [
+                    'payment_id' => $payment->payment_id,
+                    'amount' => $payment->amount,
+                    'date_time' => $payment->date_time
+                ]);
 
-            // الخيار الثاني: إذا لم يكن هناك mentorship_request_id أو جلسة، حاول الربط عبر date_time
-            if (!$session) {
-                $session = NewSession::where('date_time', '>=', $payment->date_time->subHours(1))
-                    ->where('date_time', '<=', $payment->date_time->addHours(1))
-                    ->with('service')
+                // الخطوة الثانية: التعامل مع Mentorship session وMock_Interview
+                // حاول ربط الدفعة بجلسة عبر date_time
+                $session = NewSession::where('date_time', '>=', $payment->date_time->subHours(2))
+                    ->where('date_time', '<=', $payment->date_time->addHours(2))
+                    ->whereHas('service.mentorship', function ($query) {
+                        $query->where('mentorship_type', 'Mentorship session');
+                    })
                     ->first();
 
-                if ($session) {
+                if ($session && $session->service && $session->service->mentorship) {
+                    $serviceType = $session->service->service_type;
+                    $mentorshipType = $session->service->mentorship->mentorship_type;
+
+                    // تحديد مفتاح الإيرادات
+                    if ($serviceType === 'Mock_Interview') {
+                        $revenueKey = 'Mock_Interview';
+                    } elseif ($mentorshipType === 'Mentorship session') {
+                        $revenueKey = 'Mentorship session';
+                    } else {
+                        \Log::warning('Unexpected service_type for Mentorship session', [
+                            'payment_id' => $payment->payment_id,
+                            'session_id' => $session->new_session_id,
+                            'service_type' => $serviceType
+                        ]);
+                        continue; // استبعاد الدفعة
+                    }
+
                     \Log::info('Payment linked via date_time', [
                         'payment_id' => $payment->payment_id,
                         'session_id' => $session->new_session_id,
                         'date_time' => $payment->date_time,
-                        'service_id' => $session->service_id ?? null,
-                        'service_type' => $session->service->service_type ?? null
+                        'service_id' => $session->service_id,
+                        'service_type' => $serviceType,
+                        'mentorship_type' => $mentorshipType,
+                        'revenue_key' => $revenueKey
                     ]);
                 } else {
-                    \Log::warning('No session found for payment', [
-                        'payment_id' => $payment->payment_id,
-                        'mentorship_request_id' => $payment->mentorship_request_id,
-                        'date_time' => $payment->date_time
-                    ]);
-                    continue; // استبعاد الدفعة
+                    // افتراض: الدفعة بدون mentorship_request_id هي Mentorship session أو Mock_Interview
+                    $mentorshipSessionService = Service::whereHas('mentorship', function ($query) {
+                        $query->where('mentorship_type', 'Mentorship session');
+                    })->first();
+
+                    if ($mentorshipSessionService) {
+                        $serviceType = $mentorshipSessionService->service_type;
+                        $mentorshipType = 'Mentorship session';
+                        $revenueKey = ($serviceType === 'Mock_Interview') ? 'Mock_Interview' : 'Mentorship session';
+
+                        \Log::info('Assigned service to payment without session', [
+                            'payment_id' => $payment->payment_id,
+                            'date_time' => $payment->date_time,
+                            'service_id' => $mentorshipSessionService->service_id,
+                            'service_type' => $serviceType,
+                            'mentorship_type' => $mentorshipType,
+                            'revenue_key' => $revenueKey
+                        ]);
+                    } else {
+                        \Log::warning('No Mentorship session or Mock_Interview service found', [
+                            'payment_id' => $payment->payment_id
+                        ]);
+                        continue; // استبعاد الدفعة
+                    }
                 }
             }
 
-            // التحقق من وجود خدمة
-            if (!$session->service || !in_array($session->service->service_type, $validServiceTypes)) {
-                \Log::warning('Session missing service or invalid service_type', [
-                    'payment_id' => $payment->payment_id,
-                    'session_id' => $session->new_session_id,
-                    'mentorship_request_id' => $payment->mentorship_request_id,
-                    'service_id' => $session->service_id ?? null,
-                    'service_type' => $session->service->service_type ?? null
-                ]);
-                continue; // استبعاد الدفعة
-            }
-
-            // إضافة الدفعة مع service_type إلى المجموعة
-            $payment->service_type = $session->service->service_type;
+            // إضافة الدفعة إلى المجموعة مع revenue_key
+            $payment->revenue_key = $revenueKey;
             $linkedPayments->push($payment);
         }
 
         // 4. حساب إجمالي الريفينيو للدفعات المرتبطة فقط
         $totalLinkedRevenue = $linkedPayments->sum('amount') * 0.2;
 
-        // 5. Revenue by Service with Percentage (مع %)
+        // 5. Revenue by Service with Percentage
         $revenueByService = $linkedPayments
-            ->groupBy('service_type')
-            ->mapWithKeys(function ($payments, $serviceType) use ($totalLinkedRevenue) {
+            ->groupBy('revenue_key')
+            ->mapWithKeys(function ($payments, $revenueKey) use ($totalLinkedRevenue) {
                 $serviceRevenue = $payments->sum('amount') * 0.2;
                 $percentage = $totalLinkedRevenue > 0 ? ($serviceRevenue / $totalLinkedRevenue) * 100 : 0;
                 return [
-                    $serviceType => [
+                    $revenueKey => [
                         'revenue' => round($serviceRevenue, 2),
                         'percentage' => number_format($percentage, 2) . '%' // إضافة %
                     ]
@@ -361,6 +432,7 @@ public function handleCoachRequest(Request $request, $coachId)
         ], 500);
     }
 }
+
     public function getAllTrainees(Request $request)
     {
         // Get all trainees with details from users and trainees tables
