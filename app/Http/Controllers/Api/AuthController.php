@@ -17,12 +17,12 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary; // إضافة Cloudinary
 
 class AuthController extends Controller
 {  
- public function getTraineeRegistrationEnumValues()
+    public function getTraineeRegistrationEnumValues()
     {
         return response()->json([
             'trainee' => [
@@ -91,7 +91,23 @@ class AuthController extends Controller
         ]));
     try {
         return DB::transaction(function () use ($validated, $request) {
-            $photoPath = $request->hasFile('Photo') ? $request->file('Photo')->store('photos', 'public') : null;
+            // رفع الصورة إلى Cloudinary إذا وُجدت
+            $photoPath = null;
+            if ($request->hasFile('Photo')) {
+                $uploadedFile = $request->file('Photo');
+                $result = Cloudinary::upload($uploadedFile->getRealPath(), [
+                    'folder' => 'coach_photos', // مجلد في Cloudinary
+                    'public_id' => 'coach_' . time(), // اسم فريد للصورة
+                    'transformation' => [
+                        'quality' => 'auto',
+                        'fetch_format' => 'auto',
+                        'width' => 200,
+                        'height' => 200,
+                        'crop' => 'fill',
+                    ],
+                ]);
+                $photoPath = $result->getSecurePath(); // رابط الصورة
+            }
         
             $user = User::create([
                 'Full_Name' => $validated['Full_Name'],
@@ -133,9 +149,9 @@ class AuthController extends Controller
             Mail::to($user->Email)->send(new WelcomeMail($user));
 
             return response()->json([
-            'message' => 'Registration request submitted successfully. Awaiting admin approval.',
-            'user_id' => $user->User_ID,
-        ], 201);
+                'message' => 'Registration request submitted successfully. Awaiting admin approval.',
+                'user_id' => $user->User_ID,
+            ], 201);
         });
     } catch (\Exception $e) {
         \Log::error('Failed to submit coach registration request', [
@@ -148,6 +164,7 @@ class AuthController extends Controller
         ], 500);
     }
     }
+    
     private function setAvailability($userID, array $availability)
     {
         $savedSlots = [];
@@ -194,12 +211,27 @@ class AuthController extends Controller
             'Preferred_Languages.*' => ['required', 'string', Rule::in($validLanguages)],
             'Areas_Of_Interest' => 'required|array|min:1',
             'Areas_Of_Interest.*' => ['required', 'string', Rule::in($validInterests)]
-
-            
         ]));
         
         return DB::transaction(function () use ($validated, $request) {
-            $photoPath = $request->hasFile('Photo') ? $request->file('Photo')->store('photos', 'public') : null;
+            // رفع الصورة إلى Cloudinary إذا وُجدت
+            $photoPath = null;
+            if ($request->hasFile('Photo')) {
+                $uploadedFile = $request->file('Photo');
+                $result = Cloudinary::upload($uploadedFile->getRealPath(), [
+                    'folder' => 'trainee_photos', // مجلد في Cloudinary
+                    'public_id' => 'trainee_' . time(), // اسم فريد للصورة
+                    'transformation' => [
+                        'quality' => 'auto',
+                        'fetch_format' => 'auto',
+                        'width' => 200,
+                        'height' => 200,
+                        'crop' => 'fill',
+                    ],
+                ]);
+                $photoPath = $result->getSecurePath(); // رابط الصورة
+            }
+            
             $user = User::create([
                 'Full_Name' => $validated['Full_Name'],
                 'Email' => $validated['Email'],
@@ -219,14 +251,13 @@ class AuthController extends Controller
                 'Current_Role' => $validated['Current_Role'] ?? null,  
                 'Story' => $validated['Story'] ?? null,  
                 'Years_Of_Professional_Experience' => $validated['Years_Of_Professional_Experience'] ?? null
-
             ]);
 
             foreach ($validated['Preferred_Languages'] as $lang) {
                 TraineePreferredLanguage::create([
                     'trainee_id' => $trainee->User_ID,
                     'Language' => $lang
-                ]);
+                eternity]);
             }
 
             foreach ($validated['Areas_Of_Interest'] as $interest) {
@@ -242,86 +273,84 @@ class AuthController extends Controller
                 'token' => $user->createToken('auth_token')->plainTextToken,
                 'photo_path' => $photoPath
             ], 201);
-            
         });
     }
 
-public function login(Request $request)
-{
-    $request->validate([
-        'Email' => 'required_without:email|email',
-        'email' => 'required_without:Email|email',
-        'Password' => 'required_without:password',
-        'password' => 'required_without:Password',
-    ]);
+    public function login(Request $request)
+    {
+        $request->validate([
+            'Email' => 'required_without:email|email',
+            'email' => 'required_without:Email|email',
+            'Password' => 'required_without:password',
+            'password' => 'required_without:Password',
+        ]);
 
-    // جلب الإيميل والباسوورد بغض النظر عن الحالة (uppercase أو lowercase)
-    $email = strtolower($request->Email ?? $request->email);
-    $password = $request->Password ?? $request->password;
+        // جلب الإيميل والباسوورد بغض النظر عن الحالة (uppercase أو lowercase)
+        $email = strtolower($request->Email ?? $request->email);
+        $password = $request->Password ?? $request->password;
 
-    // ابحث عن الـ admin في جدول admins (case-insensitive)
-    $admin = Admin::whereRaw('LOWER(Email) = ?', [$email])->first();
+        // ابحث عن الـ admin في جدول admins (case-insensitive)
+        $admin = Admin::whereRaw('LOWER(Email) = ?', [$email])->first();
 
-    if ($admin) {
-        // التحقق من الباسوورد للـ admin (مقارنة مباشرة، case-insensitive، وتنظيف المسافات)
-        $requestPassword = trim(strtolower($password));
-        $adminPassword = trim(strtolower($admin->getRawOriginal('Password')));
+        if ($admin) {
+            // التحقق من الباسوورد للـ admin (مقارنة مباشرة، case-insensitive، وتنظيف المسافات)
+            $requestPassword = trim(strtolower($password));
+            $adminPassword = trim(strtolower($admin->getRawOriginal('Password')));
 
-        if ($requestPassword !== $adminPassword) {
+            if ($requestPassword !== $adminPassword) {
+                return response()->json([
+                    'message' => 'Invalid credentials',
+                    'request_password' => $password,
+                    'admin_password' => $admin->getRawOriginal('Password'),
+                ], 401);
+            }
+
+            // إنشاء token للـ admin
+            $token = $admin->createToken('admin-token')->plainTextToken;
+
+            return response()->json([
+                'message' => 'Login successful Admin',
+                'token' => $token,
+                'admin_id' => $admin->id,
+            ], 200);
+        }
+
+        // لو مش admin، ابحث في جدول users (Coach/Trainee) مع التعامل مع case-insensitive
+        $user = User::whereRaw('LOWER(Email) = ?', [$email])->first();
+
+        if (!$user) {
+            return response()->json([
+                'message' =>  'The associated user account is missing. Please contact support for more details.',
+            ], 404);
+        }
+
+        if (!Hash::check($password, $user->password)) {
             return response()->json([
                 'message' => 'Invalid credentials',
                 'request_password' => $password,
-                'admin_password' => $admin->getRawOriginal('Password'),
             ], 401);
         }
 
-        // إنشاء token للـ admin
-        $token = $admin->createToken('admin-token')->plainTextToken;
+        if ($user->role_profile === 'Coach') {
+            $coach = Coach::where('User_ID', $user->User_ID)->first();
+            if ($coach && $coach->status === Coach::STATUS_PENDING) {
+                return response()->json([
+                    'message' => 'Your account is still pending approval',
+                ], 403);
+            }
+        }
+
+        $token = $user->createToken('user-token')->plainTextToken;
+        $role = $user->role_profile;
 
         return response()->json([
-            'message' => 'Login successful Admin',
+            'message' => "Login successful $role",
             'token' => $token,
-            'admin_id' => $admin->id,
-           
+            'User_ID' => $user->User_ID,
+            'role' => $role,
         ], 200);
     }
 
-    // لو مش admin، ابحث في جدول users (Coach/Trainee) مع التعامل مع case-insensitive
-    $user = User::whereRaw('LOWER(Email) = ?', [$email])->first();
-
-    if (!$user) {
-        return response()->json([
-            'message' =>  'The associated user account is missing. Please contact support for more details.',
-            
-        ], 404);
-    }
-
-    if (!Hash::check($password, $user->password)) {
-        return response()->json([
-            'message' => 'Invalid credentials',
-            'request_password' => $password,
-        ], 401);
-    }
-
-    if ($user->role_profile === 'Coach') {
-        $coach = Coach::where('User_ID', $user->User_ID)->first();
-        if ($coach && $coach->status === Coach::STATUS_PENDING) {
-            return response()->json([
-                'message' => 'Your account is still pending approval',
-            ], 403);
-        }
-    }
-
-    $token = $user->createToken('user-token')->plainTextToken;
-    $role = $user->role_profile;
-
-    return response()->json([
-        'message' => "Login successful $role",
-        'token' => $token,
-        'User_ID' => $user->User_ID,
-        'role' => $role,
-    ], 200);
-}
     public function logout(Request $request)
     {
         if ($request->wantsJson() || $request->is('api/*')) {
@@ -336,6 +365,7 @@ public function login(Request $request)
                 return response()->json([
                     'message' => 'You are already logged out or not authenticated.',
                 ], 401);
+  eternity]);
             }
 
             $request->user()->currentAccessToken()->delete();
@@ -345,12 +375,4 @@ public function login(Request $request)
             ], 200);
         }
     }
-
-
-
 }
-    
-        
-       
-
- 
