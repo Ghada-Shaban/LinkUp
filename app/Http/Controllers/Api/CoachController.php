@@ -1,3 +1,4 @@
+```php
 <?php
 
 namespace App\Http\Controllers\Api;
@@ -24,7 +25,7 @@ class CoachController extends Controller
         }
 
         $search = $request->query('search', ''); // Search query for multiple fields
-        $perPage = $request->query('per_page', 10); // Pagination: number of coaches per page
+        $perPage = $request->query('per_page', 50); // زوّدنا per_page لـ 50 عشان نضمن نجيب كل الـ coaches
 
         $coachesQuery = User::with(['coach', 'services.price', 'services.sessions', 'skills', 'reviewsAsCoach'])
             ->where('role_profile', 'Coach') // Only fetch users with role 'Coach'
@@ -50,12 +51,19 @@ class CoachController extends Controller
                 });
             });
 
+        // جربة لجلب الـ coach الجديد مباشرة (استبدلي 61 بـ User_ID بتاع الـ coach)
+        $testCoach = User::with(['coach', 'services.price', 'services.sessions', 'skills', 'reviewsAsCoach'])
+            ->where('User_ID', 61) // استبدلي 61 بـ User_ID الجديد
+            ->first();
+
         $coaches = $coachesQuery->paginate($perPage);
 
         Log::info('Fetching coaches for Explore Coaches page', [
             'search' => $search,
             'coaches_count' => $coaches->total(),
             'trainee_id' => $currentUser->User_ID,
+            'coaches_ids' => $coaches->pluck('User_ID')->toArray(),
+            'test_coach' => $testCoach ? $testCoach->toArray() : 'Not found',
         ]);
 
         return CoachResource::collection($coaches);
