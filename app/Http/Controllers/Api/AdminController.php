@@ -556,7 +556,7 @@ public function searchCoaches(Request $request)
         ], 500);
     }
 }
-    public function getDashboardStats(Request $request)
+   public function getDashboardStats(Request $request)
 {
     $authAdmin = auth('admin-api')->user();
     if (!$authAdmin) {
@@ -627,21 +627,19 @@ public function searchCoaches(Request $request)
             }
         });
 
-        // 5. Percentage of Completed Sessions by Service (based on payments)
-        $totalPaymentsCount = $completedPayments->count();
-        $sessionsByService = $completedPayments->groupBy(function ($payment) {
-            return $payment->mentorshipRequest->service_type;
-        })->mapWithKeys(function ($payments, $serviceType) use ($totalPaymentsCount) {
-            $count = $payments->count();
+        // 5. Ensure all service types are included with 0 if no data
+        $allServiceTypes = ['Mentorship', 'Mock_Interview', 'Group_Mentorship'];
+        $sessionsByService = collect($allServiceTypes)->mapWithKeys(function ($serviceType) use ($completedPayments) {
+            $count = $completedPayments->where('mentorshipRequest.service_type', $serviceType)->count();
+            $totalPaymentsCount = $completedPayments->count();
             $percentage = $totalPaymentsCount > 0 ? ($count / $totalPaymentsCount) * 100 : 0;
             return [$serviceType => round($percentage, 2)];
         });
 
         // 6. Revenue by Service (20% of each service's payments)
-        $revenueByService = $completedPayments->groupBy(function ($payment) {
-            return $payment->mentorshipRequest->service_type;
-        })->mapWithKeys(function ($payments, $serviceType) {
-            $serviceRevenue = $payments->sum('amount') * 0.2;
+        $revenueByService = collect($allServiceTypes)->mapWithKeys(function ($serviceType) use ($completedPayments) {
+            $paymentsForService = $completedPayments->where('mentorshipRequest.service_type', $serviceType);
+            $serviceRevenue = $paymentsForService->sum('amount') * 0.2;
             return [$serviceType => round($serviceRevenue, 2)];
         });
 
