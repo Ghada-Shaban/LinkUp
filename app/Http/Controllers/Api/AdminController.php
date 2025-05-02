@@ -17,6 +17,7 @@ use App\Models\Service;
 use App\Models\Mentorship;
 use App\Models\MentorshipRequest;
 use App\Models\NewSession;
+use App\Models\Book;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
