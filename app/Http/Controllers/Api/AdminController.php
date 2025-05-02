@@ -240,7 +240,7 @@ public function handleCoachRequest(Request $request, $coachId)
             'pending_coaches_count' => $pendingCoachesCount,
         ], 200);
     }
-  public function getDashboardStats(Request $request)
+ public function getDashboardStats(Request $request)
 {
     try {
         // 1. جلب جميع أنواع الخدمات الموجودة
@@ -259,6 +259,15 @@ public function handleCoachRequest(Request $request, $coachId)
                 $session = NewSession::where('mentorship_request_id', $payment->mentorship_request_id)
                     ->with('service')
                     ->first();
+                if ($session) {
+                    \Log::info('Payment linked via mentorship_request_id', [
+                        'payment_id' => $payment->payment_id,
+                        'mentorship_request_id' => $payment->mentorship_request_id,
+                        'session_id' => $session->new_session_id,
+                        'service_id' => $session->service_id ?? null,
+                        'service_type' => $session->service->service_type ?? null
+                    ]);
+                }
             }
 
             // الخيار الثاني: إذا لم يكن هناك mentorship_request_id أو جلسة، حاول الربط عبر date_time
@@ -268,7 +277,15 @@ public function handleCoachRequest(Request $request, $coachId)
                     ->with('service')
                     ->first();
 
-                if (!$session) {
+                if ($session) {
+                    \Log::info('Payment linked via date_time', [
+                        'payment_id' => $payment->payment_id,
+                        'session_id' => $session->new_session_id,
+                        'date_time' => $payment->date_time,
+                        'service_id' => $session->service_id ?? null,
+                        'service_type' => $session->service->service_type ?? null
+                    ]);
+                } else {
                     \Log::warning('No session found for payment', [
                         'payment_id' => $payment->payment_id,
                         'mentorship_request_id' => $payment->mentorship_request_id,
@@ -276,12 +293,6 @@ public function handleCoachRequest(Request $request, $coachId)
                     ]);
                     continue; // استبعاد الدفعة
                 }
-
-                \Log::info('Payment linked via date_time', [
-                    'payment_id' => $payment->payment_id,
-                    'session_id' => $session->new_session_id,
-                    'date_time' => $payment->date_time
-                ]);
             }
 
             // التحقق من وجود خدمة
@@ -290,19 +301,11 @@ public function handleCoachRequest(Request $request, $coachId)
                     'payment_id' => $payment->payment_id,
                     'session_id' => $session->new_session_id,
                     'mentorship_request_id' => $payment->mentorship_request_id,
-                    'service_id' => $session->service_id ?? null
+                    'service_id' => $session->service_id ?? null,
+                    'service_type' => $session->service->service_type ?? null
                 ]);
                 continue; // استبعاد الدفعة
             }
-
-            // تسجيل الربط الناجح
-            \Log::info('Payment linked to service', [
-                'payment_id' => $payment->payment_id,
-                'mentorship_request_id' => $payment->mentorship_request_id,
-                'session_id' => $session->new_session_id,
-                'service_id' => $session->service_id,
-                'service_type' => $session->service->service_type
-            ]);
 
             // إضافة الدفعة مع service_type إلى المجموعة
             $payment->service_type = $session->service->service_type;
@@ -310,14 +313,14 @@ public function handleCoachRequest(Request $request, $coachId)
         }
 
         // 4. حساب إجمالي الريفينيو للدفعات المرتبطة فقط
-        $totalAspectRevenue = $linkedPayments->sum('amount') * 0.2;
+        $totalLinkedRevenue = $linkedPayments->sum('amount') * 0.2;
 
         // 5. Revenue by Service with Percentage (مع %)
         $revenueByService = $linkedPayments
             ->groupBy('service_type')
-            ->mapWithKeys(function ($payments, $serviceType) use ($totalAspectRevenue) {
+            ->mapWithKeys(function ($payments, $serviceType) use ($totalLinkedRevenue) {
                 $serviceRevenue = $payments->sum('amount') * 0.2;
-                $percentage = $totalAspectRevenue > 0 ? ($serviceRevenue / $totalAspectRevenue) * 100 : 0;
+                $percentage = $totalLinkedRevenue > 0 ? ($serviceRevenue / $totalLinkedRevenue) * 100 : 0;
                 return [
                     $serviceType => [
                         'revenue' => round($serviceRevenue, 2),
@@ -342,7 +345,7 @@ public function handleCoachRequest(Request $request, $coachId)
         // Return the response
         return response()->json([
             'number_of_users' => $totalUsers,
-            'revenue' => round($totalAspectRevenue, 2),
+            'revenue' => round($totalLinkedRevenue, 2),
             'revenue_by_service' => $revenueByService,
             'completed_sessions' => $completedSessions,
             'average_rating' => round($averageRating, 2),
