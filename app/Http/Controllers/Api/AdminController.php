@@ -244,222 +244,117 @@ public function handleCoachRequest(Request $request, $coachId)
 
 
 public function getDashboardStats(Request $request)
-{
-    try {
-        // 1. جلب جميع أنواع الخدمات
-        $validServiceTypes = Service::pluck('service_type')->toArray();
-        \Log::info('Valid service types', ['service_types' => $validServiceTypes]);
+    {
+        // 1. Calculate total revenue from completed payments
+        $totalRevenue = Payment::where('payment_status', 'Completed')
+            ->sum('amount');
+        
+        // 2. Platform revenue (20% of total)
+        $revenue20Percent = $totalRevenue * 0.2;
 
-        // 2. Revenue (20%) - فقط للدفعات المرتبطة بخدمات
-        $completedPayments = Payment::where('payment_status', 'Completed')->get();
-        $linkedPayments = collect(); // لتخزين الدفعات المرتبطة بخدمات
-
-        // 3. ربط الدفعات بخدمات
-        foreach ($completedPayments as $payment) {
-            \Log::info('Processing payment', [
-                'payment_id' => $payment->payment_id,
-                'mentorship_request_id' => $payment->mentorship_request_id,
-                'amount' => $payment->amount,
-                'date_time' => $payment->date_time
-            ]);
-
-            $session = null;
-            $serviceType = null;
-            $mentorshipType = null;
-            $revenueKey = null;
-
-            // الخطوة الأولى: التعامل مع Mentorship plan وGroup_Mentorship عبر mentorship_request_id
-            if ($payment->mentorship_request_id) {
-                $session = NewSession::where('mentorship_request_id', $payment->mentorship_request_id)
-                    ->with(['service', 'service.mentorship'])
-                    ->first();
-
-                if ($session && $session->service && in_array($session->service->service_type, $validServiceTypes)) {
-                    $serviceType = $session->service->service_type;
-                    $mentorshipType = $session->service->mentorship ? $session->service->mentorship->mentorship_type : null;
-
-                    // تحديد مفتاح الإيرادات
-                    if ($serviceType === 'Group_Mentorship' && $mentorshipType === 'Mentorship plan') {
-                        $revenueKey = 'Group_Mentorship';
-                    } elseif ($serviceType === 'Mentorship' && $mentorshipType === 'Mentorship plan') {
-                        $revenueKey = 'Mentorship plan';
-                    } else {
-                        \Log::warning('Unexpected service_type or mentorship_type for mentorship_request_id', [
-                            'payment_id' => $payment->payment_id,
-                            'mentorship_request_id' => $payment->mentorship_request_id,
-                            'service_type' => $serviceType,
-                            'mentorship_type' => $mentorshipType
-                        ]);
-                        continue; // استبعاد الدفعة
-                    }
-
-                    \Log::info('Payment linked via mentorship_request_id', [
-                        'payment_id' => $payment->payment_id,
-                        'mentorship_request_id' => $payment->mentorship_request_id,
-                        'session_id' => $session->new_session_id,
-                        'service_id' => $session->service_id,
-                        'service_type' => $serviceType,
-                        'mentorship_type' => $mentorshipType,
-                        'revenue_key' => $revenueKey
-                    ]);
-                } else {
-                    \Log::warning('No valid session or service for mentorship_request_id', [
-                        'payment_id' => $payment->payment_id,
-                        'mentorship_request_id' => $payment->mentorship_request_id,
-                        'session_id' => $session ? $session->new_session_id : null
-                    ]);
-                    continue; // استبعاد الدفعة
-                }
-            } else {
-                \Log::warning('Payment missing mentorship_request_id, checking for Mock_Interview or Mentorship session', [
-                    'payment_id' => $payment->payment_id,
-                    'amount' => $payment->amount,
-                    'date_time' => $payment->date_time
-                ]);
-
-                // الخطوة الثانية: التعامل مع Mock_Interview أولاً
-                $session = NewSession::where('date_time', '>=', $payment->date_time->subHours(2))
-                    ->where('date_time', '<=', $payment->date_time->addHours(2))
-                    ->whereHas('service', function ($query) {
-                        $query->where('service_type', 'Mock_Interview');
-                    })
-                    ->first();
-
-                if ($session && $session->service) {
-                    $serviceType = $session->service->service_type;
-                    $mentorshipType = null; // Mock_Interview مش في mentorships
-                    $revenueKey = 'Mock_Interview';
-
-                    \Log::info('Payment linked to Mock_Interview via date_time', [
-                        'payment_id' => $payment->payment_id,
-                        'session_id' => $session->new_session_id,
-                        'date_time' => $payment->date_time,
-                        'service_id' => $session->service_id,
-                        'service_type' => $serviceType,
-                        'mentorship_type' => $mentorshipType,
-                        'revenue_key' => $revenueKey
-                    ]);
-                } else {
-                    // الخطوة الثالثة: التعامل مع Mentorship session
-                    $session = NewSession::where('date_time', '>=', $payment->date_time->subHours(2))
-                        ->where('date_time', '<=', $payment->date_time->addHours(2))
-                        ->whereHas('service.mentorship', function ($query) {
-                            $query->where('mentorship_type', 'Mentorship session');
-                        })
-                        ->first();
-
-                    if ($session && $session->service && $session->service->mentorship) {
-                        $serviceType = $session->service->service_type;
-                        $mentorshipType = $session->service->mentorship->mentorship_type;
-                        $revenueKey = 'Mentorship session';
-
-                        \Log::info('Payment linked to Mentorship session via date_time', [
-                            'payment_id' => $payment->payment_id,
-                            'session_id' => $session->new_session_id,
-                            'date_time' => $payment->date_time,
-                            'service_id' => $session->service_id,
-                            'service_type' => $serviceType,
-                            'mentorship_type' => $mentorshipType,
-                            'revenue_key' => $revenueKey
-                        ]);
-                    } else {
-                        // افتراض: الدفعة بدون mentorship_request_id هي Mock_Interview أو Mentorship session
-                        $mockInterviewService = Service::where('service_type', 'Mock_Interview')->first();
-                        $mentorshipSessionService = Service::whereHas('mentorship', function ($query) {
-                            $query->where('mentorship_type', 'Mentorship session');
-                        })->first();
-
-                        if ($mockInterviewService) {
-                            $serviceType = 'Mock_Interview';
-                            $mentorshipType = null; // Mock_Interview مش في mentorships
-                            $revenueKey = 'Mock_Interview';
-
-                            \Log::info('Assigned Mock_Interview to payment without session', [
-                                'payment_id' => $payment->payment_id,
-                                'date_time' => $payment->date_time,
-                                'service_id' => $mockInterviewService->service_id,
-                                'service_type' => $serviceType,
-                                'mentorship_type' => $mentorshipType,
-                                'revenue_key' => $revenueKey
-                            ]);
-                        } elseif ($mentorshipSessionService) {
-                            $serviceType = $mentorshipSessionService->service_type;
-                            $mentorshipType = 'Mentorship session';
-                            $revenueKey = 'Mentorship session';
-
-                            \Log::info('Assigned Mentorship session to payment without session', [
-                                'payment_id' => $payment->payment_id,
-                                'date_time' => $payment->date_time,
-                                'service_id' => $mentorshipSessionService->service_id,
-                                'service_type' => $serviceType,
-                                'mentorship_type' => $mentorshipType,
-                                'revenue_key' => $revenueKey
-                            ]);
-                        } else {
-                            \Log::warning('No Mock_Interview or Mentorship session service found', [
-                                'payment_id' => $payment->payment_id
-                            ]);
-                            continue; // استبعاد الدفعة
-                        }
-                    }
-                }
-            }
-
-            // إضافة الدفعة إلى المجموعة
-            $payment->revenue_key = $revenueKey;
-            $linkedPayments->push($payment);
-        }
-
-        // 4. حساب إجمالي الريفينيو للدفعات المرتبطة فقط
-        $totalLinkedRevenue = $linkedPayments->sum('amount') * 0.2;
-
-        // 5. Revenue by Service with Percentage
-        $revenueByService = $linkedPayments
-            ->groupBy('revenue_key')
-            ->mapWithKeys(function ($payments, $revenueKey) use ($totalLinkedRevenue) {
-                $serviceRevenue = $payments->sum('amount') * 0.2;
-                $percentage = $totalLinkedRevenue > 0 ? ($serviceRevenue / $totalLinkedRevenue) * 100 : 0;
-                return [
-                    $revenueKey => [
-                        'revenue' => round($serviceRevenue, 2),
-                        'percentage' => number_format($percentage, 2) . '%' // إضافة %
-                    ]
-                ];
-            });
-
-        // 6. Number of Completed Sessions
+        // 3. Number of Completed Sessions
         $completedSessions = NewSession::where('status', 'Completed')
             ->count();
 
-        // 7. Average Rating
+        // 4. Get all services for revenue calculations
+        $services = Service::all()->pluck('service_type')->unique();
+        
+        // 5. Calculate revenue data by service type
+        $revenueByService = [];
+        $totalRevenueForPercentage = 0;
+        
+        // First, calculate raw revenue values by service type
+        foreach ($services as $serviceType) {
+            // Get all completed payments for this service type
+            $serviceRevenue = Payment::where('payment_status', 'Completed')
+                ->whereHas('mentorshipRequest', function ($query) use ($serviceType) {
+                    $query->whereHas('service', function ($q) use ($serviceType) {
+                        $q->where('service_type', $serviceType);
+                    });
+                })
+                ->sum('amount');
+            
+            // Calculate 20% platform cut
+            $platformRevenue = $serviceRevenue * 0.2;
+            $totalRevenueForPercentage += $platformRevenue;
+            
+            $revenueByService[$serviceType] = [
+                'value' => round($platformRevenue, 2),
+                'percentage' => 0 // Will be calculated after we have the total
+            ];
+        }
+        
+        // Also include direct payments through sessions (if any)
+        $sessionPayments = Payment::where('payment_status', 'Completed')
+            ->whereHas('session', function ($query) {
+                $query->whereNotNull('service_id');
+            })
+            ->with('session.service')
+            ->get()
+            ->groupBy(function ($payment) {
+                return $payment->session && $payment->session->service ? 
+                    $payment->session->service->service_type : 'Unknown';
+            });
+            
+        foreach ($sessionPayments as $serviceType => $payments) {
+            $serviceRevenue = $payments->sum('amount');
+            $platformRevenue = $serviceRevenue * 0.2;
+            
+            // Add to existing or create new entry
+            if (isset($revenueByService[$serviceType])) {
+                $revenueByService[$serviceType]['value'] += round($platformRevenue, 2);
+            } else {
+                $revenueByService[$serviceType] = [
+                    'value' => round($platformRevenue, 2),
+                    'percentage' => 0
+                ];
+            }
+            
+            $totalRevenueForPercentage += $platformRevenue;
+        }
+        
+        // Now calculate percentages based on the total
+        if ($totalRevenueForPercentage > 0) {
+            foreach ($revenueByService as $serviceType => $data) {
+                $revenueByService[$serviceType]['percentage'] = 
+                    round(($data['value'] / $totalRevenueForPercentage) * 100, 2);
+            }
+        }
+        
+        // 6. Calculate sessions percentage by service
+        $totalSessionsCount = $completedSessions > 0 ? $completedSessions : 1; // Avoid division by zero
+        
+        $sessionsByService = NewSession::where('status', 'Completed')
+            ->with('service')
+            ->get()
+            ->groupBy(function ($session) {
+                return $session->service ? $session->service->service_type : 'Unknown Service';
+            })
+            ->mapWithKeys(function ($sessions, $serviceType) use ($totalSessionsCount) {
+                $count = $sessions->count();
+                $percentage = ($count / $totalSessionsCount) * 100;
+                return [$serviceType => round($percentage, 2)];
+            });
+
+        // 7. Get average rating across all coaches
         $averageRating = Coach::has('reviews')
             ->with('reviews')
             ->get()
             ->avg('average_rating');
-
-        // 8. Total Users
+            
+        // 8. Get total users count
         $totalUsers = User::count();
 
-        // Return the response
+        // Return the response with the updated revenue data
         return response()->json([
             'number_of_users' => $totalUsers,
-            'revenue' => round($totalLinkedRevenue, 2),
+            'revenue' => round($revenue20Percent, 2),
+            'sessions_percentage_by_service' => $sessionsByService,
             'revenue_by_service' => $revenueByService,
             'completed_sessions' => $completedSessions,
-            'average_rating' => round($averageRating, 2),
+            'average_rating' => round($averageRating ?? 0, 2),
         ], 200);
-    } catch (\Exception $e) {
-        \Log::error('Failed to retrieve dashboard stats', [
-            'error' => $e->getMessage(),
-            'trace' => $e->getTraceAsString(),
-        ]);
-        return response()->json([
-            'message' => 'Failed to retrieve dashboard stats',
-            'error' => $e->getMessage(),
-        ], 500);
     }
-}
-
       
     public function getAllTrainees(Request $request)
     {
