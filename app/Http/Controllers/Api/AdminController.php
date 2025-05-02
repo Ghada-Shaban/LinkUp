@@ -447,7 +447,7 @@ public function getDashboardStats(Request $request)
         ], 200);
     }
 
-    public function getSessionCompletionTrends(Request $request)
+ public function getSessionCompletionTrends(Request $request)
 {
     $authAdmin = auth('admin-api')->user();
     if (!$authAdmin) {
@@ -461,7 +461,7 @@ public function getDashboardStats(Request $request)
             DB::raw("SUM(CASE WHEN status = 'Canceled' THEN 1 ELSE 0 END) as canceled")
         )
         ->groupBy(DB::raw("DATE_FORMAT(created_at, '%b %Y')"))
-        ->orderBy(DB::raw("DATE_FORMAT(created_at, '%m %Y')"))
+        ->orderBy(DB::raw("DATE_FORMAT(created_at, '%b %Y')")) // تعديل هنا
         ->get()
         ->map(function ($trend) {
             return [
