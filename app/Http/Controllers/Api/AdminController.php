@@ -560,6 +560,72 @@ public function getDashboardStats(Request $request)
         ], 500);
     }
 }
+
+    public function searchCoaches(Request $request)
+{
+    // Check if the authenticated user is an admin
+    $authAdmin = auth('admin-api')->user();
+    if (!$authAdmin) {
+        return response()->json(['message' => 'Unauthorized'], 401);
+    }
+
+    try {
+        // Get the search parameters from the request
+        $fullName = $request->input('full_name', '');
+        $email = $request->input('email', '');
+        $title = $request->input('title', '');
+        $company = $request->input('company', '');
+
+        // Build the query
+        $coaches = Coach::with(['user' => function ($query) {
+            $query->select('User_ID', 'full_name', 'email', 'photo', 'created_at', 'updated_at');
+        }])
+        ->whereHas('user', function ($q) use ($fullName, $email) {
+            if ($fullName) {
+                $q->where('full_name', 'LIKE', "%{$fullName}%");
+            }
+            if ($email) {
+                $q->orWhere('email', 'LIKE', "%{$email}%");
+            }
+        })
+        ->when($title, function ($q) use ($title) {
+            $q->where('Title', 'LIKE', "%{$title}%");
+        })
+        ->when($company, function ($q) use ($company) {
+            $q->where('Company_or_School', 'LIKE', "%{$company}%");
+        })
+        ->withCount(['sessions as completed_sessions_count' => function ($query) {
+            $query->where('status', NewSession::STATUS_COMPLETED);
+        }])
+        ->get()
+        ->map(function ($coach) {
+            return [
+                'user_id' => $coach->User_ID,
+                'full_name' => $coach->user->full_name,
+                'email' => $coach->user->email,
+                'photo' => $coach->user->photo,
+                'title' => $coach->Title,
+                'company_or_school' => $coach->Company_or_School,
+                'completed_sessions' => $coach->completed_sessions_count,
+                'years_of_experience' => $coach->Years_Of_Experience,
+            ];
+        });
+
+        return response()->json([
+            'message' => 'Coaches retrieved successfully',
+            'coaches' => $coaches,
+        ], 200);
+    } catch (\Exception $e) {
+        \Log::error('Failed to search coaches', [
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString(),
+        ]);
+        return response()->json([
+            'message' => 'Failed to search coaches',
+            'error' => $e->getMessage(),
+        ], 500);
+    }
+}
 }
         
            
