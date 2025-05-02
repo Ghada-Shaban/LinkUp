@@ -255,25 +255,19 @@ public function handleCoachRequest(Request $request, $coachId)
             ->get();
 
         // 4. Percentage of Completed Sessions by Service (based on payments)
-        $totalPaymentsCount = $completedPayments->count();
-        $sessionsByService = $completedPayments
+       $revenueByService = $completedPayments
             ->groupBy(function ($payment) {
                 return $payment->session && $payment->session->service ? $payment->session->service->service_type : 'Unknown Service';
             })
-            ->mapWithKeys(function ($payments, $serviceType) use ($totalPaymentsCount) {
-                $count = $payments->count();
-                $percentage = $totalPaymentsCount > 0 ? ($count / $totalPaymentsCount) * 100 : 0;
-                return [$serviceType => round($percentage, 2)];
-            });
-
-        // 5. Revenue by Service (20% of each service's payments)
-        $revenueByService = $completedPayments
-            ->groupBy(function ($payment) {
-                return $payment->session && $payment->session->service ? $payment->session->service->service_type : 'Unknown Service';
-            })
-            ->mapWithKeys(function ($payments, $serviceType) {
+            ->mapWithKeys(function ($payments, $serviceType) use ($totalRevenue) {
                 $serviceRevenue = $payments->sum('amount') * 0.2;
-                return [$serviceType => round($serviceRevenue, 2)];
+                $percentage = $totalRevenue > 0 ? ($serviceRevenue / ($totalRevenue * 0.2)) * 100 : 0;
+                return [
+                    $serviceType => [
+                        'revenue' => round($serviceRevenue, 2),
+                        'percentage' => round($percentage, 2)
+                    ]
+                ];
             });
 
 
@@ -290,7 +284,6 @@ public function handleCoachRequest(Request $request, $coachId)
         return response()->json([
             'number_of_users' => $totalUsers,
             'revenue' => round($revenue20Percent, 2),
-            'sessions_percentage_by_service' => $sessionsByService,
             'revenue_by_service' => $revenueByService,
             'completed_sessions' => $completedSessions,
             'average_rating' => round($averageRating, 2),
