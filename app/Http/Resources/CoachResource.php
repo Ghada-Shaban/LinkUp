@@ -33,15 +33,16 @@ class CoachResource extends JsonResource
         $yearsOfExperience = $this->coach ? ($this->coach->Years_Of_Experience + floor($this->coach->Months_Of_Experience / 12)) : 0;
         $experienceText = $yearsOfExperience > 0 ? "$yearsOfExperience+ years of experience" : "Less than a year of experience";
 
-        // إضافة log للتحقق من قيمة Photo
-        Log::info('CoachResource photo check', [
+        // إضافة log للتحقق من البيانات
+        Log::info('CoachResource data check', [
             'coach_id' => $this->User_ID,
+            'full_name' => $this->Full_Name,
             'photo' => $this->Photo,
         ]);
 
         return [
             'coach_id' => $this->User_ID,
-            'name' => $this->full_name, // رجعنا لـ full_name زي ما كان
+            'name' => $this->full_name, // استخدمنا Full_Name زي ما هو في جدول users
             'role' => $this->coach ? $this->coach->Title : 'N/A',
             'company' => $this->coach ? $this->coach->Company_or_School : 'N/A',
             'experience' => $experienceText, // سنين الخبرة
