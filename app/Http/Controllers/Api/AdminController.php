@@ -447,6 +447,46 @@ public function getDashboardStats(Request $request)
         ], 200);
     }
 
+    public function getSessionCompletionTrends(Request $request)
+{
+    $authAdmin = auth('admin-api')->user();
+    if (!$authAdmin) {
+        return response()->json(['message' => 'Unauthorized'], 401);
+    }
+
+    try {
+        $trends = NewSession::select(
+            DB::raw("DATE_FORMAT(created_at, '%b %Y') as month"),
+            DB::raw("SUM(CASE WHEN status = 'Completed' THEN 1 ELSE 0 END) as completed"),
+            DB::raw("SUM(CASE WHEN status = 'Canceled' THEN 1 ELSE 0 END) as canceled")
+        )
+        ->groupBy(DB::raw("DATE_FORMAT(created_at, '%b %Y')"))
+        ->orderBy(DB::raw("DATE_FORMAT(created_at, '%m %Y')"))
+        ->get()
+        ->map(function ($trend) {
+            return [
+                'month' => $trend->month,
+                'completed' => (int)$trend->completed,
+                'canceled' => (int)$trend->canceled,
+            ];
+        });
+
+        return response()->json([
+            'message' => 'Session completion trends retrieved successfully',
+            'trends' => $trends,
+        ], 200);
+    } catch (\Exception $e) {
+        \Log::error('Failed to retrieve session completion trends', [
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString(),
+        ]);
+        return response()->json([
+            'message' => 'Failed to retrieve session completion trends',
+            'error' => $e->getMessage(),
+        ], 500);
+    }
+}
+
     public function deleteUser(Request $request, $userId)
 {
     // Check if the authenticated user is an admin
