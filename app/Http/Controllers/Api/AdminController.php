@@ -247,157 +247,70 @@ public function handleCoachRequest(Request $request, $coachId)
 
 
 public function getDashboardStats(Request $request)
-    {
-        // 1. Calculate total revenue from completed payments
+{
+    $authAdmin = auth('admin-api')->user();
+    if (!$authAdmin) {
+        return response()->json(['message' => 'Unauthorized'], 401);
+    }
+
+    try {
+        // 1. Revenue (20%)
         $totalRevenue = Payment::where('payment_status', 'Completed')
+            ->whereHas('session', function ($query) {
+                $query->whereHas('service', function ($query) {
+                    $query->whereNull('deleted_at');
+                });
+            })
             ->sum('amount');
-        
-        // 2. Platform revenue (20% of total)
         $revenue20Percent = $totalRevenue * 0.2;
 
-        // 3. Number of Completed Sessions
-        $completedSessions = NewSession::where('status', 'Completed')
-            ->count();
-        
-        // 4. Calculate revenue by service type
-        $serviceTypes = Service::distinct()->pluck('service_type');
-        $revenueByService = [];
-        $totalRevenueForPercentage = 0;
-        
-        // Initialize revenue data for each service type
-        foreach ($serviceTypes as $serviceType) {
-            $revenueByService[$serviceType] = [
-                'value' => 0,
-                'percentage' => 0
-            ];
-        }
-        
-        // Get all sessions with completed payments and group them by service type
-        $sessionsWithPayments = NewSession::whereHas('service')
-            ->with('service')
-            ->get();
-        
-        foreach ($sessionsWithPayments as $session) {
-            $serviceType = $session->service->service_type;
-            
-            // Find payments associated with this session through mentorship_request_id
-            $paymentsAmount = Payment::where('payment_status', 'Completed')
-                ->where('mentorship_request_id', $session->mentorship_request_id)
-                ->sum('amount');
-                
-            if ($paymentsAmount > 0) {
-                $platformRevenue = $paymentsAmount * 0.2;
-                $revenueByService[$serviceType]['value'] += round($platformRevenue, 2);
-                $totalRevenueForPercentage += $platformRevenue;
-            }
-        }
-        
-        // Also include direct payments if payment model has a relationship to session
-        // But check if the relationship exists in the model first
-        $paymentModel = new Payment();
-        if (method_exists($paymentModel, 'session')) {
-            $directSessionPayments = Payment::where('payment_status', 'Completed')
-                ->whereHas('session.service')
-                ->with('session.service')
-                ->get();
-                
-            foreach ($directSessionPayments as $payment) {
-                if ($payment->session && $payment->session->service) {
-                    $serviceType = $payment->session->service->service_type;
-                    $platformRevenue = $payment->amount * 0.2;
-                    
-                    if (!isset($revenueByService[$serviceType])) {
-                        $revenueByService[$serviceType] = [
-                            'value' => 0,
-                            'percentage' => 0
-                        ];
-                    }
-                    
-                    $revenueByService[$serviceType]['value'] += round($platformRevenue, 2);
-                    $totalRevenueForPercentage += $platformRevenue;
-                }
-            }
-        }
-        
-        // Calculate percentages if we have any revenue
-        if ($totalRevenueForPercentage > 0) {
-            foreach ($revenueByService as $serviceType => $data) {
-                if ($data['value'] > 0) {
-                    $revenueByService[$serviceType]['percentage'] = 
-                        round(($data['value'] / $totalRevenueForPercentage) * 100, 2);
-                }
-            }
-        }
-        
-        // 6. Calculate sessions percentage by service
-        $totalSessionsCount = $completedSessions > 0 ? $completedSessions : 1; // Avoid division by zero
-        
-        // Get all completed sessions grouped by service type
-        $sessionsByServiceData = NewSession::where('status', 'Completed')
-            ->with('service')
-            ->get();
-            
-        // Initialize result array
-        $sessionsByService = [];
-        
-        // Create counts for each service type
-        $serviceCountMap = [];
-        foreach ($sessionsByServiceData as $session) {
-            if ($session->service) {
-                $serviceType = $session->service->service_type;
-                if (!isset($serviceCountMap[$serviceType])) {
-                    $serviceCountMap[$serviceType] = 0;
-                }
-                $serviceCountMap[$serviceType]++;
-            }
-        }
-        
-        // Convert counts to percentages
-        foreach ($serviceCountMap as $serviceType => $count) {
-            $percentage = ($count / $totalSessionsCount) * 100;
-            $sessionsByService[$serviceType] = round($percentage, 2);
-        }
+       
 
-        // 7. Get average rating across all coaches
-        $averageRating = 0;
-        $coaches = Coach::has('reviews')->get();
-        if ($coaches->count() > 0) {
-            $totalRating = 0;
-            $ratingCount = 0;
-            
-            foreach ($coaches as $coach) {
-                $coachRating = $coach->reviews()->avg('rating');
-                if ($coachRating) {
-                    $totalRating += $coachRating;
-                    $ratingCount++;
-                }
-            }
-            
-            if ($ratingCount > 0) {
-                $averageRating = $totalRating / $ratingCount;
-            }
-        }
-            
-        // 8. Get total users count
+        // 3. Get all completed payments with their sessions and services
+        $completedPayments = Payment::where('payment_status', 'Completed')
+            ->with(['session.service'])
+            ->get();
+
+        // 4. Percentage of Completed Sessions by Service (based on payments)
+        $totalPaymentsCount = $completedPayments->count();
+        $sessionsByService = $completedPayments->groupBy(function ($payment) {
+            return $payment->session && $payment->session->service ? $payment->session->service->service_type : 'Unknown Service';
+        })->mapWithKeys(function ($payments, $serviceType) use ($totalPaymentsCount) {
+            $count = $payments->count();
+            $percentage = $totalPaymentsCount > 0 ? ($count / $totalPaymentsCount) * 100 : 0;
+            return [$serviceType => round($percentage, 2)];
+        });
+
+        // 5. Revenue by Service (20% of each service's payments)
+        $revenueByService = $completedPayments->groupBy(function ($payment) {
+            return $payment->session && $payment->session->service ? $payment->session->service->service_type : 'Unknown Service';
+        })->mapWithKeys(function ($payments, $serviceType) {
+            $serviceRevenue = $payments->sum('amount') * 0.2;
+            return [$serviceType => round($serviceRevenue, 2)];
+        });
+
+        $averageRating = Coach::has('reviews')->with('reviews')->get()->avg('average_rating');
         $totalUsers = User::count();
 
-        // 9. Clean up empty services (with zero value) from the revenue by service
-        foreach ($revenueByService as $key => $data) {
-            if ($data['value'] <= 0) {
-                unset($revenueByService[$key]);
-            }
-        }
-
-        // Return the response with the updated revenue data
         return response()->json([
             'number_of_users' => $totalUsers,
             'revenue' => round($revenue20Percent, 2),
             'sessions_percentage_by_service' => $sessionsByService,
             'revenue_by_service' => $revenueByService,
-            'completed_sessions' => $completedSessions,
+          
             'average_rating' => round($averageRating, 2),
         ], 200);
+    } catch (\Exception $e) {
+        \Log::error('Failed to retrieve dashboard stats', [
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString(),
+        ]);
+        return response()->json([
+            'message' => 'Failed to retrieve dashboard stats',
+            'error' => $e->getMessage(),
+        ], 500);
     }
+}
 
       
     public function getAllTrainees(Request $request)
