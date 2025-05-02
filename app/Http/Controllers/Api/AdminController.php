@@ -240,6 +240,8 @@ public function handleCoachRequest(Request $request, $coachId)
             'pending_coaches_count' => $pendingCoachesCount,
         ], 200);
     }
+
+
 public function getDashboardStats(Request $request)
 {
     try {
@@ -275,8 +277,8 @@ public function getDashboardStats(Request $request)
                     $serviceType = $session->service->service_type;
                     $mentorshipType = $session->service->mentorship ? $session->service->mentorship->mentorship_type : null;
 
-                    // تحديد مفتاح الإيرادات بناءً على service_type وmentorship_type
-                    if ($serviceType === 'Group_Mentorship') {
+                    // تحديد مفتاح الإيرادات
+                    if ($serviceType === 'Group_Mentorship' && $mentorshipType === 'Mentorship plan') {
                         $revenueKey = 'Group_Mentorship';
                     } elseif ($serviceType === 'Mentorship' && $mentorshipType === 'Mentorship plan') {
                         $revenueKey = 'Mentorship plan';
@@ -308,40 +310,26 @@ public function getDashboardStats(Request $request)
                     continue; // استبعاد الدفعة
                 }
             } else {
-                \Log::warning('Payment missing mentorship_request_id, checking for Mentorship session or Mock_Interview', [
+                \Log::warning('Payment missing mentorship_request_id, checking for Mock_Interview or Mentorship session', [
                     'payment_id' => $payment->payment_id,
                     'amount' => $payment->amount,
                     'date_time' => $payment->date_time
                 ]);
 
-                // الخطوة الثانية: التعامل مع Mentorship session وMock_Interview
-                // حاول ربط الدفعة بجلسة عبر date_time
+                // الخطوة الثانية: التعامل مع Mock_Interview أولاً
                 $session = NewSession::where('date_time', '>=', $payment->date_time->subHours(2))
                     ->where('date_time', '<=', $payment->date_time->addHours(2))
-                    ->whereHas('service.mentorship', function ($query) {
-                        $query->where('mentorship_type', 'Mentorship session');
+                    ->whereHas('service', function ($query) {
+                        $query->where('service_type', 'Mock_Interview');
                     })
                     ->first();
 
-                if ($session && $session->service && $session->service->mentorship) {
+                if ($session && $session->service) {
                     $serviceType = $session->service->service_type;
-                    $mentorshipType = $session->service->mentorship->mentorship_type;
+                    $mentorshipType = null; // Mock_Interview مش في mentorships
+                    $revenueKey = 'Mock_Interview';
 
-                    // تحديد مفتاح الإيرادات
-                    if ($serviceType === 'Mock_Interview') {
-                        $revenueKey = 'Mock_Interview';
-                    } elseif ($mentorshipType === 'Mentorship session') {
-                        $revenueKey = 'Mentorship session';
-                    } else {
-                        \Log::warning('Unexpected service_type for Mentorship session', [
-                            'payment_id' => $payment->payment_id,
-                            'session_id' => $session->new_session_id,
-                            'service_type' => $serviceType
-                        ]);
-                        continue; // استبعاد الدفعة
-                    }
-
-                    \Log::info('Payment linked via date_time', [
+                    \Log::info('Payment linked to Mock_Interview via date_time', [
                         'payment_id' => $payment->payment_id,
                         'session_id' => $session->new_session_id,
                         'date_time' => $payment->date_time,
@@ -351,34 +339,72 @@ public function getDashboardStats(Request $request)
                         'revenue_key' => $revenueKey
                     ]);
                 } else {
-                    // افتراض: الدفعة بدون mentorship_request_id هي Mentorship session أو Mock_Interview
-                    $mentorshipSessionService = Service::whereHas('mentorship', function ($query) {
-                        $query->where('mentorship_type', 'Mentorship session');
-                    })->first();
+                    // الخطوة الثالثة: التعامل مع Mentorship session
+                    $session = NewSession::where('date_time', '>=', $payment->date_time->subHours(2))
+                        ->where('date_time', '<=', $payment->date_time->addHours(2))
+                        ->whereHas('service.mentorship', function ($query) {
+                            $query->where('mentorship_type', 'Mentorship session');
+                        })
+                        ->first();
 
-                    if ($mentorshipSessionService) {
-                        $serviceType = $mentorshipSessionService->service_type;
-                        $mentorshipType = 'Mentorship session';
-                        $revenueKey = ($serviceType === 'Mock_Interview') ? 'Mock_Interview' : 'Mentorship session';
+                    if ($session && $session->service && $session->service->mentorship) {
+                        $serviceType = $session->service->service_type;
+                        $mentorshipType = $session->service->mentorship->mentorship_type;
+                        $revenueKey = 'Mentorship session';
 
-                        \Log::info('Assigned service to payment without session', [
+                        \Log::info('Payment linked to Mentorship session via date_time', [
                             'payment_id' => $payment->payment_id,
+                            'session_id' => $session->new_session_id,
                             'date_time' => $payment->date_time,
-                            'service_id' => $mentorshipSessionService->service_id,
+                            'service_id' => $session->service_id,
                             'service_type' => $serviceType,
                             'mentorship_type' => $mentorshipType,
                             'revenue_key' => $revenueKey
                         ]);
                     } else {
-                        \Log::warning('No Mentorship session or Mock_Interview service found', [
-                            'payment_id' => $payment->payment_id
-                        ]);
-                        continue; // استبعاد الدفعة
+                        // افتراض: الدفعة بدون mentorship_request_id هي Mock_Interview أو Mentorship session
+                        $mockInterviewService = Service::where('service_type', 'Mock_Interview')->first();
+                        $mentorshipSessionService = Service::whereHas('mentorship', function ($query) {
+                            $query->where('mentorship_type', 'Mentorship session');
+                        })->first();
+
+                        if ($mockInterviewService) {
+                            $serviceType = 'Mock_Interview';
+                            $mentorshipType = null; // Mock_Interview مش في mentorships
+                            $revenueKey = 'Mock_Interview';
+
+                            \Log::info('Assigned Mock_Interview to payment without session', [
+                                'payment_id' => $payment->payment_id,
+                                'date_time' => $payment->date_time,
+                                'service_id' => $mockInterviewService->service_id,
+                                'service_type' => $serviceType,
+                                'mentorship_type' => $mentorshipType,
+                                'revenue_key' => $revenueKey
+                            ]);
+                        } elseif ($mentorshipSessionService) {
+                            $serviceType = $mentorshipSessionService->service_type;
+                            $mentorshipType = 'Mentorship session';
+                            $revenueKey = 'Mentorship session';
+
+                            \Log::info('Assigned Mentorship session to payment without session', [
+                                'payment_id' => $payment->payment_id,
+                                'date_time' => $payment->date_time,
+                                'service_id' => $mentorshipSessionService->service_id,
+                                'service_type' => $serviceType,
+                                'mentorship_type' => $mentorshipType,
+                                'revenue_key' => $revenueKey
+                            ]);
+                        } else {
+                            \Log::warning('No Mock_Interview or Mentorship session service found', [
+                                'payment_id' => $payment->payment_id
+                            ]);
+                            continue; // استبعاد الدفعة
+                        }
                     }
                 }
             }
 
-            // إضافة الدفعة إلى المجموعة مع revenue_key
+            // إضافة الدفعة إلى المجموعة
             $payment->revenue_key = $revenueKey;
             $linkedPayments->push($payment);
         }
@@ -433,6 +459,7 @@ public function getDashboardStats(Request $request)
     }
 }
 
+      
     public function getAllTrainees(Request $request)
     {
         // Get all trainees with details from users and trainees tables
