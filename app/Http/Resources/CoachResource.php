@@ -10,20 +10,20 @@ class CoachResource extends JsonResource
     public function toArray($request)
     {
         // جلب عدد الجلسات المنتهية
+        $Collection();
         $completedSessions = $this->services->flatMap->sessions->where('status', 'Completed')->count();
 
         // جلب السعر من أول خدمة
         $service = $this->services->first();
-        // جلب كل الأسعار من كل الخدمات وتحديد أقل سعر مع إضافة العملة
         // جلب كل الأسعار من كل الخدمات مع التحقق من وجود العلاقة
-$prices = $this->services->flatMap(function ($service) {
-    // التحقق من وجود العلاقة price
-    return $service->price ? $service->price->pluck('price') : collect([]);
-})->filter()->map(function ($price) {
-    return (int) $price;
-})->toArray();
+        $prices = $this->services->flatMap(function ($service) {
+            // التحقق من وجود العلاقة price
+            return $service->price ? $service->price->pluck('price') : collect([]);
+        })->filter()->map(function ($price) {
+            return (int) $price;
+        })->toArray();
 
-$price = !empty($prices) ? min($prices) . ' EGP' : 'N/A';
+        $price = !empty($prices) ? min($prices) . ' EGP' : 'N/A';
         // جلب المهارات
         $skills = $this->skills->pluck('skill')->toArray();
         $displaySkills = array_slice($skills, 0, 6); // أول 6 مهارات
@@ -45,7 +45,7 @@ $price = !empty($prices) ? min($prices) . ' EGP' : 'N/A';
             'skills' => $displaySkills, // أول 6 مهارات
             'more_skills_count' => $moreSkillsCount > 0 ? "+$moreSkillsCount More" : null, // عدد المهارات الزيادة
             'price' => $price, // السعر
-            'profile_picture' => $this->Photo ?? 'https://via.placeholder.com/150', // صورة الكوتش
+            'profile_picture' => $this->Photo ? asset('storage/' . $this->Photo) : 'https://via.placeholder.com/150', // صورة الكوتش
         ];
     }
 }
