@@ -291,12 +291,12 @@ public function handleCoachRequest(Request $request, $coachId)
         $revenueByService = $linkedPayments
             ->groupBy('service_type')
             ->mapWithKeys(function ($payments, $serviceType) use ($totalLinkedRevenue) {
-                $serviceRevenue = $payments->sum('amount') * 0.2;
+                $serviceRevenue = $payments->sum('amount') * 0.2 . 'EGP';
                 $percentage = $totalLinkedRevenue > 0 ? ($serviceRevenue / $totalLinkedRevenue) * 100 : 0;
                 return [
                     $serviceType => [
-                        'revenue' => round($serviceRevenue, 2),
-                        'percentage' => round($percentage, 2)
+                        'revenue' => round($serviceRevenue, 2) . 'EGP',
+                        'percentage' => round($percentage, 2) . '%'
                     ]
                 ];
             });
