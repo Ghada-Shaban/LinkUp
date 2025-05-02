@@ -121,3 +121,4 @@ Route::get('/admin/Pending-coaches-count', [AdminController::class, 'getPendingC
 Route::get('/admin/DashboardStats', [AdminController::class, 'getDashboardStats']);
 Route::get('/admin/trainees', [AdminController::class, 'getAllTrainees']);
 Route::get('/admin/trainees-count', [AdminController::class, 'getTraineesCount']);
+Route::delete('/admin/delete-users/{userId}', [AdminController::class, 'deleteUser']);
