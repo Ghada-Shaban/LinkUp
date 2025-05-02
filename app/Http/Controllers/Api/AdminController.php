@@ -561,7 +561,13 @@ public function getDashboardStats(Request $request)
     }
 }
 
-    public function searchCoaches(Request $request)
+  /**
+ * Search for coaches based on a single query string across full_name, email, title, and company.
+ *
+ * @param Request $request
+ * @return \Illuminate\Http\JsonResponse
+ */
+public function searchCoaches(Request $request)
 {
     // Check if the authenticated user is an admin
     $authAdmin = auth('admin-api')->user();
@@ -570,30 +576,19 @@ public function getDashboardStats(Request $request)
     }
 
     try {
-        // Get the search parameters from the request
-        $fullName = $request->input('full_name', '');
-        $email = $request->input('email', '');
-        $title = $request->input('title', '');
-        $company = $request->input('company', '');
+        // Get the search query from the request
+        $query = $request->input('query', '');
 
         // Build the query
         $coaches = Coach::with(['user' => function ($query) {
             $query->select('User_ID', 'full_name', 'email', 'photo', 'created_at', 'updated_at');
         }])
-        ->whereHas('user', function ($q) use ($fullName, $email) {
-            if ($fullName) {
-                $q->where('full_name', 'LIKE', "%{$fullName}%");
-            }
-            if ($email) {
-                $q->orWhere('email', 'LIKE', "%{$email}%");
-            }
+        ->whereHas('user', function ($q) use ($query) {
+            $q->where('full_name', 'LIKE', "%{$query}%")
+              ->orWhere('email', 'LIKE', "%{$query}%");
         })
-        ->when($title, function ($q) use ($title) {
-            $q->where('Title', 'LIKE', "%{$title}%");
-        })
-        ->when($company, function ($q) use ($company) {
-            $q->where('Company_or_School', 'LIKE', "%{$company}%");
-        })
+        ->orWhere('Title', 'LIKE', "%{$query}%")
+        ->orWhere('Company_or_School', 'LIKE', "%{$query}%")
         ->withCount(['sessions as completed_sessions_count' => function ($query) {
             $query->where('status', NewSession::STATUS_COMPLETED);
         }])
