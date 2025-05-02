@@ -556,7 +556,7 @@ public function searchCoaches(Request $request)
         ], 500);
     }
 }
-   public function getDashboardStats(Request $request)
+  public function getDashboardStats(Request $request)
 {
     $authAdmin = auth('admin-api')->user();
     if (!$authAdmin) {
@@ -598,9 +598,21 @@ public function searchCoaches(Request $request)
                 $query->whereIn('service_type', ['Mentorship', 'Mock_Interview', 'Group_Mentorship'])
                       ->whereNull('deleted_at');
             })
-            ->count();
+            ->get();
 
-        // 3. Get all completed payments with their mentorship requests and services
+        $totalCompletedSessionsCount = $completedSessions->count();
+
+        // 3. Percentage of Completed Sessions by Service (based on new_sessions)
+        $allServiceTypes = ['Mentorship', 'Mock_Interview', 'Group_Mentorship'];
+        $sessionsByService = collect($allServiceTypes)->mapWithKeys(function ($serviceType) use ($completedSessions, $totalCompletedSessionsCount) {
+            $count = $completedSessions->filter(function ($session) use ($serviceType) {
+                return $session->service->service_type === $serviceType;
+            })->count();
+            $percentage = $totalCompletedSessionsCount > 0 ? ($count / $totalCompletedSessionsCount) * 100 : 0;
+            return [$serviceType => round($percentage, 2)];
+        });
+
+        // 4. Get all completed payments with their mentorship requests and services
         $completedPayments = Payment::where('payment_status', 'Completed')
             ->with(['mentorshipRequest'])
             ->get()
@@ -608,7 +620,7 @@ public function searchCoaches(Request $request)
                 return $payment->mentorshipRequest && $payment->mentorshipRequest->requestable;
             });
 
-        // 4. Load services for each mentorship request manually
+        // 5. Load services for each mentorship request manually
         $completedPayments->each(function ($payment) {
             if ($payment->mentorshipRequest->requestable_type === 'App\Models\MentorshipPlan') {
                 $service = Service::where('service_id', $payment->mentorshipRequest->requestable_id)
@@ -627,15 +639,6 @@ public function searchCoaches(Request $request)
             }
         });
 
-        // 5. Ensure all service types are included with 0 if no data
-        $allServiceTypes = ['Mentorship', 'Mock_Interview', 'Group_Mentorship'];
-        $sessionsByService = collect($allServiceTypes)->mapWithKeys(function ($serviceType) use ($completedPayments) {
-            $count = $completedPayments->where('mentorshipRequest.service_type', $serviceType)->count();
-            $totalPaymentsCount = $completedPayments->count();
-            $percentage = $totalPaymentsCount > 0 ? ($count / $totalPaymentsCount) * 100 : 0;
-            return [$serviceType => round($percentage, 2)];
-        });
-
         // 6. Revenue by Service (20% of each service's payments)
         $revenueByService = collect($allServiceTypes)->mapWithKeys(function ($serviceType) use ($completedPayments) {
             $paymentsForService = $completedPayments->where('mentorshipRequest.service_type', $serviceType);
@@ -649,7 +652,7 @@ public function searchCoaches(Request $request)
         return response()->json([
             'number_of_users' => $totalUsers,
             'revenue' => round($revenue20Percent, 2),
-            'completed_sessions' => $completedSessions,
+            'completed_sessions' => $totalCompletedSessionsCount,
             'sessions_percentage_by_service' => $sessionsByService,
             'revenue_by_service' => $revenueByService,
             'average_rating' => round($averageRating, 2),
