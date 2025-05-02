@@ -239,29 +239,60 @@ public function handleCoachRequest(Request $request, $coachId)
             'pending_coaches_count' => $pendingCoachesCount,
         ], 200);
     }
-     public function getDashboardStats(Request $request)
-    {
-        // 1. Revenue (20%)
-        $totalRevenue = Payment::where('payment_status', 'Completed')
-            ->sum('amount');
-        $revenue20Percent = $totalRevenue * 0.2;
+    public function getDashboardStats(Request $request)
+{
+    try {
+        // 1. Revenue (20%) - فقط للدفعات المرتبطة بخدمات
+        $completedPayments = Payment::where('payment_status', 'Completed')->get();
+        $linkedPayments = collect(); // لتخزين الدفعات المرتبطة بخدمات
 
-              // 2. Number of Completed Sessions
-        $completedSessions = NewSession::where('status', 'Completed')
-            ->count();
-        // 3. Get all completed payments with their sessions and services
-        $completedPayments = Payment::where('payment_status', 'Completed')
-            ->with(['session.service'])
-            ->get();
+        // 2. ربط الدفعات بخدمات
+        foreach ($completedPayments as $payment) {
+            if (!$payment->mentorship_request_id) {
+                \Log::warning('Payment missing mentorship_request_id', [
+                    'payment_id' => $payment->payment_id,
+                    'amount' => $payment->amount,
+                    'date_time' => $payment->date_time
+                ]);
+                continue; // استبعاد الدفعة
+            }
 
-        // 4. Percentage of Completed Sessions by Service (based on payments)
-       $revenueByService = $completedPayments
-            ->groupBy(function ($payment) {
-                return $payment->session && $payment->session->service ? $payment->session->service->service_type : 'Unknown Service';
-            })
-            ->mapWithKeys(function ($payments, $serviceType) use ($totalRevenue) {
+            // البحث عن جلسة بناءً على mentorship_request_id
+            $session = NewSession::where('mentorship_request_id', $payment->mentorship_request_id)
+                ->with('service')
+                ->first();
+
+            if (!$session) {
+                \Log::warning('No session found for mentorship_request_id', [
+                    'payment_id' => $payment->payment_id,
+                    'mentorship_request_id' => $payment->mentorship_request_id
+                ]);
+                continue; // استبعاد الدفعة
+            }
+
+            if (!$session->service) {
+                \Log::warning('Session missing service', [
+                    'payment_id' => $payment->payment_id,
+                    'session_id' => $session->new_session_id,
+                    'mentorship_request_id' => $payment->mentorship_request_id
+                ]);
+                continue; // استبعاد الدفعة
+            }
+
+            // إضافة الدفعة مع service_type إلى المجموعة
+            $payment->service_type = $session->service->service_type;
+            $linkedPayments->push($payment);
+        }
+
+        // 3. حساب إجمالي الريفينيو للدفعات المرتبطة فقط
+        $totalLinkedRevenue = $linkedPayments->sum('amount') * 0.2;
+
+        // 4. Revenue Share Revenue by Service with Percentage
+        $revenueByService = $linkedPayments
+            ->groupBy('service_type')
+            ->mapWithKeys(function ($payments, $serviceType) use ($totalLinkedRevenue) {
                 $serviceRevenue = $payments->sum('amount') * 0.2;
-                $percentage = $totalRevenue > 0 ? ($serviceRevenue / ($totalRevenue * 0.2)) * 100 : 0;
+                $percentage = $totalLinkedRevenue > 0 ? ($serviceRevenue / $totalLinkedRevenue) * 100 : 0;
                 return [
                     $serviceType => [
                         'revenue' => round($serviceRevenue, 2),
@@ -270,25 +301,38 @@ public function handleCoachRequest(Request $request, $coachId)
                 ];
             });
 
+        // 5. Number of Completed Sessions
+        $completedSessions = NewSession::where('status', 'Completed')
+            ->count();
 
-  
-         $averageRating = Coach::has('reviews')
+        // 6. Average Rating
+        $averageRating = Coach::has('reviews')
             ->with('reviews')
             ->get()
             ->avg('average_rating');
-         $totalUsers = User::count();
 
-     
+        // 7. Total Users
+        $totalUsers = User::count();
 
         // Return the response
         return response()->json([
             'number_of_users' => $totalUsers,
-            'revenue' => round($revenue20Percent, 2),
+            'revenue' => round($totalLinkedRevenue, 2),
             'revenue_by_service' => $revenueByService,
             'completed_sessions' => $completedSessions,
             'average_rating' => round($averageRating, 2),
         ], 200);
+    } catch (\Exception $e) {
+        \Log::error('Failed to retrieve dashboard stats', [
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString(),
+        ]);
+        return response()->json([
+            'message' => 'Failed to retrieve dashboard stats',
+            'error' => $e->getMessage(),
+        ], 500);
     }
+}
 
     public function getAllTrainees(Request $request)
     {
