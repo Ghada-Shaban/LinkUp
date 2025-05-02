@@ -444,6 +444,119 @@ public function getDashboardStats(Request $request)
             'trainees_count' => $traineesCount,
         ], 200);
     }
+
+    public function deleteUser(Request $request, $userId)
+{
+    // Check if the authenticated user is an admin
+    $authAdmin = auth('admin-api')->user();
+    if (!$authAdmin) {
+        return response()->json(['message' => 'Unauthorized'], 401);
+    }
+
+    try {
+        // Find the user
+        $user = User::findOrFail($userId);
+
+        // Start a transaction to ensure data consistency
+        DB::beginTransaction();
+
+        // Handle Coach-related data
+        $coach = $user->coach;
+        if ($coach) {
+            // Delete coach skills and languages
+            CoachSkill::where('coach_id', $userId)->forceDelete();
+            CoachLanguage::where('coach_id', $userId)->forceDelete();
+
+            // Delete coach services (pivot table: chooses)
+            $coach->services()->detach();
+
+            // Delete direct services
+            Service::where('coach_id', $userId)->forceDelete();
+
+            // Delete coach sessions
+            NewSession::where('coach_id', $userId)->forceDelete();
+
+            // Delete coach availability
+            CoachAvailability::where('coach_id', $userId)->forceDelete();
+
+            // Delete coach mentorship requests
+            MentorshipRequest::where('coach_id', $userId)->forceDelete();
+
+            // Delete coach record
+            $coach->forceDelete();
+        }
+
+        // Handle Trainee-related data
+        $trainee = $user->trainee;
+        if ($trainee) {
+            // Delete trainee preferred languages and areas of interest
+            TraineePreferredLanguage::where('trainee_id', $userId)->forceDelete();
+            TraineeAreaOfInterest::where('trainee_id', $userId)->forceDelete();
+
+            // Delete trainee bookings (pivot table: books)
+            $trainee->bookedSessions()->detach();
+
+            // Delete trainee sessions
+            NewSession::where('trainee_id', $userId)->forceDelete();
+
+            // Delete trainee performance reports
+            EmailPerformanceReport::where('trainee_id', $userId)->forceDelete();
+
+            // Delete trainee mentorship requests
+            MentorshipRequest::where('trainee_id', $userId)->forceDelete();
+
+            // Delete trainee record
+            $trainee->forceDelete();
+        }
+
+        // Delete user-related data
+        // Delete reviews (as coach or trainee)
+        Review::where('coach_id', $userId)->orWhere('trainee_id', $userId)->forceDelete();
+
+        // Delete bookings
+        Book::where('trainee_id', $userId)->forceDelete();
+
+        // Delete attended sessions (pivot table: attends)
+        $user->attendedSessions()->detach();
+
+        // Delete viewed services (pivot table: views)
+        $user->viewedServices()->detach();
+
+        // Delete email notifications (pivot table: received_by)
+        $user->emailNotifications()->detach();
+
+        // Delete mentorship requests (polymorphic)
+        MentorshipRequest::where('requestable_id', $userId)->where('requestable_type', User::class)->forceDelete();
+
+        // Delete user photo if it exists
+        if ($user->photo) {
+            \Storage::disk('public')->delete($user->photo);
+        }
+
+        // Delete the user
+        $user->forceDelete();
+
+        // Commit the transaction
+        DB::commit();
+
+        return response()->json([
+            'message' => 'User and associated data deleted successfully',
+            'user_id' => $userId,
+        ], 200);
+    } catch (\Exception $e) {
+        // Rollback the transaction on error
+        DB::rollBack();
+
+        \Log::error('Failed to delete user', [
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString(),
+        ]);
+        return response()->json([
+            'message' => 'Failed to delete user',
+            'error' => $e->getMessage(),
+        ], 500);
+    }
+}
 }
         
            
