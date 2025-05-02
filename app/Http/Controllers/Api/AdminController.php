@@ -506,6 +506,60 @@ public function getDashboardStats(Request $request)
         ], 500);
     }
 }
+
+
+    public function searchTrainees(Request $request)
+{
+    // Check if the authenticated user is an admin
+    $authAdmin = auth('admin-api')->user();
+    if (!$authAdmin) {
+        return response()->json(['message' => 'Unauthorized'], 401);
+    }
+
+    try {
+        // Get the search query from the request
+        $query = $request->input('query', '');
+
+        // Search for trainees limited to full_name, email, and Current_Role
+        $trainees = Trainee::with(['user' => function ($query) {
+            $query->select('User_ID', 'full_name', 'email', 'photo', 'created_at', 'updated_at');
+        }])
+        ->whereHas('user', function ($q) use ($query) {
+            $q->where('full_name', 'LIKE', "%{$query}%")
+              ->orWhere('email', 'LIKE', "%{$query}%");
+        })
+        ->orWhere('Current_Role', 'LIKE', "%{$query}%")
+        ->withCount(['sessionsAsTrainee as completed_sessions_count' => function ($query) {
+            $query->where('status', NewSession::STATUS_COMPLETED);
+        }])
+        ->get()
+        ->map(function ($trainee) {
+            return [
+                'user_id' => $trainee->User_ID,
+                'full_name' => $trainee->user->full_name,
+                'email' => $trainee->user->email,
+                'photo' => $trainee->user->photo,
+                'completed_sessions' => $trainee->completed_sessions_count,
+                'current_role' => $trainee->Current_Role,
+                'years_of_professional_experience' => $trainee->Years_Of_Professional_Experience,
+            ];
+        });
+
+        return response()->json([
+            'message' => 'Trainees retrieved successfully',
+            'trainees' => $trainees,
+        ], 200);
+    } catch (\Exception $e) {
+        \Log::error('Failed to search trainees', [
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString(),
+        ]);
+        return response()->json([
+            'message' => 'Failed to search trainees',
+            'error' => $e->getMessage(),
+        ], 500);
+    }
+}
 }
         
            
