@@ -271,7 +271,7 @@ class ProfileController extends Controller
     ], 200);
 }
 
-public function updateTraineeProfile(Request $request, int $user_id): \Illuminate\Http\JsonResponse
+public function updateTraineeProfile(Request $request, int $user_id)
 {
     $authUser = auth('sanctum')->user();
     if (!$authUser) {
@@ -454,6 +454,7 @@ public function updateTraineeProfile(Request $request, int $user_id): \Illuminat
             ], 500);
         }
     }
+ }
 
     private function setAvailability(int $userID, array $availability): array
     {
@@ -507,7 +508,7 @@ public function updateTraineeProfile(Request $request, int $user_id): \Illuminat
      * @param int $user_id
      * @return \Illuminate\Http\JsonResponse
      */
-    public function getCoachProfile(int $user_id): \Illuminate\Http\JsonResponse
+    public function getCoachProfile(int $user_id)
     {
         $user = User::where('User_ID', $user_id)->where('Role_Profile', 'Coach')->first();
         if (!$user) {
