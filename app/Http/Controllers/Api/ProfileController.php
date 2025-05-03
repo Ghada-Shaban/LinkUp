@@ -453,8 +453,8 @@ public function updateTraineeProfile(Request $request, int $user_id)
                 'error' => $e->getMessage()
             ], 500);
         }
-    }
- }
+    });
+}
 
     private function setAvailability(int $userID, array $availability): array
     {
