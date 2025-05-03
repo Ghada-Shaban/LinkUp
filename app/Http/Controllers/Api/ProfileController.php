@@ -213,6 +213,9 @@ public function updateTraineeProfile(Request $request)
     try {
         DB::beginTransaction();
 
+        // تسجيل البيانات الواردة من الـ Request
+        \Log::info('Raw request data', ['data' => $request->all(), 'files' => $request->allFiles()]);
+
         // التحقق من البيانات للتحديث
         $validated = $request->validate([
             'Full_Name' => 'sometimes|string|max:255',
@@ -222,17 +225,27 @@ public function updateTraineeProfile(Request $request)
             ],
             'Linkedin_Link' => 'sometimes|nullable|url',
             'Photo' => 'sometimes|nullable|image|mimes:jpeg,png,jpg|max:2048',
+            'Education_Level' => 'sometimes|string',
+            'Institution_Or_School' => 'sometimes|string|max:255',
+            'Field_Of_Study' => 'sometimes|string',
+            'Current_Role' => 'sometimes|string',
+            'Story' => 'sometimes|string',
+            'Years_Of_Professional_Experience' => 'sometimes|integer|min:0',
+            'Preferred_Languages' => 'sometimes|array|min:1',
+            'Preferred_Languages.*' => ['string', Rule::in($this->getEnumValues('trainee_preferred_languages', 'Language'))],
+            'Areas_Of_Interest' => 'sometimes|array|min:1',
+            'Areas_Of_Interest.*' => ['string', Rule::in($this->getEnumValues('trainee_areas_of_interest', 'Area_Of_Interest'))],
         ]);
+
+        \Log::info('Validated data before update', ['validated' => $validated]);
 
         // معالجة الصورة إذا تم تقديمها
         if ($request->hasFile('Photo')) {
             // إذا كانت هناك صورة قديمة، احذفها أولاً
             if ($user->Photo) {
                 if ($user->Photo_Public_ID) {
-                    // حذف الصورة من Cloudinary إذا كان هناك معرف عام
                     Cloudinary::destroy($user->Photo_Public_ID);
                 } else {
-                    // حذف الصورة من التخزين المحلي
                     Storage::disk('public')->delete($user->Photo);
                 }
             }
@@ -262,26 +275,22 @@ public function updateTraineeProfile(Request $request)
         if ($user->trainee) {
             $traineeData = [];
             if ($request->has('Education_Level')) {
-                $validEducationLevels = $this->getEnumValues('trainees', 'Education_Level');
-                $request->validate([
-                    'Education_Level' => ['string', Rule::in($validEducationLevels)],
-                ]);
-                $traineeData['Education_Level'] = $request->Education_Level;
+                $traineeData['Education_Level'] = $request->input('Education_Level');
             }
             if ($request->has('Institution_Or_School')) {
-                $traineeData['Institution_Or_School'] = $request->Institution_Or_School;
+                $traineeData['Institution_Or_School'] = $request->input('Institution_Or_School');
             }
             if ($request->has('Field_Of_Study')) {
-                $traineeData['Field_Of_Study'] = $request->Field_Of_Study;
+                $traineeData['Field_Of_Study'] = $request->input('Field_Of_Study');
             }
             if ($request->has('Current_Role')) {
-                $traineeData['Current_Role'] = $request->Current_Role;
+                $traineeData['Current_Role'] = $request->input('Current_Role');
             }
             if ($request->has('Story')) {
-                $traineeData['Story'] = $request->Story;
+                $traineeData['Story'] = $request->input('Story');
             }
             if ($request->has('Years_Of_Professional_Experience')) {
-                $traineeData['Years_Of_Professional_Experience'] = $request->Years_Of_Professional_Experience;
+                $traineeData['Years_Of_Professional_Experience'] = $request->input('Years_Of_Professional_Experience');
             }
             
             if (!empty($traineeData)) {
@@ -290,15 +299,8 @@ public function updateTraineeProfile(Request $request)
             
             // تحديث اللغات المفضلة إذا تم تقديمها
             if ($request->has('Preferred_Languages')) {
-                $validLanguages = $this->getEnumValues('trainee_preferred_languages', 'Language');
-                $request->validate([
-                    'Preferred_Languages' => 'array|min:1',
-                    'Preferred_Languages.*' => ['string', Rule::in($validLanguages)],
-                ]);
-                
-                // حذف اللغات القديمة وإضافة الجديدة
                 TraineePreferredLanguage::where('trainee_id', $user->User_ID)->delete();
-                foreach ($request->Preferred_Languages as $lang) {
+                foreach ($request->input('Preferred_Languages', []) as $lang) {
                     TraineePreferredLanguage::create([
                         'trainee_id' => $user->User_ID,
                         'Language' => $lang
@@ -308,15 +310,8 @@ public function updateTraineeProfile(Request $request)
             
             // تحديث مجالات الاهتمام إذا تم تقديمها
             if ($request->has('Areas_Of_Interest')) {
-                $validInterests = $this->getEnumValues('trainee_areas_of_interest', 'Area_Of_Interest');
-                $request->validate([
-                    'Areas_Of_Interest' => 'array|min:1',
-                    'Areas_Of_Interest.*' => ['string', Rule::in($validInterests)],
-                ]);
-                
-                // حذف مجالات الاهتمام القديمة وإضافة الجديدة
                 TraineeAreaOfInterest::where('trainee_id', $user->User_ID)->delete();
-                foreach ($request->Areas_Of_Interest as $interest) {
+                foreach ($request->input('Areas_Of_Interest', []) as $interest) {
                     TraineeAreaOfInterest::create([
                         'trainee_id' => $user->User_ID,
                         'Area_Of_Interest' => $interest
