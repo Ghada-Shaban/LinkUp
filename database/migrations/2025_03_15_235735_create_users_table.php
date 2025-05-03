@@ -21,7 +21,7 @@ return new class extends Migration
             $table->enum('role_profile', ['Coach', 'Trainee']);
             $table->string('photo')->nullable();
             $table->timestamps();
-            
+            $table->string('Photo_Public_ID')->nullable();
            
         });
     }
