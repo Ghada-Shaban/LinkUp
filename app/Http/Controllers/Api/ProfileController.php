@@ -40,6 +40,9 @@ class ProfileController extends Controller
   /**
  * تحديث بيانات المدرب
  */
+/**
+ * تحديث بيانات المدرب
+ */
 public function updateCoachProfile(Request $request)
 {
     $user = auth('sanctum')->user();
@@ -54,6 +57,9 @@ public function updateCoachProfile(Request $request)
     try {
         DB::beginTransaction();
 
+        // تسجيل البيانات الواردة من الـ Request
+        \Log::info('Raw request data', ['data' => $request->all()]);
+
         // التحقق من البيانات للتحديث
         $validated = $request->validate([
             'Full_Name' => 'sometimes|string|max:255',
@@ -63,7 +69,25 @@ public function updateCoachProfile(Request $request)
             ],
             'Linkedin_Link' => 'sometimes|nullable|url',
             'Photo' => 'sometimes|nullable|image|mimes:jpeg,png,jpg|max:2048',
+            'Title' => 'sometimes|string|max:100',
+            'Company_or_School' => 'sometimes|string|max:255',
+            'Bio' => 'sometimes|string',
+            'Years_Of_Experience' => 'sometimes|integer|min:0',
+            'Months_Of_Experience' => 'sometimes|integer|between:0,11',
+            'Skills' => 'sometimes|array|min:1',
+            'Skills.*' => ['string', Rule::in($this->getEnumValues('coach_skills', 'Skill'))],
+            'Languages' => 'sometimes|array|min:1',
+            'Languages.*' => ['string', Rule::in($this->getEnumValues('coach_languages', 'Language'))],
+            'availability' => 'sometimes|array',
+            'availability.days' => 'required_with:availability|array',
+            'availability.days.*' => 'in:Sunday,Monday,Tuesday,Wednesday,Thursday,Friday,Saturday',
+            'availability.time_slots' => 'required_with:availability|array',
+            'availability.time_slots.*' => 'array',
+            'availability.time_slots.*.*.start_time' => 'required_with:availability|date_format:H:i',
+            'availability.time_slots.*.*.end_time' => 'required_with:availability|date_format:H:i|after:availability.time_slots.*.*.start_time',
         ]);
+
+        \Log::info('Validated data before update', ['validated' => $validated]);
 
         // معالجة الصورة إذا تم تقديمها
         if ($request->hasFile('Photo')) {
@@ -103,19 +127,19 @@ public function updateCoachProfile(Request $request)
         if ($user->coach) {
             $coachData = [];
             if ($request->has('Title')) {
-                $coachData['Title'] = $request->Title;
+                $coachData['Title'] = $request->input('Title');
             }
             if ($request->has('Company_or_School')) {
-                $coachData['Company_or_School'] = $request->Company_or_School;
+                $coachData['Company_or_School'] = $request->input('Company_or_School');
             }
             if ($request->has('Bio')) {
-                $coachData['Bio'] = $request->Bio;
+                $coachData['Bio'] = $request->input('Bio');
             }
             if ($request->has('Years_Of_Experience')) {
-                $coachData['Years_Of_Experience'] = $request->Years_Of_Experience;
+                $coachData['Years_Of_Experience'] = $request->input('Years_Of_Experience');
             }
             if ($request->has('Months_Of_Experience')) {
-                $coachData['Months_Of_Experience'] = $request->Months_Of_Experience;
+                $coachData['Months_Of_Experience'] = $request->input('Months_Of_Experience');
             }
             
             if (!empty($coachData)) {
@@ -124,15 +148,9 @@ public function updateCoachProfile(Request $request)
             
             // تحديث المهارات إذا تم تقديمها
             if ($request->has('Skills')) {
-                $validSkills = $this->getEnumValues('coach_skills', 'Skill');
-                $request->validate([
-                    'Skills' => 'array|min:1',
-                    'Skills.*' => ['string', Rule::in($validSkills)],
-                ]);
-                
-                // حذف المهارات القديمة وإضافة الجديدة
+                // التحقق من المهارات تم داخل الـ Validation
                 CoachSkill::where('coach_id', $user->User_ID)->delete();
-                foreach ($request->Skills as $skill) {
+                foreach ($request->input('Skills', []) as $skill) {
                     CoachSkill::create([
                         'coach_id' => $user->User_ID,
                         'Skill' => $skill
@@ -142,15 +160,9 @@ public function updateCoachProfile(Request $request)
             
             // تحديث اللغات إذا تم تقديمها
             if ($request->has('Languages')) {
-                $validLanguages = $this->getEnumValues('coach_languages', 'Language');
-                $request->validate([
-                    'Languages' => 'array|min:1',
-                    'Languages.*' => ['string', Rule::in($validLanguages)],
-                ]);
-                
-                // حذف اللغات القديمة وإضافة الجديدة
+                // التحقق من اللغات تم داخل الـ Validation
                 CoachLanguage::where('coach_id', $user->User_ID)->delete();
-                foreach ($request->Languages as $language) {
+                foreach ($request->input('Languages', []) as $language) {
                     CoachLanguage::create([
                         'coach_id' => $user->User_ID,
                         'Language' => $language
@@ -160,21 +172,9 @@ public function updateCoachProfile(Request $request)
             
             // تحديث أوقات التوفر إذا تم تقديمها
             if ($request->has('availability')) {
-                $request->validate([
-                    'availability' => 'array', 
-                    'availability.days' => 'required_with:availability|array',
-                    'availability.days.*' => 'in:Sunday,Monday,Tuesday,Wednesday,Thursday,Friday,Saturday',
-                    'availability.time_slots' => 'required_with:availability|array',
-                    'availability.time_slots.*' => 'array',
-                    'availability.time_slots.*.*.start_time' => 'required_with:availability|date_format:H:i',
-                    'availability.time_slots.*.*.end_time' => 'required_with:availability|date_format:H:i|after:availability.time_slots.*.*.start_time',
-                ]);
-                
-                // حذف أوقات التوفر القديمة
+                // التحقق من التوفر تم داخل الـ Validation
                 CoachAvailability::where('coach_id', $user->User_ID)->delete();
-                
-                // إضافة أوقات التوفر الجديدة
-                $this->setAvailability($user->User_ID, $request->availability);
+                $this->setAvailability($user->User_ID, $request->input('availability'));
             }
         }
 
@@ -196,7 +196,6 @@ public function updateCoachProfile(Request $request)
         ], 500);
     }
 }
-
 /**
  * تحديث بيانات المتدرب
  */
