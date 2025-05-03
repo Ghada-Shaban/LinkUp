@@ -41,7 +41,61 @@ class User extends Authenticatable
         'profile_photo_url',
      'photo_url',
     ];
-    // أضف هذه الدالة داخل class User مباشرة
+   // تعيين خريطة بين أسماء الحقول في النموذج وأسماء الأعمدة في قاعدة البيانات
+    public function getAttributeMap()
+    {
+        return [
+            'Full_Name' => 'full_name',
+            'Email' => 'email',
+            'Password' => 'password',
+            'Linkedin_Link' => 'linkedin_link',
+            'Photo' => 'photo',
+            'Role_Profile' => 'role_profile',
+            // الحقول الأخرى تبقى كما هي
+        ];
+    }
+
+    /**
+     * تجاوز دالة الحصول على قيمة الحقل لاستخدام الاسم الصحيح في قاعدة البيانات
+     */
+    public function getAttribute($key)
+    {
+        $map = $this->getAttributeMap();
+        
+        if (array_key_exists($key, $map)) {
+            return parent::getAttribute($map[$key]);
+        }
+        
+        return parent::getAttribute($key);
+    }
+
+    /**
+     * تجاوز دالة تعيين قيمة الحقل لاستخدام الاسم الصحيح في قاعدة البيانات
+     */
+    public function setAttribute($key, $value)
+    {
+        $map = $this->getAttributeMap();
+        
+        if (array_key_exists($key, $map)) {
+            return parent::setAttribute($map[$key], $value);
+        }
+        
+        return parent::setAttribute($key, $value);
+    }
+    
+    /**
+     * تجاوز الدالة التي تحدد وجود الخاصية
+     */
+    public function __isset($key)
+    {
+        $map = $this->getAttributeMap();
+        
+        if (array_key_exists($key, $map)) {
+            return parent::__isset($map[$key]);
+        }
+        
+        return parent::__isset($key);
+    }  // أضف هذه الدالة داخل class User مباشرة
 public function getPhotoUrlAttribute()
 {
     return $this->photo ? Storage::url($this->photo) : null;
