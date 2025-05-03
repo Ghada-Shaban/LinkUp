@@ -35,16 +35,7 @@ class ProfileController extends Controller
         return $matches[1] ?? [];
     }
 
-    /**
-     * Update Coach profile details.
-     *
-     * @param Request $request
-     * @param int $user_id
-     * @return \Illuminate\Http\JsonResponse
-     */
-
-
-  */
+    
    public function updateCoachProfile(Request $request, int $user_id): \Illuminate\Http\JsonResponse
 {
     // Check if the authenticated user has permission
