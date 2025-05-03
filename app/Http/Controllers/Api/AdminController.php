@@ -602,7 +602,7 @@ public function searchCoaches(Request $request)
                     return $session->service->service_type === $serviceType;
                 })->count();
                 $percentage = $totalCompletedSessionsCount > 0 ? ($count / $totalCompletedSessionsCount) * 100 : 0;
-                return [$serviceType => $percentage . '%'];
+                return [$serviceType => round($percentage, 2) . '%'];
             });
 
             // 5. Revenue by Service (20% of each service's payments)
