@@ -556,7 +556,7 @@ public function searchCoaches(Request $request)
         ], 500);
     }
 }
- public function getDashboardStats(Request $request)
+public function getDashboardStats(Request $request)
     {
         $authAdmin = auth('admin-api')->user();
         if (!$authAdmin) {
@@ -590,18 +590,23 @@ public function searchCoaches(Request $request)
                 ->get();
             $totalCompletedSessionsCount = $completedSessions->count();
 
-            // 4. Percentage of Completed Sessions by Service
+            // 4. Percentage of Completed Sessions by Service based on revenue
             $allServiceTypes = ['Mentorship Session', 'Mentorship Plan', 'Mock_Interview', 'Group_Mentorship'];
-            $sessionsByService = collect($allServiceTypes)->mapWithKeys(function ($serviceType) use ($completedSessions, $totalCompletedSessionsCount) {
-                $count = $completedSessions->filter(function ($session) use ($serviceType) {
+            $revenueByService = collect($allServiceTypes)->mapWithKeys(function ($serviceType) use ($completedPayments) {
+                $paymentsForService = $completedPayments->filter(function ($payment) use ($serviceType) {
                     if ($serviceType === 'Mentorship Session') {
-                        return $session->service->service_type === 'Mentorship' && $session->service->mentorship && $session->service->mentorship->mentorship_type === 'Mentorship session';
+                        return $payment->service->service_type === 'Mentorship' && $payment->service->mentorship && $payment->service->mentorship->mentorship_type === 'Mentorship session';
                     } elseif ($serviceType === 'Mentorship Plan') {
-                        return $session->service->service_type === 'Mentorship' && $session->service->mentorship && $session->service->mentorship->mentorship_type === 'Mentorship plan';
+                        return $payment->service->service_type === 'Mentorship' && $payment->service->mentorship && $payment->service->mentorship->mentorship_type === 'Mentorship plan';
                     }
-                    return $session->service->service_type === $serviceType;
-                })->count();
-                $percentage = $totalCompletedSessionsCount > 0 ? ($count / $totalCompletedSessionsCount) * 100 : 0;
+                    return $payment->service->service_type === $serviceType;
+                });
+                $serviceRevenue = $paymentsForService->sum('amount') * 0.2;
+                return [$serviceType => $serviceRevenue];
+            });
+            $totalRevenue20 = $revenueByService->sum();
+            $sessionsByService = $revenueByService->mapWithKeys(function ($revenue, $serviceType) use ($totalRevenue20) {
+                $percentage = $totalRevenue20 > 0 ? ($revenue / $totalRevenue20) * 100 : 0;
                 return [$serviceType => round($percentage, 2) . '%'];
             });
 
