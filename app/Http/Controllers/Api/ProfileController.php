@@ -42,7 +42,7 @@ class ProfileController extends Controller
      * @param int $user_id
      * @return \Illuminate\Http\JsonResponse
      */
-   public function updateCoachProfile(Request $request, int $user_id)
+  public function updateCoachProfile(Request $request, int $user_id)
 {
     $authUser = auth('sanctum')->user();
     if (!$authUser) {
@@ -102,7 +102,7 @@ class ProfileController extends Controller
     $updateData = [];
     if (isset($validated['Full_Name'])) {
         $updateData['Full_Name'] = $validated['Full_Name'];
-        \Log::info('Preparing to update Full_Name', ['User_ID' => $user->User_ID, 'Full_Name' => $validated['Full_Name']);
+        \Log::info('Preparing to update Full_Name', ['User_ID' => $user->User_ID, 'Full_Name' => $validated['Full_Name']]);
     }
     if (isset($validated['Email'])) {
         $updateData['Email'] = $validated['Email'];
