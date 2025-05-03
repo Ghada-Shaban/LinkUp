@@ -185,7 +185,7 @@ public function updateCoachProfile(Request $request)
         
         return response()->json([
             'message' => 'Coach profile updated successfully',
-            'user' => $user
+           
         ]);
         
     } catch (\Exception $e) {
@@ -327,7 +327,7 @@ public function updateTraineeProfile(Request $request)
         
         return response()->json([
             'message' => 'Trainee profile updated successfully',
-            'user' => $user
+            
         ]);
         
     } catch (\Exception $e) {
