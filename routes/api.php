@@ -101,8 +101,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
 Route::middleware('auth:sanctum')->group(function () {
     // Update profile (Coach & Trainee)
-    Route::put('/coach/profile/update/{user_id}', [ProfileController::class, 'updateCoachProfile']);
-    Route::put('/trainee/profile/update/{user_id}', [ProfileController::class, 'updateTraineeProfile']);
+    Route::post('/coach/profile/update/{user_id}', [ProfileController::class, 'updateCoachProfile']);
+    Route::post('/trainee/profile/update/{user_id}', [ProfileController::class, 'updateTraineeProfile']);
 
     // Get Coach profile
     Route::get('/coach/profile/{user_id}', [ProfileController::class, 'getCoachProfile']);
