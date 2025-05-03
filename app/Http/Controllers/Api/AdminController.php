@@ -556,7 +556,7 @@ public function searchCoaches(Request $request)
         ], 500);
     }
 }
-public function getDashboardStats(Request $request)
+ public function getDashboardStats(Request $request)
     {
         $authAdmin = auth('admin-api')->user();
         if (!$authAdmin) {
@@ -564,26 +564,33 @@ public function getDashboardStats(Request $request)
         }
 
         try {
-            // 1. Total Revenue (20%) - Only for Completed payments
-            $totalRevenue = Payment::where('payment_status', 'Completed')
-                ->whereHas('service', function ($query) {
-                    $query->whereIn('service_type', ['Mentorship', 'Mock_Interview', 'Group_Mentorship'])
-                          ->whereNull('deleted_at');
-                })
-                ->sum('amount');
-            $revenue20Percent = round($totalRevenue * 0.2, 2);
-
-            // 2. Number of Completed Sessions
-            $completedSessions = NewSession::where('status', NewSession::STATUS_COMPLETED)
+            // 1. Get all completed payments with their services
+            $completedPayments = Payment::where('payment_status', 'Completed')
                 ->whereHas('service', function ($query) {
                     $query->whereIn('service_type', ['Mentorship', 'Mock_Interview', 'Group_Mentorship'])
                           ->whereNull('deleted_at');
                 })
                 ->with('service.mentorship')
                 ->get();
+
+            // 2. Total Revenue (20%) - Only for Completed payments
+            $totalRevenue = $completedPayments->sum('amount');
+            $revenue20Percent = round($totalRevenue * 0.2, 2);
+
+            // 3. Get completed sessions that have a corresponding completed payment
+            $completedSessions = NewSession::where('status', NewSession::STATUS_COMPLETED)
+                ->whereHas('service', function ($query) {
+                    $query->whereIn('service_type', ['Mentorship', 'Mock_Interview', 'Group_Mentorship'])
+                          ->whereNull('deleted_at');
+                })
+                ->whereHas('service.payments', function ($query) {
+                    $query->where('payment_status', 'Completed');
+                })
+                ->with('service.mentorship')
+                ->get();
             $totalCompletedSessionsCount = $completedSessions->count();
 
-            // 3. Percentage of Completed Sessions by Service
+            // 4. Percentage of Completed Sessions by Service
             $allServiceTypes = ['Mentorship (Session)', 'Mentorship (Plan)', 'Mock_Interview', 'Group_Mentorship'];
             $sessionsByService = collect($allServiceTypes)->mapWithKeys(function ($serviceType) use ($completedSessions, $totalCompletedSessionsCount) {
                 $count = $completedSessions->filter(function ($session) use ($serviceType) {
@@ -597,15 +604,6 @@ public function getDashboardStats(Request $request)
                 $percentage = $totalCompletedSessionsCount > 0 ? ($count / $totalCompletedSessionsCount) * 100 : 0;
                 return [$serviceType => round($percentage, 2)];
             });
-
-            // 4. Get all completed payments with their services and mentorship types
-            $completedPayments = Payment::where('payment_status', 'Completed')
-                ->whereHas('service', function ($query) {
-                    $query->whereIn('service_type', ['Mentorship', 'Mock_Interview', 'Group_Mentorship'])
-                          ->whereNull('deleted_at');
-                })
-                ->with('service.mentorship')
-                ->get();
 
             // 5. Revenue by Service (20% of each service's payments)
             $revenueByService = collect($allServiceTypes)->mapWithKeys(function ($serviceType) use ($completedPayments) {
