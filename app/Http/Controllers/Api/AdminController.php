@@ -637,9 +637,9 @@ public function getDashboardStats(Request $request)
             return response()->json([
                 'number_of_users' => $totalUsers,
                 'revenue' => $revenue20Percent,
-                'completed_sessions' => $totalCompletedSessionsCount,
                 'sessions_percentage_by_service' => $sessionsByService,
                 'revenue_by_service' => $revenueByService,
+                'completed_sessions' => $totalCompletedSessionsCount,
                 'average_rating' => round($averageRating, 2),
             ], 200);
         } catch (\Exception $e) {
