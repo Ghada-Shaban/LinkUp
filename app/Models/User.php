@@ -20,7 +20,8 @@ class User extends Authenticatable
         'Password',
         'Linkedin_Link',
         'Photo',
-        'Role_Profile'
+        'Role_Profile',
+        'Photo_Public_ID'
     ];
 
     protected $primaryKey = 'User_ID';
