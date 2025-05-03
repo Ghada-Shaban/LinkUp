@@ -76,5 +76,8 @@ class Service extends Model
     {
         return $this->belongsTo(Coach::class, 'coach_id', 'User_ID');
     }
-
+ public function payments()
+    {
+        return $this->hasMany(Payment::class, 'service_id', 'service_id');
+    }
 }
