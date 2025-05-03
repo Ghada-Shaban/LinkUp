@@ -42,36 +42,38 @@ class ProfileController extends Controller
      * @param int $user_id
      * @return \Illuminate\Http\JsonResponse
      */
-     public function updateCoachProfile(Request $request, int $user_id)
+    public function updateCoachProfile(Request $request, int $user_id)
     {
-        // Check if the authenticated user has permission
         $authUser = auth('sanctum')->user();
         if (!$authUser) {
+            \Log::error('Unauthorized access attempt', ['user_id' => $user_id]);
             return response()->json(['message' => 'Unauthorized'], 401);
         }
 
-        // Restrict updates to the authenticated user
         if ($authUser->User_ID !== $user_id) {
+            \Log::error('User attempted to update a profile that is not theirs', [
+                'auth_user_id' => $authUser->User_ID,
+                'requested_user_id' => $user_id
+            ]);
             return response()->json(['message' => 'You can only update your own profile'], 403);
         }
 
-        // Find the user by User_ID and ensure they are a Coach
         $user = User::where('User_ID', $user_id)->where('Role_Profile', 'Coach')->first();
         if (!$user) {
+            \Log::error('Coach not found or user is not a Coach', ['user_id' => $user_id]);
             return response()->json(['message' => 'Coach not found or user is not a Coach'], 404);
         }
 
         $validSkills = $this->getEnumValues('coach_skills', 'Skill');
         $validLanguages = $this->getEnumValues('coach_languages', 'Language');
 
-        // Log the incoming request data
         \Log::info('Incoming request data for updateCoachProfile', [
             'user_id' => $user_id,
             'request_data' => $request->all(),
+            'has_file' => $request->hasFile('Photo'),
         ]);
 
         $validated = $request->validate([
-            // Coach Profile
             'Full_Name' => ['sometimes', 'string', 'max:255'],
             'Email' => ['sometimes', 'email', Rule::unique('users', 'Email')->ignore($user->User_ID, 'User_ID')],
             'Password' => ['sometimes', 'string', 'min:8'],
@@ -79,8 +81,6 @@ class ProfileController extends Controller
             'Bio' => ['sometimes', 'string'],
             'Languages' => ['sometimes', 'array', 'min:1'],
             'Languages.*' => ['required', 'string', Rule::in($validLanguages)],
-
-            // Personal Info
             'Company_or_School' => ['sometimes', 'string', 'max:255'],
             'Skills' => ['sometimes', 'array', 'min:1'],
             'Skills.*' => ['required', 'string', Rule::in($validSkills)],
@@ -88,8 +88,6 @@ class ProfileController extends Controller
             'Years_Of_Experience' => ['sometimes', 'integer', 'min:0'],
             'Months_Of_Experience' => ['sometimes', 'integer', 'between:0,11'],
             'Linkedin_Link' => ['sometimes', 'url'],
-
-            // Availability
             'availability' => ['sometimes', 'array'],
             'availability.days' => ['required_with:availability', 'array'],
             'availability.days.*' => ['in:Sunday,Monday,Tuesday,Wednesday,Thursday,Friday,Saturday'],
@@ -99,7 +97,6 @@ class ProfileController extends Controller
             'availability.time_slots.*.*.end_time' => ['required_with:availability', 'date_format:H:i', 'after:availability.time_slots.*.*.start_time'],
         ]);
 
-        // Update user table (users)
         $updateData = [];
         if (isset($validated['Full_Name'])) {
             $updateData['Full_Name'] = $validated['Full_Name'];
@@ -116,17 +113,26 @@ class ProfileController extends Controller
             $updateData['Linkedin_Link'] = $validated['Linkedin_Link'];
         }
 
-        // Handle photo upload to Cloudinary if a new photo is provided
         if ($request->hasFile('Photo')) {
             try {
-                // Delete the old photo from Cloudinary if it exists
                 if ($user->Photo_Public_ID) {
-                    Cloudinary::destroy($user->Photo_Public_ID);
-                    \Log::info('Old photo deleted from Cloudinary', ['public_id' => $user->Photo_Public_ID]);
+                    try {
+                        Cloudinary::destroy($user->Photo_Public_ID);
+                        \Log::info('Old photo deleted from Cloudinary', ['public_id' => $user->Photo_Public_ID]);
+                    } catch (\Exception $e) {
+                        \Log::warning('Failed to delete old photo from Cloudinary, proceeding with upload', [
+                            'public_id' => $user->Photo_Public_ID,
+                            'error' => $e->getMessage()
+                        ]);
+                    }
                 }
 
-                // Upload the new photo
                 $uploadedFile = $request->file('Photo');
+                \Log::info('Attempting to upload new photo', [
+                    'file_size' => $uploadedFile->getSize(),
+                    'file_type' => $uploadedFile->getMimeType(),
+                    'file_name' => $uploadedFile->getClientOriginalName()
+                ]);
                 $result = Cloudinary::upload($uploadedFile->getRealPath(), [
                     'folder' => 'coach_photos',
                     'public_id' => 'coach_' . time(),
@@ -138,29 +144,35 @@ class ProfileController extends Controller
                         'crop' => 'fill',
                     ],
                 ]);
-                $updateData['Photo'] = $result->getSecurePath(); // Store the secure URL
-                $updateData['Photo_Public_ID'] = $result->getPublicId(); // Store the public_id
-                \Log::info('New photo uploaded to Cloudinary', ['url' => $updateData['Photo'], 'public_id' => $updateData['Photo_Public_ID']]);
+                $updateData['Photo'] = $result->getSecurePath();
+                $updateData['Photo_Public_ID'] = $result->getPublicId();
+                \Log::info('New photo uploaded to Cloudinary', [
+                    'url' => $updateData['Photo'],
+                    'public_id' => $updateData['Photo_Public_ID']
+                ]);
             } catch (\Exception $e) {
-                \Log::error('Error handling photo with Cloudinary', ['error' => $e->getMessage()]);
-                return response()->json(['message' => 'Failed to handle photo', 'error' => $e->getMessage()], 500);
+                \Log::error('Error uploading photo to Cloudinary', [
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString()
+                ]);
+                return response()->json(['message' => 'Failed to upload photo', 'error' => $e->getMessage()], 500);
             }
         }
 
-        if (!empty($updateData)) {
-            \Log::info('Updating user table', ['User_ID' => $user->User_ID, 'updateData' => $updateData]);
-            try {
-                $user->update($updateData);
-                \Log::info('User table updated', ['User_ID' => $user->User_ID, 'new_Full_Name' => $user->fresh()->Full_Name]);
-            } catch (\Exception $e) {
-                \Log::error('Error updating user', ['User_ID' => $user->User_ID, 'error' => $e->getMessage()]);
-                return response()->json(['message' => 'Failed to update profile', 'error' => $e->getMessage()], 500);
-            }
-        } else {
-            \Log::info('No data to update in user table', ['User_ID' => $user->User_ID]);
+        if (empty($updateData)) {
+            \Log::warning('No data to update in user table', ['User_ID' => $user->User_ID]);
+            return response()->json(['message' => 'No changes to update'], 400);
         }
 
-        // Update coach table (coaches)
+        \Log::info('Updating user table', ['User_ID' => $user->User_ID, 'updateData' => $updateData]);
+        try {
+            $user->update($updateData);
+            \Log::info('User table updated', ['User_ID' => $user->User_ID, 'new_Full_Name' => $user->fresh()->Full_Name]);
+        } catch (\Exception $e) {
+            \Log::error('Error updating user', ['User_ID' => $user->User_ID, 'error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
+            return response()->json(['message' => 'Failed to update profile', 'error' => $e->getMessage()], 500);
+        }
+
         $coach = Coach::where('User_ID', $user->User_ID)->first();
         if ($coach) {
             $coachUpdateData = [];
@@ -190,7 +202,6 @@ class ProfileController extends Controller
             }
         }
 
-        // Update skills
         if (isset($validated['Skills'])) {
             \Log::info('Skills received for update', ['User_ID' => $user->User_ID, 'Skills' => $validated['Skills']]);
             try {
@@ -206,11 +217,8 @@ class ProfileController extends Controller
                 \Log::error('Error updating skills', ['coach_id' => $user->User_ID, 'error' => $e->getMessage()]);
                 return response()->json(['message' => 'Failed to update skills'], 500);
             }
-        } else {
-            \Log::info('No Skills provided for update', ['User_ID' => $user->User_ID]);
         }
 
-        // Update languages
         if (isset($validated['Languages'])) {
             \Log::info('Languages received for update', ['coach_id' => $user->User_ID, 'Languages' => $validated['Languages']]);
             try {
@@ -226,11 +234,8 @@ class ProfileController extends Controller
                 \Log::error('Error updating languages', ['coach_id' => $user->User_ID, 'error' => $e->getMessage()]);
                 return response()->json(['message' => 'Failed to update languages'], 500);
             }
-        } else {
-            \Log::info('No Languages provided for update', ['coach_id' => $user->User_ID]);
         }
 
-        // Update availability
         if (isset($validated['availability'])) {
             try {
                 CoachAvailability::where('coach_id', $user->User_ID)->delete();
@@ -241,7 +246,6 @@ class ProfileController extends Controller
             }
         }
 
-        // Fetch updated data for response
         $updatedUser = $user->fresh();
         $coach = Coach::where('User_ID', $updatedUser->User_ID)->first();
         $languages = CoachLanguage::where('coach_id', $updatedUser->User_ID)->pluck('Language');
@@ -263,27 +267,17 @@ class ProfileController extends Controller
         ], 200);
     }
 
-    /**
-     * Update Trainee profile details.
-     *
-     * @param Request $request
-     * @param int $user_id
-     * @return \Illuminate\Http\JsonResponse
-     */
     public function updateTraineeProfile(Request $request, int $user_id): \Illuminate\Http\JsonResponse
     {
-        // Check if the authenticated user has permission
         $authUser = auth('sanctum')->user();
         if (!$authUser) {
             return response()->json(['message' => 'Unauthorized'], 401);
         }
 
-        // Restrict updates to the authenticated user
         if ($authUser->User_ID !== $user_id) {
             return response()->json(['message' => 'You can only update your own profile'], 403);
         }
 
-        // Find the user by User_ID and ensure they are a Trainee
         $user = User::where('User_ID', $user_id)->where('Role_Profile', 'Trainee')->first();
         if (!$user) {
             return response()->json(['message' => 'Trainee not found or user is not a Trainee'], 404);
@@ -293,14 +287,13 @@ class ProfileController extends Controller
         $validInterests = $this->getEnumValues('trainee_areas_of_interest', 'Area_Of_Interest');
         $validEducationLevels = $this->getEnumValues('trainees', 'Education_Level');
 
-        // Log the incoming request data
         \Log::info('Incoming request data for updateTraineeProfile', [
             'user_id' => $user_id,
             'request_data' => $request->all(),
+            'has_file' => $request->hasFile('Photo'),
         ]);
 
         $validated = $request->validate([
-            // Trainee Profile
             'Full_Name' => ['sometimes', 'string', 'max:255'],
             'Email' => ['sometimes', 'email', Rule::unique('users', 'Email')->ignore($user->User_ID, 'User_ID')],
             'Password' => ['sometimes', 'string', 'min:8'],
@@ -308,8 +301,6 @@ class ProfileController extends Controller
             'Story' => ['sometimes', 'string'],
             'Preferred_Languages' => ['sometimes', 'array', 'min:1'],
             'Preferred_Languages.*' => ['required', 'string', Rule::in($validLanguages)],
-
-            // Personal Info
             'Institution_Or_School' => ['sometimes', 'string', 'max:255'],
             'Areas_Of_Interest' => ['sometimes', 'array', 'min:1'],
             'Areas_Of_Interest.*' => ['required', 'string', Rule::in($validInterests)],
@@ -320,7 +311,6 @@ class ProfileController extends Controller
 
         return DB::transaction(function () use ($user, $validated, $request) {
             try {
-                // Update user table (users)
                 $updateData = [];
                 if (isset($validated['Full_Name'])) {
                     $updateData['Full_Name'] = $validated['Full_Name'];
@@ -337,17 +327,26 @@ class ProfileController extends Controller
                     $updateData['Linkedin_Link'] = $validated['Linkedin_Link'];
                 }
 
-                // Handle photo upload to Cloudinary if a new photo is provided
                 if ($request->hasFile('Photo')) {
                     try {
-                        // Delete the old photo from Cloudinary if it exists
                         if ($user->Photo_Public_ID) {
-                            Cloudinary::destroy($user->Photo_Public_ID);
-                            \Log::info('Old photo deleted from Cloudinary', ['public_id' => $user->Photo_Public_ID]);
+                            try {
+                                Cloudinary::destroy($user->Photo_Public_ID);
+                                \Log::info('Old photo deleted from Cloudinary', ['public_id' => $user->Photo_Public_ID]);
+                            } catch (\Exception $e) {
+                                \Log::warning('Failed to delete old photo from Cloudinary, proceeding with upload', [
+                                    'public_id' => $user->Photo_Public_ID,
+                                    'error' => $e->getMessage()
+                                ]);
+                            }
                         }
 
-                        // Upload the new photo
                         $uploadedFile = $request->file('Photo');
+                        \Log::info('Attempting to upload new photo', [
+                            'file_size' => $uploadedFile->getSize(),
+                            'file_type' => $uploadedFile->getMimeType(),
+                            'file_name' => $uploadedFile->getClientOriginalName()
+                        ]);
                         $result = Cloudinary::upload($uploadedFile->getRealPath(), [
                             'folder' => 'trainee_photos',
                             'public_id' => 'trainee_' . time(),
@@ -359,24 +358,30 @@ class ProfileController extends Controller
                                 'crop' => 'fill',
                             ],
                         ]);
-                        $updateData['Photo'] = $result->getSecurePath(); // Store the secure URL
-                        $updateData['Photo_Public_ID'] = $result->getPublicId(); // Store the public_id
-                        \Log::info('New photo uploaded to Cloudinary', ['url' => $updateData['Photo'], 'public_id' => $updateData['Photo_Public_ID']]);
+                        $updateData['Photo'] = $result->getSecurePath();
+                        $updateData['Photo_Public_ID'] = $result->getPublicId();
+                        \Log::info('New photo uploaded to Cloudinary', [
+                            'url' => $updateData['Photo'],
+                            'public_id' => $updateData['Photo_Public_ID']
+                        ]);
                     } catch (\Exception $e) {
-                        \Log::error('Error handling photo with Cloudinary', ['error' => $e->getMessage()]);
-                        return response()->json(['message' => 'Failed to handle photo', 'error' => $e->getMessage()], 500);
+                        \Log::error('Error uploading photo to Cloudinary', [
+                            'error' => $e->getMessage(),
+                            'trace' => $e->getTraceAsString()
+                        ]);
+                        return response()->json(['message' => 'Failed to upload photo', 'error' => $e->getMessage()], 500);
                     }
                 }
 
-                if (!empty($updateData)) {
-                    \Log::info('Updating user table', ['User_ID' => $user->User_ID, 'updateData' => $updateData]);
-                    $user->update($updateData);
-                    \Log::info('User table updated', ['User_ID' => $user->User_ID, 'new_Full_Name' => $user->fresh()->Full_Name]);
-                } else {
-                    \Log::info('No data to update in user table', ['User_ID' => $user->User_ID]);
+                if (empty($updateData)) {
+                    \Log::warning('No data to update in user table', ['User_ID' => $user->User_ID]);
+                    return response()->json(['message' => 'No changes to update'], 400);
                 }
 
-                // Update trainee table (trainees)
+                \Log::info('Updating user table', ['User_ID' => $user->User_ID, 'updateData' => $updateData]);
+                $user->update($updateData);
+                \Log::info('User table updated', ['User_ID' => $user->User_ID, 'new_Full_Name' => $user->fresh()->Full_Name]);
+
                 $trainee = Trainee::where('User_ID', $user->User_ID)->first();
                 if ($trainee) {
                     $traineeUpdateData = [];
@@ -399,7 +404,6 @@ class ProfileController extends Controller
                     }
                 }
 
-                // Update preferred languages
                 if (isset($validated['Preferred_Languages'])) {
                     TraineePreferredLanguage::where('trainee_id', $user->User_ID)->delete();
                     foreach ($validated['Preferred_Languages'] as $lang) {
@@ -411,7 +415,6 @@ class ProfileController extends Controller
                     \Log::info('Trainee languages updated', ['User_ID' => $user->User_ID]);
                 }
 
-                // Update areas of interest
                 if (isset($validated['Areas_Of_Interest'])) {
                     TraineeAreaOfInterest::where('trainee_id', $user->User_ID)->delete();
                     foreach ($validated['Areas_Of_Interest'] as $interest) {
@@ -423,7 +426,6 @@ class ProfileController extends Controller
                     \Log::info('Trainee interests updated', ['User_ID' => $user->User_ID]);
                 }
 
-                // Fetch updated data for response
                 $updatedUser = $user->fresh();
                 $trainee = Trainee::where('User_ID', $updatedUser->User_ID)->first();
                 $languages = TraineePreferredLanguage::where('trainee_id', $updatedUser->User_ID)->pluck('Language');
@@ -438,10 +440,7 @@ class ProfileController extends Controller
                     'error' => $e->getMessage(),
                     'trace' => $e->getTraceAsString()
                 ]);
-                
-                // Roll back the transaction in case of any error
                 DB::rollBack();
-                
                 return response()->json([
                     'message' => 'Failed to update trainee profile',
                     'error' => $e->getMessage()
@@ -449,6 +448,7 @@ class ProfileController extends Controller
             }
         });
     }
+
     /**
      * Get Coach profile data.
      *
