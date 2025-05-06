@@ -71,7 +71,7 @@ class AuthController extends Controller
             'Email' => 'required|email|unique:users,email',
             'Password' => 'required|string|min:8',
             'Linkedin_Link' => 'required|url',
-            'Photo' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
+            'Photo' => 'required|image|mimes:jpeg,png,jpg|max:2048',
             'Title' => 'required|string|max:100',
             'Company_or_School' => 'required|string|max:255',
             'Bio' => 'required|string',
