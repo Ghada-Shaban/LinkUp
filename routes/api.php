@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\CoachController;
 use App\Http\Controllers\Api\AdminController;
 use App\Http\Controllers\Api\BookingController;
+use App\Http\Controllers\Api\CoachDashboardController;
 
 /*
 |--------------------------------------------------------------------------
@@ -125,3 +126,8 @@ Route::get('/admin/session-trends', [AdminController::class, 'getSessionCompleti
 Route::delete('/admin/delete-users/{userId}', [AdminController::class, 'deleteUser']);
 Route::get('/admin/trainees/search', [AdminController::class, 'searchTrainees']);
 Route::get('/admin/coaches/search', [AdminController::class, 'searchCoaches']);
+
+// New route for Coach Dashboard Stats
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/coach-dashboard/stats', [CoachDashboardController::class, 'getCoachDashboardStats']);
+});
