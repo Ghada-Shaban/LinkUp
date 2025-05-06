@@ -116,8 +116,8 @@ class CoachDashboardController extends Controller
                     }
 
                     return [
-                        'session_id' => $session->id,
-                        'trainee_name' => $session->trainees->full_name ?? 'Unknown Trainee',
+                        'session_id' => $session->new_session_id,
+                        'trainee_name' => $session->trainees->Full_Name ?? 'Unknown Trainee',
                         'date_time' => Carbon::parse($session->date_time)->setTimezone('Africa/Cairo')->format('Y-m-d H:i:s'),
                         'duration' => $session->duration,
                         'service_type' => $session->service->service_type ?? 'Unknown Service',
@@ -128,7 +128,7 @@ class CoachDashboardController extends Controller
             // 9. Pending Mentorship Requests
             $pendingMentorshipRequests = MentorshipRequest::where('status', 'pending')
                 ->where('coach_id', $authCoach->User_ID)
-                ->with(['trainee.user'])
+                ->with(['trainee'])
                 ->get()
                 ->map(function ($request) {
                     $requestType = null;
@@ -140,7 +140,7 @@ class CoachDashboardController extends Controller
 
                     return [
                         'request_id' => $request->id,
-                        'trainee_name' => $request->trainee->user->full_name ?? 'Unknown Trainee',
+                        'trainee_name' => $request->trainee->Full_Name ?? 'Unknown Trainee',
                         'request_type' => $requestType,
                         'created_at' => Carbon::parse($request->created_at)->setTimezone('Africa/Cairo')->format('Y-m-d H:i:s'),
                     ];
