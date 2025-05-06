@@ -21,7 +21,23 @@ class TraineeDashboardController extends Controller
         }
 
         try {
-            // 1. Top 5 Coaches based on average rating
+            // 1. Completed Sessions Count
+            $completedSessionsCount = NewSession::where('status', NewSession::STATUS_COMPLETED)
+                ->where('trainee_id', $authTrainee->User_ID)
+                ->count();
+
+            // 2. Total Learning Time (Sum of durations of completed sessions in hours)
+            $completedSessions = NewSession::where('status', NewSession::STATUS_COMPLETED)
+                ->where('trainee_id', $authTrainee->User_ID)
+                ->get();
+            $totalLearningTime = $completedSessions->sum('duration') / 60; // Convert minutes to hours
+
+            // 3. Pending Session Requests Count
+            $pendingSessionRequests = MentorshipRequest::where('status', 'pending')
+                ->where('trainee_id', $authTrainee->User_ID)
+                ->count();
+
+            // 4. Top 5 Coaches based on average rating
             $topCoaches = User::with(['coach', 'services.sessions', 'reviewsAsCoach'])
                 ->where('role_profile', 'Coach')
                 ->whereHas('coach', function ($query) {
@@ -49,11 +65,11 @@ class TraineeDashboardController extends Controller
                     ];
                 });
 
-            // 2. Upcoming Sessions (Top 5 Scheduled Sessions for the Trainee)
+            // 5. Upcoming Sessions (Top 5 Scheduled Sessions for the Trainee)
             $upcomingSessions = NewSession::where('status', 'Scheduled')
                 ->where('trainee_id', $authTrainee->User_ID)
                 ->where('date_time', '>=', Carbon::now())
-                ->with(['mentorshipRequest', 'coach.user', 'service'])
+                ->with(['mentorshipRequest', 'service'])
                 ->orderBy('date_time', 'asc')
                 ->take(5)
                 ->get()
@@ -70,9 +86,13 @@ class TraineeDashboardController extends Controller
                         }
                     }
 
+                    $coach = User::where('User_ID', $session->coach_id)
+                        ->where('role_profile', 'Coach')
+                        ->first();
+
                     return [
                         'session_id' => $session->new_session_id,
-                        'coach_name' => $session->coach->user->Full_Name ?? 'Unknown Coach',
+                        'coach_name' => $coach->Full_Name ?? 'Unknown Coach',
                         'date_time' => Carbon::parse($session->date_time)->setTimezone('Africa/Cairo')->format('Y-m-d H:i:s'),
                         'duration' => $session->duration,
                         'service_type' => $session->service->service_type ?? 'Unknown Service',
@@ -80,15 +100,10 @@ class TraineeDashboardController extends Controller
                     ];
                 });
 
-            // 3. Completed Sessions Count
-            $completedSessionsCount = NewSession::where('status', NewSession::STATUS_COMPLETED)
-                ->where('trainee_id', $authTrainee->User_ID)
-                ->count();
-
-            // 4. Pending Mentorship Requests
+            // 6. Pending Mentorship Requests
             $pendingMentorshipRequests = MentorshipRequest::where('status', 'pending')
                 ->where('trainee_id', $authTrainee->User_ID)
-                ->with(['coach.user'])
+                ->with(['coach'])
                 ->get()
                 ->map(function ($request) {
                     $requestType = null;
@@ -100,7 +115,7 @@ class TraineeDashboardController extends Controller
 
                     return [
                         'request_id' => $request->id,
-                        'coach_name' => $request->coach->user->Full_Name ?? 'Unknown Coach',
+                        'coach_name' => $request->coach->Full_Name ?? 'Unknown Coach',
                         'request_type' => $requestType,
                         'created_at' => Carbon::parse($request->created_at)->setTimezone('Africa/Cairo')->format('Y-m-d H:i:s'),
                     ];
@@ -108,9 +123,11 @@ class TraineeDashboardController extends Controller
 
             // Return the response
             return response()->json([
+                'completed_sessions' => $completedSessionsCount,
+                'total_learning_time' => round($totalLearningTime, 2),
+                'pending_session_requests' => $pendingSessionRequests,
                 'top_coaches' => $topCoaches,
                 'upcoming_sessions' => $upcomingSessions,
-                'completed_sessions' => $completedSessionsCount,
                 'pending_mentorship_requests' => $pendingMentorshipRequests,
             ], 200);
         } catch (\Exception $e) {
