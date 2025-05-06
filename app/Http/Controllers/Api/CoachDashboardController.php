@@ -8,9 +8,11 @@ use App\Models\Payment;
 use App\Models\Review;
 use App\Models\Service;
 use App\Models\Mentorship;
+use App\Models\MentorshipRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Carbon\Carbon;
 
 class CoachDashboardController extends Controller
 {
@@ -92,6 +94,58 @@ class CoachDashboardController extends Controller
                 return [$serviceType => round($serviceRevenue, 2)];
             });
 
+            // 8. Upcoming Sessions (Top 5 Scheduled Sessions)
+            $upcomingSessions = NewSession::where('status', 'Scheduled')
+                ->where('coach_id', $authCoach->User_ID)
+                ->where('date_time', '>=', Carbon::now())
+                ->with(['mentorshipRequest', 'trainee.user', 'service'])
+                ->orderBy('date_time', 'asc')
+                ->take(5)
+                ->get()
+                ->map(function ($session) {
+                    $sessionType = null;
+                    if ($session->mentorship_request_id) {
+                        $mentorshipRequest = $session->mentorshipRequest;
+                        if ($mentorshipRequest) {
+                            if ($mentorshipRequest->requestable_type === 'App\\Models\\MentorshipPlan') {
+                                $sessionType = 'Mentorship Plan';
+                            } elseif ($mentorshipRequest->requestable_type === 'App\\Models\\GroupMentorship') {
+                                $sessionType = 'Group Mentorship';
+                            }
+                        }
+                    }
+
+                    return [
+                        'session_id' => $session->id,
+                        'trainee_name' => $session->trainee->user->full_name ?? 'Unknown Trainee',
+                        'date_time' => Carbon::parse($session->date_time)->setTimezone('Africa/Cairo')->format('Y-m-d H:i:s'),
+                        'duration' => $session->duration,
+                        'service_type' => $session->service->service_type ?? 'Unknown Service',
+                        'session_type' => $sessionType,
+                    ];
+                });
+
+            // 9. Pending Mentorship Requests
+            $pendingMentorshipRequests = MentorshipRequest::where('status', 'pending')
+                ->where('coach_id', $authCoach->User_ID)
+                ->with(['trainee.user'])
+                ->get()
+                ->map(function ($request) {
+                    $requestType = null;
+                    if ($request->requestable_type === 'App\\Models\\MentorshipPlan') {
+                        $requestType = 'Mentorship Plan';
+                    } elseif ($request->requestable_type === 'App\\Models\\GroupMentorship') {
+                        $requestType = 'Group Mentorship';
+                    }
+
+                    return [
+                        'request_id' => $request->id,
+                        'trainee_name' => $request->trainee->user->full_name ?? 'Unknown Trainee',
+                        'request_type' => $requestType,
+                        'created_at' => Carbon::parse($request->created_at)->setTimezone('Africa/Cairo')->format('Y-m-d H:i:s'),
+                    ];
+                });
+
             // Return the response
             return response()->json([
                 'revenue' => $revenue80Percent,
@@ -100,6 +154,8 @@ class CoachDashboardController extends Controller
                 'average_rating' => $averageRating,
                 'sessions_percentage_by_service' => $sessionsByService,
                 'revenue_by_service' => $revenueByService,
+                'upcoming_sessions' => $upcomingSessions,
+                'pending_mentorship_requests' => $pendingMentorshipRequests,
             ], 200);
         } catch (\Exception $e) {
             Log::error('Failed to retrieve coach dashboard stats', [
