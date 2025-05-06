@@ -423,7 +423,7 @@ public function updateTraineeProfile(Request $request)
                 'User_ID' => $user->User_ID,
                 'Full_Name' => $user->full_name,
                 'Email' => $user->email,
-                'Photo' => !empty($user->photo) ? url(Storage::url($user->photo)) : null,
+                'Photo' => !empty($user->photo) ? (filter_var($user->photo, FILTER_VALIDATE_URL) ? $user->photo : url(Storage::url($user->photo))) : null,
                 'Bio' => $coach->Bio ?? null,
                 'Languages' => $languages,
                 'Company_or_School' => $coach->Company_or_School ?? null,
