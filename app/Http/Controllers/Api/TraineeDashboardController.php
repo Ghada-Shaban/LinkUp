@@ -100,35 +100,13 @@ class TraineeDashboardController extends Controller
                     ];
                 });
 
-            // 6. Pending Mentorship Requests
-            $pendingMentorshipRequests = MentorshipRequest::where('status', 'pending')
-                ->where('trainee_id', $authTrainee->User_ID)
-                ->with(['coach'])
-                ->get()
-                ->map(function ($request) {
-                    $requestType = null;
-                    if ($request->requestable_type === 'App\\Models\\MentorshipPlan') {
-                        $requestType = 'Mentorship Plan';
-                    } elseif ($request->requestable_type === 'App\\Models\\GroupMentorship') {
-                        $requestType = 'Group Mentorship';
-                    }
-
-                    return [
-                        'request_id' => $request->id,
-                        'coach_name' => $request->coach->Full_Name ?? 'Unknown Coach',
-                        'request_type' => $requestType,
-                        'created_at' => Carbon::parse($request->created_at)->setTimezone('Africa/Cairo')->format('Y-m-d H:i:s'),
-                    ];
-                });
-
-            // Return the response
+            // Return the response without pending_mentorship_requests
             return response()->json([
                 'completed_sessions' => $completedSessionsCount,
                 'total_learning_time' => round($totalLearningTime, 2),
                 'pending_session_requests' => $pendingSessionRequests,
                 'top_coaches' => $topCoaches,
                 'upcoming_sessions' => $upcomingSessions,
-                'pending_mentorship_requests' => $pendingMentorshipRequests,
             ], 200);
         } catch (\Exception $e) {
             Log::error('Failed to retrieve trainee dashboard stats', [
