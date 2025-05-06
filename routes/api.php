@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\CoachController;
 use App\Http\Controllers\Api\AdminController;
 use App\Http\Controllers\Api\BookingController;
 use App\Http\Controllers\Api\CoachDashboardController;
+use App\Http\Controllers\Api\TraineeDashboardController;
 
 /*
 |--------------------------------------------------------------------------
@@ -130,4 +131,9 @@ Route::get('/admin/coaches/search', [AdminController::class, 'searchCoaches']);
 // New route for Coach Dashboard Stats
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/coach-dashboard/stats', [CoachDashboardController::class, 'getCoachDashboardStats']);
+});
+
+// New route for Trainee Dashboard Stats
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/trainee-dashboard/stats', [TraineeDashboardController::class, 'getTraineeDashboardStats']);
 });
