@@ -98,7 +98,7 @@ class CoachDashboardController extends Controller
             $upcomingSessions = NewSession::where('status', 'Scheduled')
                 ->where('coach_id', $authCoach->User_ID)
                 ->where('date_time', '>=', Carbon::now())
-                ->with(['mentorshipRequest', 'trainee.user', 'service'])
+                ->with(['mentorshipRequest', 'trainees', 'service'])
                 ->orderBy('date_time', 'asc')
                 ->take(5)
                 ->get()
@@ -117,7 +117,7 @@ class CoachDashboardController extends Controller
 
                     return [
                         'session_id' => $session->id,
-                        'trainee_name' => $session->trainee->user->full_name ?? 'Unknown Trainee',
+                        'trainee_name' => $session->trainees->full_name ?? 'Unknown Trainee',
                         'date_time' => Carbon::parse($session->date_time)->setTimezone('Africa/Cairo')->format('Y-m-d H:i:s'),
                         'duration' => $session->duration,
                         'service_type' => $session->service->service_type ?? 'Unknown Service',
