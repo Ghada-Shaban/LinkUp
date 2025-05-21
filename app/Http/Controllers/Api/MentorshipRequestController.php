@@ -134,7 +134,7 @@ class MentorshipRequestController extends Controller
             return response()->json(['message' => 'Only coaches can accept requests.'], 403);
         }
 
-        $request = MentorshipRequest::find($id);
+        $request = MentorshipRequest::with('trainee')->find($id);
 
         if (!$request) {
             return response()->json(['message' => 'Request not found.'], 404);
@@ -197,8 +197,8 @@ class MentorshipRequestController extends Controller
             return response()->json(['message' => 'Only coaches can reject requests.'], 403);
         }
 
-        // استرجاع الطلب مع الـ trainee
-        $request = MentorshipRequest::with('trainee')->find($id);
+        // استرجاع الطلب مع الـ trainee وrequestable
+        $request = MentorshipRequest::with(['trainee', 'requestable'])->find($id);
 
         if (!$request) {
             Log::warning('Mentorship request not found', [
