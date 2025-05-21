@@ -1,17 +1,21 @@
-@component('mail::message')
-# Mentorship Request Rejected
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Mentorship Request Rejected</title>
+</head>
+<body>
+    <h1>Mentorship Request Rejected</h1>
 
-Hello {{ $mentorshipRequest->trainee->full_name }},
+    <p>Hello {{ $mentorshipRequest->trainee->full_name }},</p>
 
-Unfortunately, your mentorship request for **{{ $mentorshipRequest->requestable->title }}** has been rejected by the coach.
+    <p>Unfortunately, your mentorship request for <strong>{{ $mentorshipRequest->requestable->title }}</strong> has been rejected by the coach.</p>
 
-You can try submitting another request or contact the coach for more details.
+    <p>You can try submitting another request or contact the coach for more details.</p>
 
-@component('mail::button', ['url' => url('/trainee/mentorship-requests')])
-Submit Another Request
-@endcomponent
+    <p>
+        <a href="{{ url('/trainee/mentorship-requests') }}" style="padding: 10px 20px; background-color: #dc3545; color: white; text-decoration: none; border-radius: 5px;">Submit Another Request</a>
+    </p>
 
-Thanks,  
-{{ config('app.name') }}
-
-@endcomponent
+    <p>Thanks,<br>{{ config('app.name') }} Team</p>
+</body>
+</html>
