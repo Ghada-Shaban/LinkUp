@@ -20,7 +20,7 @@ class RequestRejected extends Mailable
 
     public function build()
     {
-        return $this->subject('Your Mentorship Request Has Been Rejected')
+        return $this->subject('Mentorship Request Rejected')
                     ->view('emails.request_rejected');
     }
 }
