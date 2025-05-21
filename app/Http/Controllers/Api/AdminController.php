@@ -22,6 +22,9 @@ use App\Models\CoachAvailability;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
+use App\Mail\CoachAccepted;
+use App\Mail\CoachRejected;
 
 class AdminController extends Controller
 {
@@ -29,8 +32,7 @@ class AdminController extends Controller
 public function getPendingCoachRequests(Request $request)
 {
     // Check if the authenticated user is an admin
-   
-  $authAdmin = auth('admin-api')->user();
+    $authAdmin = auth('admin-api')->user();
     if (!$authAdmin) {
         return response()->json(['message' => 'Unauthorized'], 401);
     }
@@ -53,8 +55,6 @@ public function getPendingCoachRequests(Request $request)
                     'photo' => $coach->user->photo,
                     'languages' => $coach->languages->pluck('language'),
                     'skills' => $coach->skills->pluck('skill'),
-                 
-                   
                 ];
             });
 
@@ -78,7 +78,7 @@ public function getPendingCoachRequests(Request $request)
  * Approve or reject a coach registration request.
  *
  * @param Request $request
- * @param int $userId
+ * @param int $coachId
  * @return \Illuminate\Http\JsonResponse
  */
 public function handleCoachRequest(Request $request, $coachId)
@@ -95,8 +95,8 @@ public function handleCoachRequest(Request $request, $coachId)
     ]);
 
     try {
-        // Find the coach by its primary key (id)
-        $coach = Coach::findOrFail($coachId);
+        // Find the coach by its primary key (id) with user relationship
+        $coach = Coach::with('user')->findOrFail($coachId);
 
         if ($coach->status !== Coach::STATUS_PENDING) {
             return response()->json(['message' => 'Request has already been processed'], 400);
@@ -109,9 +109,49 @@ public function handleCoachRequest(Request $request, $coachId)
             $coach->status = Coach::STATUS_APPROVED;
             $coach->admin_id = $authAdmin->id; // Link the coach to the admin who approved
             $message = 'Coach registration request approved successfully';
+
+            // Send acceptance email to Coach
+            try {
+                if ($user && $user->email) {
+                    Mail::to($user->email)->send(new CoachAccepted($coach, $user));
+                    Log::info('Coach acceptance email sent', [
+                        'coach_id' => $coach->User_ID,
+                        'email' => $user->email,
+                    ]);
+                } else {
+                    Log::warning('Coach email not found for acceptance email', [
+                        'coach_id' => $coach->User_ID,
+                    ]);
+                }
+            } catch (\Exception $e) {
+                Log::error('Failed to send coach acceptance email', [
+                    'error' => $e->getMessage(),
+                    'coach_id' => $coach->User_ID,
+                ]);
+            }
         } else {
             $coach->status = Coach::STATUS_REJECTED;
             $message = 'Coach registration request rejected';
+
+            // Send rejection email to Coach before deletion
+            try {
+                if ($user && $user->email) {
+                    Mail::to($user->email)->send(new CoachRejected($coach, $user));
+                    Log::info('Coach rejection email sent', [
+                        'coach_id' => $coach->User_ID,
+                        'email' => $user->email,
+                    ]);
+                } else {
+                    Log::warning('Coach email not found for rejection email', [
+                        'coach_id' => $coach->User_ID,
+                    ]);
+                }
+            } catch (\Exception $e) {
+                Log::error('Failed to send coach rejection email', [
+                    'error' => $e->getMessage(),
+                    'coach_id' => $coach->User_ID,
+                ]);
+            }
 
             // Delete related data
             CoachLanguage::where('coach_id', $coach->User_ID)->forceDelete();
@@ -147,155 +187,140 @@ public function handleCoachRequest(Request $request, $coachId)
         ], 500);
     }
 }
-    public function getTopCoaches(Request $request)
-    {
-        // Get top coaches based on average rating
-        $topCoaches = Coach::select('coaches.*')
-            ->with(['user' => function ($query) {
-                $query->select('User_ID', 'full_name','photo','email');
-            }])
-            ->withCount('reviews')
-            ->withAvg('reviews', 'rating')
-            ->withCount(['sessions as completed_sessions_count' => function ($query) {
-                $query->where('status', NewSession::STATUS_COMPLETED);
-                }])
-            ->orderByDesc('reviews_avg_rating')
-            ->take(5) // Top 5 coaches
-            ->get()
-            ->map(function ($coach) {
-                return [
-                    'user_id' => $coach->User_ID,
-                    'full_name' => $coach->user->full_name,
-                    'email' => $coach->user->email,
-                     'photo' => $coach->user->photo,
-                     'title' => $coach->Title,
-                   'completed_sessions' => $coach->completed_sessions_count,
-                    'average_rating' => round($coach->reviews_avg_rating, 2),
-    
-                ];
-            });
 
-        // Return the response
-        return response()->json([
-            'top_coaches' => $topCoaches,
-        ], 200);
-    }
-
-    public function getApprovedCoaches(Request $request)
-    {
-    
-        $approvedCoaches = Coach::where('status', 'approved')
-            ->with(['user' => function ($query) {
-                $query->select('User_ID', 'full_name', 'email', 'linkedin_link', 'role_profile', 'photo', 'created_at', 'updated_at');
-            }])
-            ->withCount('reviews')
-            ->withAvg('reviews', 'rating')
-            ->withCount(['sessions as completed_sessions_count' => function ($query) {
-                $query->where('status', NewSession::STATUS_COMPLETED);
-                }])
-            ->get()
-            ->map(function ($coach) {
-                return [
-                    // From users table
-                    'user_id' => $coach->User_ID,
-                    'full_name' => $coach->user->full_name,
-                    'email' => $coach->user->email,
-                    'photo' => $coach->user->photo,
-                   'completed_sessions' => $coach->completed_sessions_count,
-                  
-
-                    // From coaches table
-                    'title' => $coach->Title,
-                   
-               
-                    'years_of_experience' => $coach->Years_Of_Experience,
-                    'months_of_experience' => $coach->Months_Of_Experience,
-                   
-                ];
-            });
-
-        // Get count of approved coaches
-        $approvedCoachesCount = $approvedCoaches->count();
-
-        // Return the response
-        return response()->json([
-            'approved_coaches' => $approvedCoaches,
-          
-        ], 200);
-    }
-    public function getApprovedCoachesCount(Request $request)
-    {
-        // Get count of approved coaches
-        $approvedCoachesCount = Coach::where('status', 'approved')->count();
-
-        // Return the response
-        return response()->json([
-            'approved_coaches_count' => $approvedCoachesCount,
-        ], 200);
-    }
-
-    public function getPendingCoachesCount(Request $request)
-    {
-        // Get count of pending coaches
-        $pendingCoachesCount = Coach::where('status', 'pending')->count();
-
-        // Return the response
-        return response()->json([
-            'pending_coaches_count' => $pendingCoachesCount,
-        ], 200);
-    }
-
-
-
-      
-    public function getAllTrainees(Request $request)
-    {
-        // Get all trainees with details from users and trainees tables
-        $trainees = Trainee::with(['user' => function ($query) {
-               $query->select('User_ID', 'full_name', 'email', 'linkedin_link', 'role_profile', 'photo', 'created_at', 'updated_at');
+public function getTopCoaches(Request $request)
+{
+    // Get top coaches based on average rating
+    $topCoaches = Coach::select('coaches.*')
+        ->with(['user' => function ($query) {
+            $query->select('User_ID', 'full_name','photo','email');
         }])
-            ->withCount(['sessionsAsTrainee as completed_sessions_count' => function ($query) {
-                $query->where('status', NewSession::STATUS_COMPLETED);
+        ->withCount('reviews')
+        ->withAvg('reviews', 'rating')
+        ->withCount(['sessions as completed_sessions_count' => function ($query) {
+            $query->where('status', NewSession::STATUS_COMPLETED);
             }])
-            ->get()
-            ->map(function ($trainee) {
-                return [
-                    // From users table
-                    'user_id' => $trainee->User_ID,
-                    'full_name' => $trainee->user->full_name,
-                    'email' => $trainee->user->email,
-                    'photo' => $trainee->user->photo,
-                    'completed_sessions' => $trainee->completed_sessions_count,
-                  
-                    // From trainees table
-               
-            
-                   
-                    'current_role' => $trainee->Current_Role,
-                   
-                    'years_of_professional_experience' => $trainee->Years_Of_Professional_Experience,
-                    
-                ];
-            });
+        ->orderByDesc('reviews_avg_rating')
+        ->take(5) // Top 5 coaches
+        ->get()
+        ->map(function ($coach) {
+            return [
+                'user_id' => $coach->User_ID,
+                'full_name' => $coach->user->full_name,
+                'email' => $coach->user->email,
+                 'photo' => $coach->user->photo,
+                 'title' => $coach->Title,
+               'completed_sessions' => $coach->completed_sessions_count,
+                'average_rating' => round($coach->reviews_avg_rating, 2),
+            ];
+        });
 
-        // Return the response (without the count)
-        return response()->json([
-            'trainees' => $trainees,
-        ], 200);
-    }
+    // Return the response
+    return response()->json([
+        'top_coaches' => $topCoaches,
+    ], 200);
+}
 
-    public function getTraineesCount(Request $request)
-    {
-        // Get count of trainees
-        $traineesCount = Trainee::count();
+public function getApprovedCoaches(Request $request)
+{
+    $approvedCoaches = Coach::where('status', 'approved')
+        ->with(['user' => function ($query) {
+            $query->select('User_ID', 'full_name', 'email', 'linkedin_link', 'role_profile', 'photo', 'created_at', 'updated_at');
+        }])
+        ->withCount('reviews')
+        ->withAvg('reviews', 'rating')
+        ->withCount(['sessions as completed_sessions_count' => function ($query) {
+            $query->where('status', NewSession::STATUS_COMPLETED);
+            }])
+        ->get()
+        ->map(function ($coach) {
+            return [
+                // From users table
+                'user_id' => $coach->User_ID,
+                'full_name' => $coach->user->full_name,
+                'email' => $coach->user->email,
+                'photo' => $coach->user->photo,
+               'completed_sessions' => $coach->completed_sessions_count,
+                // From coaches table
+                'title' => $coach->Title,
+                'years_of_experience' => $coach->Years_Of_Experience,
+                'months_of_experience' => $coach->Months_Of_Experience,
+            ];
+        });
 
-        // Return the response
-        return response()->json([
-            'trainees_count' => $traineesCount,
-        ], 200);
-    }
+    // Get count of approved coaches
+    $approvedCoachesCount = $approvedCoaches->count();
 
- public function getSessionCompletionTrends(Request $request)
+    // Return the response
+    return response()->json([
+        'approved_coaches' => $approvedCoaches,
+    ], 200);
+}
+
+public function getApprovedCoachesCount(Request $request)
+{
+    // Get count of approved coaches
+    $approvedCoachesCount = Coach::where('status', 'approved')->count();
+
+    // Return the response
+    return response()->json([
+        'approved_coaches_count' => $approvedCoachesCount,
+    ], 200);
+}
+
+public function getPendingCoachesCount(Request $request)
+{
+    // Get count of pending coaches
+    $pendingCoachesCount = Coach::where('status', 'pending')->count();
+
+    // Return the response
+    return response()->json([
+        'pending_coaches_count' => $pendingCoachesCount,
+    ], 200);
+}
+
+public function getAllTrainees(Request $request)
+{
+    // Get all trainees with details from users and trainees tables
+    $trainees = Trainee::with(['user' => function ($query) {
+           $query->select('User_ID', 'full_name', 'email', 'linkedin_link', 'role_profile', 'photo', 'created_at', 'updated_at');
+    }])
+        ->withCount(['sessionsAsTrainee as completed_sessions_count' => function ($query) {
+            $query->where('status', NewSession::STATUS_COMPLETED);
+        }])
+        ->get()
+        ->map(function ($trainee) {
+            return [
+                // From users table
+                'user_id' => $trainee->User_ID,
+                'full_name' => $trainee->user->full_name,
+                'email' => $trainee->user->email,
+                'photo' => $trainee->user->photo,
+                'completed_sessions' => $trainee->completed_sessions_count,
+                // From trainees table
+                'current_role' => $trainee->Current_Role,
+                'years_of_professional_experience' => $trainee->Years_Of_Professional_Experience,
+            ];
+        });
+
+    // Return the response (without the count)
+    return response()->json([
+        'trainees' => $trainees,
+    ], 200);
+}
+
+public function getTraineesCount(Request $request)
+{
+    // Get count of trainees
+    $traineesCount = Trainee::count();
+
+    // Return the response
+    return response()->json([
+        'trainees_count' => $traineesCount,
+    ], 200);
+}
+
+public function getSessionCompletionTrends(Request $request)
 {
     $authAdmin = auth('admin-api')->user();
     if (!$authAdmin) {
@@ -309,7 +334,7 @@ public function handleCoachRequest(Request $request, $coachId)
             DB::raw("SUM(CASE WHEN status = 'Canceled' THEN 1 ELSE 0 END) as canceled")
         )
         ->groupBy(DB::raw("DATE_FORMAT(created_at, '%b %Y')"))
-        ->orderBy(DB::raw("DATE_FORMAT(created_at, '%b %Y')")) // تعديل هنا
+        ->orderBy(DB::raw("DATE_FORMAT(created_at, '%b %Y')"))
         ->get()
         ->map(function ($trend) {
             return [
@@ -335,7 +360,7 @@ public function handleCoachRequest(Request $request, $coachId)
     }
 }
 
-    public function deleteUser(Request $request, $userId)
+public function deleteUser(Request $request, $userId)
 {
     // Check if the authenticated user is an admin
     $authAdmin = auth('admin-api')->user();
@@ -389,8 +414,6 @@ public function handleCoachRequest(Request $request, $coachId)
             // Delete trainee sessions
             NewSession::where('trainee_id', $userId)->forceDelete();
 
-          
-
             // Delete trainee mentorship requests
             MentorshipRequest::where('trainee_id', $userId)->forceDelete();
 
@@ -404,10 +427,6 @@ public function handleCoachRequest(Request $request, $coachId)
 
         // Delete bookings
         Book::where('trainee_id', $userId)->forceDelete();
-
-     
-
-      
 
         // Delete mentorship requests (polymorphic)
         MentorshipRequest::where('requestable_id', $userId)->where('requestable_type', User::class)->forceDelete();
@@ -442,8 +461,7 @@ public function handleCoachRequest(Request $request, $coachId)
     }
 }
 
-
-    public function searchTrainees(Request $request)
+public function searchTrainees(Request $request)
 {
     // Check if the authenticated user is an admin
     $authAdmin = auth('admin-api')->user();
@@ -496,7 +514,7 @@ public function handleCoachRequest(Request $request, $coachId)
     }
 }
 
-  /**
+/**
  * Search for coaches based on a single query string across full_name, email, title, and company.
  *
  * @param Request $request
@@ -556,107 +574,102 @@ public function searchCoaches(Request $request)
         ], 500);
     }
 }
+
 public function getDashboardStats(Request $request)
-    {
-        $authAdmin = auth('admin-api')->user();
-        if (!$authAdmin) {
-            return response()->json(['message' => 'Unauthorized'], 401);
-        }
+{
+    $authAdmin = auth('admin-api')->user();
+    if (!$authAdmin) {
+        return response()->json(['message' => 'Unauthorized'], 401);
+    }
 
-        try {
-            // 1. Get all completed payments with their services
-            $completedPayments = Payment::where('payment_status', 'Completed')
-                ->whereHas('service', function ($query) {
-                    $query->whereIn('service_type', ['Mentorship', 'Mock_Interview', 'Group_Mentorship'])
-                          ->whereNull('deleted_at');
-                })
-                ->with('service.mentorship')
-                ->get();
+    try {
+        // 1. Get all completed payments with their services
+        $completedPayments = Payment::where('payment_status', 'Completed')
+            ->whereHas('service', function ($query) {
+                $query->whereIn('service_type', ['Mentorship', 'Mock_Interview', 'Group_Mentorship'])
+                      ->whereNull('deleted_at');
+            })
+            ->with('service.mentorship')
+            ->get();
 
-            // 2. Total Revenue (20%) - Only for Completed payments
-            $totalRevenue = $completedPayments->sum('amount');
-            $revenue20Percent = round($totalRevenue * 0.2, 2);
+        // 2. Total Revenue (20%) - Only for Completed payments
+        $totalRevenue = $completedPayments->sum('amount');
+        $revenue20Percent = round($totalRevenue * 0.2, 2);
 
-            // 3. Get completed sessions that have a corresponding completed payment
-            $completedSessions = NewSession::where('status', NewSession::STATUS_COMPLETED)
-                ->whereHas('service', function ($query) {
-                    $query->whereIn('service_type', ['Mentorship', 'Mock_Interview', 'Group_Mentorship'])
-                          ->whereNull('deleted_at');
-                })
-                ->whereHas('service.payments', function ($query) {
-                    $query->where('payment_status', 'Completed');
-                })
-                ->with('service.mentorship')
-                ->get();
-            $totalCompletedSessionsCount = $completedSessions->count();
+        // 3. Get completed sessions that have a corresponding completed payment
+        $completedSessions = NewSession::where('status', NewSession::STATUS_COMPLETED)
+            ->whereHas('service', function ($query) {
+                $query->whereIn('service_type', ['Mentorship', 'Mock_Interview', 'Group_Mentorship'])
+                      ->whereNull('deleted_at');
+            })
+            ->whereHas('service.payments', function ($query) {
+                $query->where('payment_status', 'Completed');
+            })
+            ->with('service.mentorship')
+            ->get();
+        $totalCompletedSessionsCount = $completedSessions->count();
 
-            // 4. Percentage of Completed Sessions by Service based on revenue
-            $allServiceTypes = ['Mentorship Session', 'Mentorship Plan', 'Mock_Interview', 'Group_Mentorship'];
-            $revenueByService = collect($allServiceTypes)->mapWithKeys(function ($serviceType) use ($completedPayments) {
-                $paymentsForService = $completedPayments->filter(function ($payment) use ($serviceType) {
-                    if ($serviceType === 'Mentorship Session') {
-                        return $payment->service->service_type === 'Mentorship' && $payment->service->mentorship && $payment->service->mentorship->mentorship_type === 'Mentorship session';
-                    } elseif ($serviceType === 'Mentorship Plan') {
-                        return $payment->service->service_type === 'Mentorship' && $payment->service->mentorship && $payment->service->mentorship->mentorship_type === 'Mentorship plan';
-                    }
-                    return $payment->service->service_type === $serviceType;
-                });
-                $serviceRevenue = $paymentsForService->sum('amount') * 0.2;
-                return [$serviceType => $serviceRevenue];
+        // 4. Percentage of Completed Sessions by Service based on revenue
+        $allServiceTypes = ['Mentorship Session', 'Mentorship Plan', 'Mock_Interview', 'Group_Mentorship'];
+        $revenueByService = collect($allServiceTypes)->mapWithKeys(function ($serviceType) use ($completedPayments) {
+            $paymentsForService = $completedPayments->filter(function ($payment) use ($serviceType) {
+                if ($serviceType === 'Mentorship Session') {
+                    return $payment->service->service_type === 'Mentorship' && $payment->service->mentorship && $payment->service->mentorship->mentorship_type === 'Mentorship session';
+                } elseif ($serviceType === 'Mentorship Plan') {
+                    return $payment->service->service_type === 'Mentorship' && $payment->service->mentorship && $payment->service->mentorship->mentorship_type === 'Mentorship plan';
+                }
+                return $payment->service->service_type === $serviceType;
             });
-            $totalRevenue20 = $revenueByService->sum();
-            $sessionsByService = $revenueByService->mapWithKeys(function ($revenue, $serviceType) use ($totalRevenue20) {
-                $percentage = $totalRevenue20 > 0 ? ($revenue / $totalRevenue20) * 100 : 0;
-                return [$serviceType => round($percentage, 2) . '%'];
+            $serviceRevenue = $paymentsForService->sum('amount') * 0.2;
+            return [$serviceType => $serviceRevenue];
+        });
+        $totalRevenue20 = $revenueByService->sum();
+        $sessionsByService = $revenueByService->mapWithKeys(function ($revenue, $serviceType) use ($totalRevenue20) {
+            $percentage = $totalRevenue20 > 0 ? ($revenue / $totalRevenue20) * 100 : 0;
+            return [$serviceType => round($percentage, 2) . '%'];
+        });
+
+        // 5. Revenue by Service (20% of each service's payments)
+        $revenueByService = collect($allServiceTypes)->mapWithKeys(function ($serviceType) use ($completedPayments) {
+            $paymentsForService = $completedPayments->filter(function ($payment) use ($serviceType) {
+                if ($serviceType === 'Mentorship Session') {
+                    return $payment->service->service_type === 'Mentorship' && $payment->service->mentorship && $payment->service->mentorship->mentorship_type === 'Mentorship session';
+                } elseif ($serviceType === 'Mentorship Plan') {
+                    return $payment->service->service_type === 'Mentorship' && $payment->service->mentorship && $payment->service->mentorship->mentorship_type === 'Mentorship plan';
+                }
+                return $payment->service->service_type === $serviceType;
             });
+            $serviceRevenue = $paymentsForService->sum('amount') * 0.2;
+            return [$serviceType => round($serviceRevenue, 2)];
+        });
 
-            // 5. Revenue by Service (20% of each service's payments)
-            $revenueByService = collect($allServiceTypes)->mapWithKeys(function ($serviceType) use ($completedPayments) {
-                $paymentsForService = $completedPayments->filter(function ($payment) use ($serviceType) {
-                    if ($serviceType === 'Mentorship Session') {
-                        return $payment->service->service_type === 'Mentorship' && $payment->service->mentorship && $payment->service->mentorship->mentorship_type === 'Mentorship session';
-                    } elseif ($serviceType === 'Mentorship Plan') {
-                        return $payment->service->service_type === 'Mentorship' && $payment->service->mentorship && $payment->service->mentorship->mentorship_type === 'Mentorship plan';
-                    }
-                    return $payment->service->service_type === $serviceType;
-                });
-                $serviceRevenue = $paymentsForService->sum('amount') * 0.2;
-                return [$serviceType => round($serviceRevenue, 2)];
-            });
+        // 6. Average Rating for Coaches
+        $averageRating = Coach::has('reviews')
+            ->withAvg('reviews', 'rating')
+            ->get()
+            ->avg('reviews_avg_rating');
 
-            // 6. Average Rating for Coaches
-            $averageRating = Coach::has('reviews')
-                ->withAvg('reviews', 'rating')
-                ->get()
-                ->avg('reviews_avg_rating');
+        // 7. Total Users
+        $totalUsers = User::count();
 
-            // 7. Total Users
-            $totalUsers = User::count();
-
-            // Return the response
-            return response()->json([
-                'number_of_users' => $totalUsers,
-                'revenue' => $revenue20Percent,
-                'sessions_percentage_by_service' => $sessionsByService,
-                'revenue_by_service' => $revenueByService,
-                'completed_sessions' => $totalCompletedSessionsCount,
-                'average_rating' => round($averageRating, 2),
-            ], 200);
-        } catch (\Exception $e) {
-            \Log::error('Failed to retrieve dashboard stats', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-            ]);
-            return response()->json([
-                'message' => 'Failed to retrieve dashboard stats',
-                'error' => $e->getMessage(),
-            ], 500);
-        }
+        // Return the response
+        return response()->json([
+            'number_of_users' => $totalUsers,
+            'revenue' => $revenue20Percent,
+            'sessions_percentage_by_service' => $sessionsByService,
+            'revenue_by_service' => $revenueByService,
+            'completed_sessions' => $totalCompletedSessionsCount,
+            'average_rating' => round($averageRating, 2),
+        ], 200);
+    } catch (\Exception $e) {
+        \Log::error('Failed to retrieve dashboard stats', [
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString(),
+        ]);
+        return response()->json([
+            'message' => 'Failed to retrieve dashboard stats',
+            'error' => $e->getMessage(),
+        ], 500);
     }
 }
-        
-           
-            
-           
-          
-
+}
