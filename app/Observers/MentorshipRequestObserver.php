@@ -7,10 +7,6 @@ use App\Models\NewSession;
 use App\Models\GroupMentorship;
 use App\Models\User;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
-use App\Mail\NewMentorshipRequest;
-use App\Mail\RequestAccepted;
-use App\Mail\RequestRejected;
 
 class MentorshipRequestObserver
 {
@@ -19,11 +15,10 @@ class MentorshipRequestObserver
      */
     public function created(MentorshipRequest $mentorshipRequest)
     {
-        // Send email to Coach when a new request is created
+        // Log the creation of the new request
         $coach = User::find($mentorshipRequest->coach_id);
         if ($coach) {
-            Mail::to($coach->email)->send(new NewMentorshipRequest($mentorshipRequest));
-            Log::info('New mentorship request email sent to coach', [
+            Log::info('New mentorship request created', [
                 'request_id' => $mentorshipRequest->id,
                 'coach_id' => $coach->User_ID,
             ]);
@@ -70,50 +65,16 @@ class MentorshipRequestObserver
                         ]);
                     }
                 }
-
-                // إرسال إيميل للـ Trainee
-                $trainee = $mentorshipRequest->trainee;
-                if ($trainee) {
-                    Mail::to($trainee->email)->send(new RequestRejected($mentorshipRequest));
-                    Log::info('Rejection email sent to trainee', [
-                        'request_id' => $mentorshipRequest->id,
-                        'trainee_id' => $trainee->User_ID,
-                    ]);
-                } else {
-                    Log::warning('Trainee not found for rejection email', [
-                        'request_id' => $mentorshipRequest->id,
-                        'trainee_id' => $mentorshipRequest->trainee_id,
-                    ]);
-                }
             }
 
             // لو الطلب بقى accepted
             if ($newStatus === 'accepted' && $oldStatus === 'pending') {
-                // إرسال إيميل للـ Trainee
-                $trainee = $mentorshipRequest->trainee;
-                if ($trainee) {
-                    try {
-                        Mail::to($trainee->email)->send(new RequestAccepted($mentorshipRequest));
-                        Log::info('Acceptance email sent to trainee', [
-                            'request_id' => $mentorshipRequest->id,
-                            'trainee_id' => $trainee->User_ID,
-                        ]);
-                    } catch (\Exception $e) {
-                        Log::error('Failed to send Mentorship Request Accepted email', [
-                            'request_id' => $mentorshipRequest->id,
-                            'trainee_id' => $trainee->User_ID,
-                            'error' => $e->getMessage(),
-                        ]);
-                    }
-                } else {
-                    Log::warning('Trainee not found for acceptance email', [
-                        'request_id' => $mentorshipRequest->id,
-                        'trainee_id' => $mentorshipRequest->trainee_id,
-                    ]);
-                }
-
                 // ملاحظة: الجلسات هتتولد بعد الدفع في completePayment (للـ Group Mentorship)
                 // أو في scheduleSessions (للـ Mentorship Plan)
+                Log::info('Mentorship request accepted', [
+                    'request_id' => $mentorshipRequest->id,
+                    'trainee_id' => $mentorshipRequest->trainee_id,
+                ]);
             }
 
             // لو الطلب بقى cancelled (مثلاً بسبب عدم الدفع أو أي سبب آخر)
@@ -135,8 +96,6 @@ class MentorshipRequestObserver
                         ]);
                     }
                 }
-
-                // ملاحظة: ممكن نضيف إيميل للـ Trainee هنا لو عايزين نعرفهم إن الطلب اتلغى
             }
         }
     }
