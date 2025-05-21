@@ -169,8 +169,16 @@ class PaymentController extends Controller
                 if ($mentorshipRequest->requestable_type === 'App\\Models\\GroupMentorship') {
                     $groupMentorship = $requestable;
 
+                    // Ensure trainee_ids is an array
+                    $traineeIds = json_decode($groupMentorship->trainee_ids, true) ?? [];
+                    if (!is_array($traineeIds)) {
+                        $traineeIds = [];
+                        Log::warning('trainee_ids is not a valid array, resetting to empty array', [
+                            'group_mentorship_id' => $groupMentorship->id,
+                        ]);
+                    }
+
                     // Check current_participants before proceeding
-                    $traineeIds = $groupMentorship->trainee_ids ?? [];
                     $currentParticipants = count($traineeIds);
                     if (!in_array($mentorshipRequest->trainee_id, $traineeIds)) {
                         $currentParticipants++; // Simulate adding the new trainee
@@ -223,7 +231,7 @@ class PaymentController extends Controller
                     // Update the trainee_ids and current_participants
                     if (!in_array($mentorshipRequest->trainee_id, $traineeIds)) {
                         $traineeIds[] = $mentorshipRequest->trainee_id;
-                        $groupMentorship->trainee_ids = $traineeIds;
+                        $groupMentorship->trainee_ids = json_encode($traineeIds);
                         $groupMentorship->current_participants = count($traineeIds);
                         $groupMentorship->save();
                     }
