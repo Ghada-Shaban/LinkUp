@@ -4,8 +4,8 @@
     <title>Payment Confirmed & Session Schedule</title>
 </head>
 <body style="font-family: Arial, sans-serif; text-align: center; padding: 20px;">
-    <h1>✅ Payment Confirmed, {{ $mentorshipRequest->trainee->full_name }}! ✅</h1>
-    <p>Thank you for your payment of ${{ $mentorshipRequest->payment->amount }}. Your session(s) have been successfully scheduled! 🎉</p>
+    <h1>✅ Payment Confirmed, {{ $mentorshipRequest ? $mentorshipRequest->trainee->full_name : Auth::user()->full_name }}! ✅</h1>
+    <p>Thank you for your payment of ${{ $payment->amount ?? 0 }}. Your session(s) have been successfully scheduled! 🎉</p>
     <p>Below are the details of your upcoming sessions:</p>
     <table style="margin: 0 auto; border-collapse: collapse; width: 80%;">
         <tr style="background-color: #f2f2f2;">
