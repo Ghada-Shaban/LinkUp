@@ -12,6 +12,7 @@
 
     <p>
         <strong>Service:</strong> {{ $mentorshipRequest->requestable->title }} <br>
+        <strong>Type:</strong> {{ $mentorshipRequest->requestable_type === 'App\\Models\\MentorshipPlan' ? 'Mentorship Plan' : 'Group Mentorship' }} <br>
         <strong>Trainee:</strong> {{ $mentorshipRequest->trainee->full_name }} <br>
         <strong>Email:</strong> {{ $mentorshipRequest->trainee->email }}
     </p>
