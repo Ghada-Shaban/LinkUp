@@ -17,6 +17,8 @@ use Carbon\Carbon;
 use Stripe\Stripe;
 use Stripe\PaymentIntent;
 use App\Models\Price;
+use Illuminate\Support\Facades\Mail;
+use App\Mail\PaymentConfirmation;
 
 class PaymentController extends Controller
 {
@@ -163,6 +165,7 @@ class PaymentController extends Controller
                 }
 
                 // Step 2: Handle the sessions and update new_sessions
+                $sessions = [];
                 if ($mentorshipRequest->requestable_type === 'App\\Models\\GroupMentorship') {
                     $groupMentorship = $requestable;
 
@@ -192,7 +195,6 @@ class PaymentController extends Controller
                     $startDateTime->setTimezone('UTC');
 
                     // Create 4 sessions, each one week apart
-                    $sessionsCreated = [];
                     for ($i = 0; $i < 4; $i++) {
                         $sessionDateTime = $startDateTime->copy()->addWeeks($i);
                         $newSession = NewSession::create([
@@ -215,7 +217,7 @@ class PaymentController extends Controller
                             return response()->json(['message' => "Payment succeeded but failed to create session for week " . ($i + 1)], 500);
                         }
 
-                        $sessionsCreated[] = $newSession;
+                        $sessions[] = $newSession;
                     }
 
                     // Update the trainee_ids and current_participants
@@ -227,6 +229,17 @@ class PaymentController extends Controller
                     }
                 } elseif ($mentorshipRequest->requestable_type === 'App\\Models\\MentorshipPlan') {
                     // Update the status of all sessions to 'Scheduled' and payment_status to 'Completed'
+                    $sessions = NewSession::where('mentorship_request_id', $mentorshipRequest->id)
+                        ->where('status', 'Pending')
+                        ->get();
+
+                    if ($sessions->isEmpty()) {
+                        Log::warning('No sessions found for Mentorship Plan', [
+                            'mentorship_request_id' => $mentorshipRequest->id,
+                        ]);
+                        return response()->json(['message' => 'Payment succeeded but no sessions found'], 500);
+                    }
+
                     $updated = NewSession::where('mentorship_request_id', $mentorshipRequest->id)
                         ->where('status', 'Pending')
                         ->update([
@@ -243,7 +256,27 @@ class PaymentController extends Controller
                     }
                 }
 
-                // Step 3: Delete the pending payment record
+                // Step 3: Send payment confirmation email
+                try {
+                    if ($mentorshipRequest->trainee && $mentorshipRequest->trainee->email) {
+                        Mail::to($mentorshipRequest->trainee->email)->send(new PaymentConfirmation($mentorshipRequest, $sessions));
+                        Log::info('Payment confirmation email sent', [
+                            'mentorship_request_id' => $mentorshipRequest->id,
+                            'email' => $mentorshipRequest->trainee->email,
+                        ]);
+                    } else {
+                        Log::warning('Trainee email not found for payment confirmation', [
+                            'mentorship_request_id' => $mentorshipRequest->id,
+                        ]);
+                    }
+                } catch (\Exception $e) {
+                    Log::error('Failed to send payment confirmation email', [
+                        'error' => $e->getMessage(),
+                        'mentorship_request_id' => $mentorshipRequest->id,
+                    ]);
+                }
+
+                // Step 4: Delete the pending payment record
                 $pendingPayment->delete();
 
                 Log::info('Payment processed successfully for mentorship request', [
@@ -371,6 +404,27 @@ class PaymentController extends Controller
                         'temp_session_id' => $sessionData['temp_session_id'],
                     ]);
                     return response()->json(['message' => 'Payment succeeded but failed to create session'], 500);
+                }
+
+                // Step 3: Send payment confirmation email for single session
+                try {
+                    $trainee = Auth::user();
+                    if ($trainee && $trainee->email) {
+                        Mail::to($trainee->email)->send(new PaymentConfirmation(null, [$newSession]));
+                        Log::info('Payment confirmation email sent for single session', [
+                            'temp_session_id' => $sessionData['temp_session_id'],
+                            'email' => $trainee->email,
+                        ]);
+                    } else {
+                        Log::warning('Trainee email not found for payment confirmation', [
+                            'temp_session_id' => $sessionData['temp_session_id'],
+                        ]);
+                    }
+                } catch (\Exception $e) {
+                    Log::error('Failed to send payment confirmation email for single session', [
+                        'error' => $e->getMessage(),
+                        'temp_session_id' => $sessionData['temp_session_id'],
+                    ]);
                 }
 
                 Log::info('Payment processed successfully for regular session', [
