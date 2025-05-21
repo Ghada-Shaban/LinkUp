@@ -1,14 +1,14 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Mentorship Request Accepted</title>
+    <title>Group Mentorship Request Accepted</title>
 </head>
 <body>
-    <h1>Mentorship Request Accepted</h1>
+    <h1>Group Mentorship Request Accepted</h1>
 
     <p>Hello {{ $mentorshipRequest->trainee->full_name }},</p>
 
-    <p>Your mentorship request for <strong>{{ $mentorshipRequest->requestable->title }}</strong> has been accepted by the coach.</p>
+    <p>Your group mentorship request for <strong>{{ $mentorshipRequest->requestable->title }}</strong> has been accepted by the coach.</p>
 
     <p>Please proceed to payment to confirm your booking.</p>
 
