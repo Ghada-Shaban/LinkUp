@@ -223,7 +223,7 @@ class PaymentController extends Controller
                     // Update the trainee_ids and current_participants
                     if (!in_array($mentorshipRequest->trainee_id, $traineeIds)) {
                         $traineeIds[] = $mentorshipRequest->trainee_id;
-                        $groupMentorship->trainee_ids = $traineeIds; // Laravel will handle encoding to JSON
+                        $groupMentorship->trainee_ids = $traineeIds;
                         $groupMentorship->current_participants = count($traineeIds);
                         $groupMentorship->save();
                     }
@@ -259,7 +259,7 @@ class PaymentController extends Controller
                 // Step 3: Send payment confirmation email
                 try {
                     if ($mentorshipRequest->trainee && $mentorshipRequest->trainee->email) {
-                        Mail::to($mentorshipRequest->trainee->email)->send(new PaymentConfirmation($mentorshipRequest, $sessions));
+                        Mail::to($mentorshipRequest->trainee->email)->send(new PaymentConfirmation($mentorshipRequest, $sessions, $payment));
                         Log::info('Payment confirmation email sent', [
                             'mentorship_request_id' => $mentorshipRequest->id,
                             'email' => $mentorshipRequest->trainee->email,
@@ -297,7 +297,6 @@ class PaymentController extends Controller
             }
         } else {
             // Handle payment for regular session (Mock Interview, Mentorship Sessions)
-            // Session data should be passed in the request
             $request->validate([
                 'session_data' => 'required|array',
                 'session_data.temp_session_id' => 'required|string',
@@ -383,7 +382,6 @@ class PaymentController extends Controller
 
                 // Step 2: Parse the date_time to respect the original time in Africa/Cairo
                 $parsedDateTime = Carbon::parse($sessionData['date_time'], 'Africa/Cairo');
-                // Convert to UTC before storing in the database
                 $parsedDateTime->setTimezone('UTC');
 
                 // Create the session in new_sessions
@@ -410,7 +408,7 @@ class PaymentController extends Controller
                 try {
                     $trainee = Auth::user();
                     if ($trainee && $trainee->email) {
-                        Mail::to($trainee->email)->send(new PaymentConfirmation(null, [$newSession]));
+                        Mail::to($trainee->email)->send(new PaymentConfirmation(null, [$newSession], $payment));
                         Log::info('Payment confirmation email sent for single session', [
                             'temp_session_id' => $sessionData['temp_session_id'],
                             'email' => $trainee->email,
