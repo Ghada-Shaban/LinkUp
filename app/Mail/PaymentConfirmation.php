@@ -7,6 +7,7 @@ use Illuminate\Mail\Mailable;
 use Illuminate\Queue\SerializesModels;
 use App\Models\MentorshipRequest;
 use App\Models\NewSession;
+use App\Models\Payment;
 
 class PaymentConfirmation extends Mailable
 {
@@ -14,11 +15,13 @@ class PaymentConfirmation extends Mailable
 
     public $mentorshipRequest;
     public $sessions;
+    public $payment;
 
-    public function __construct(MentorshipRequest $mentorshipRequest, $sessions)
+    public function __construct($mentorshipRequest, $sessions, $payment)
     {
         $this->mentorshipRequest = $mentorshipRequest;
         $this->sessions = $sessions;
+        $this->payment = $payment;
     }
 
     public function build()
