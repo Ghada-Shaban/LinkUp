@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Mail\RequestAccepted;
+use App\Mail\NewMentorshipRequest;
+use App\Mail\GroupMentorshipRequestAccepted;
+use App\Mail\MentorshipPlanRequestAccepted;
 use App\Models\MentorshipRequest;
 use App\Models\NewSession;
 use App\Models\Service;
@@ -53,6 +55,22 @@ class MentorshipRequestController extends Controller
 
         // Load trainee data for the response
         $trainee = User::findOrFail(Auth::user()->User_ID);
+
+        // Send email to the Coach
+        try {
+            $coach = User::findOrFail($coachId);
+            Mail::to($coach->email)->send(new NewMentorshipRequest($mentorshipRequest));
+            Log::info('New mentorship request email sent to coach', [
+                'request_id' => $mentorshipRequest->id,
+                'coach_id' => $coachId,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Failed to send new mentorship request email', [
+                'error' => $e->getMessage(),
+                'request_id' => $mentorshipRequest->id,
+                'coach_id' => $coachId,
+            ]);
+        }
 
         return response()->json([
             'message' => 'Mentorship request sent successfully.',
@@ -137,13 +155,22 @@ class MentorshipRequestController extends Controller
             'payment_due_at' => now()->addHours(24), // تاريخ الاستحقاق بعد 24 ساعة من دلوقتي
         ]);
 
-        // إرسال الإيميل للـ Trainee
+        // إرسال الإيميل للـ Trainee بناءً على نوع الطلب
         try {
-            Mail::to($request->trainee->email)->send(new RequestAccepted($request));
+            if ($request->requestable_type === \App\Models\MentorshipPlan::class) {
+                Mail::to($request->trainee->email)->send(new MentorshipPlanRequestAccepted($request));
+            } else {
+                Mail::to($request->trainee->email)->send(new GroupMentorshipRequestAccepted($request));
+            }
+            Log::info('Acceptance email sent to trainee', [
+                'request_id' => $request->id,
+                'trainee_id' => $request->trainee_id,
+            ]);
         } catch (\Exception $e) {
-            \Log::error('Failed to send Mentorship Request Accepted email', [
-                'request_id' => $id,
+            Log::error('Failed to send acceptance email', [
                 'error' => $e->getMessage(),
+                'request_id' => $request->id,
+                'trainee_id' => $request->trainee_id,
             ]);
         }
 
