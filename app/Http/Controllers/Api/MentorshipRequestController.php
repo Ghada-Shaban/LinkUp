@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Mail\NewMentorshipRequest;
 use App\Mail\GroupMentorshipRequestAccepted;
 use App\Mail\MentorshipPlanRequestAccepted;
+use App\Mail\RequestRejected;
 use App\Models\MentorshipRequest;
 use App\Models\NewSession;
 use App\Models\Service;
@@ -217,6 +218,21 @@ class MentorshipRequestController extends Controller
 
         $request->status = 'rejected';
         $request->save();
+
+        // إرسال الإيميل للـ Trainee
+        try {
+            Mail::to($request->trainee->email)->send(new RequestRejected($request));
+            Log::info('Rejection email sent to trainee', [
+                'request_id' => $request->id,
+                'trainee_id' => $request->trainee_id,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Failed to send rejection email', [
+                'error' => $e->getMessage(),
+                'request_id' => $request->id,
+                'trainee_id' => $request->trainee_id,
+            ]);
+        }
 
         Log::info('Mentorship request rejected successfully', [
             'request_id' => $id,
