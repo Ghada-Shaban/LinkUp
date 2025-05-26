@@ -99,6 +99,27 @@ Route::get('/coachprofile/{user_id}', [ProfileController::class, 'getCoachProfil
 // Route الخاصة بـ Explore Coaches
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/coaches/explore', [CoachController::class, 'exploreCoaches']);
+    // New routes for Explore Coaches with specific service types
+    Route::get('/coaches/explore/mentorship-sessions', function (Request $request) {
+        $request->merge(['service_type' => 'Mentorship sessions']);
+        return app(CoachController::class)->exploreCoaches($request);
+    });
+    Route::get('/coaches/explore/mock-interviews', function (Request $request) {
+        $request->merge(['service_type' => 'Mock interviews']);
+        return app(CoachController::class)->exploreCoaches($request);
+    });
+    Route::get('/coaches/explore/group-mentorship', function (Request $request) {
+        $request->merge(['service_type' => 'Group mentorship']);
+        return app(CoachController::class)->exploreCoaches($request);
+    });
+    Route::get('/coaches/explore/mentorship', function (Request $request) {
+        $request->merge(['service_type' => 'Mentorship']);
+        return app(CoachController::class)->exploreCoaches($request);
+    });
+    Route::get('/coaches/explore/mentorship-plan', function (Request $request) {
+        $request->merge(['service_type' => 'Mentorship plan']);
+        return app(CoachController::class)->exploreCoaches($request);
+    });
 });
 
 Route::middleware('auth:sanctum')->group(function () {
