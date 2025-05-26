@@ -25,6 +25,7 @@ class CoachController extends Controller
 
         $search = $request->query('search', ''); // Search query for multiple fields
         $perPage = $request->query('per_page', 50); // زوّدنا per_page لـ 50 عشان نضمن نجيب كل الـ coaches
+        $serviceType = $request->query('service_type', ''); // جلب نوع الـ Service من الـ Request
 
         $coachesQuery = User::with(['coach', 'services.price', 'services.sessions', 'skills', 'reviewsAsCoach'])
             ->where('role_profile', 'Coach') // Only fetch users with role 'Coach'
@@ -48,6 +49,38 @@ class CoachController extends Controller
                           $q->where('skill', 'like', "%{$search}%");
                       });
                 });
+            })
+            ->when($serviceType && $serviceType !== 'All', function ($query) use ($serviceType) {
+                $query->whereHas('services', function ($q) use ($serviceType) {
+                    if ($serviceType === 'Mentorship') {
+                        // جلب الكوتشز اللي بيقدموا Mentorship (سواء Mentorship session أو Mentorship plan)
+                        $q->where('service_type', 'Mentorship');
+                    } elseif ($serviceType === 'Mentorship session') {
+                        // جلب الكوتشز اللي بيقدموا Mentorship session
+                        $q->where('service_type', 'Mentorship')
+                          ->whereHas('mentorships', function ($subQuery) {
+                              $subQuery->where('mentorship_type', 'Mentorship session');
+                          });
+                    } elseif ($serviceType === 'Mentorship plan') {
+                        // جلب الكوتشز اللي بيقدموا Mentorship plan
+                        $q->where('service_type', 'Mentorship')
+                          ->whereHas('mentorships', function ($subQuery) {
+                              $subQuery->where('mentorship_type', 'Mentorship plan');
+                          });
+                    } elseif (in_array($serviceType, ['Project Assessment', 'CV Review', 'LinkedIn Optimization'])) {
+                        // جلب الكوتشز اللي بيقدموا Mentorship session مع الـ sub-type المحدد
+                        $q->where('service_type', 'Mentorship')
+                          ->whereHas('mentorships', function ($subQuery) use ($serviceType) {
+                              $subQuery->where('mentorship_type', 'Mentorship session')
+                                       ->whereHas('mentorshipSessions', function ($subSubQuery) use ($serviceType) {
+                                           $subSubQuery->where('sub_type', $serviceType);
+                                       });
+                          });
+                    } else {
+                        // جلب الكوتشز اللي بيقدموا الـ Service Type المحدد مباشرة (Group Mentorship أو Mock Interview)
+                        $q->where('service_type', $serviceType);
+                    }
+                });
             });
 
         // جربة لجلب الـ coach الجديد مباشرة (استبدلي 61 بـ User_ID بتاع الـ coach)
@@ -59,6 +92,7 @@ class CoachController extends Controller
 
         Log::info('Fetching coaches for Explore Coaches page', [
             'search' => $search,
+            'service_type' => $serviceType,
             'coaches_count' => $coaches->total(),
             'trainee_id' => $currentUser->User_ID,
             'coaches_ids' => $coaches->pluck('User_ID')->toArray(),
