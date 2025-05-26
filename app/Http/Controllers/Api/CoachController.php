@@ -73,12 +73,17 @@ class CoachController extends Controller
                           ->whereHas('mentorships', function ($subQuery) use ($serviceType) {
                               $subQuery->where('mentorship_type', 'Mentorship session')
                                        ->whereHas('mentorshipSessions', function ($subSubQuery) use ($serviceType) {
-                                           $subSubQuery->where('sub_type', $serviceType);
+                                           $subSubQuery->where('session_type', $serviceType); // تعديل من sub_type لـ session_type
                                        });
                           });
                     } else {
                         // جلب الكوتشز اللي بيقدموا الـ Service Type المحدد مباشرة (Group Mentorship أو Mock Interview)
-                        $q->where('service_type', $serviceType);
+                        $serviceTypeMap = [
+                            'Mock interviews' => 'Mock_Interview',
+                            'Group mentorship' => 'Group_Mentorship', // تعديل للتطابق مع الـ Database
+                        ];
+                        $mappedServiceType = $serviceTypeMap[$serviceType] ?? $serviceType;
+                        $q->where('service_type', $mappedServiceType);
                     }
                 });
             });
@@ -97,6 +102,8 @@ class CoachController extends Controller
             'trainee_id' => $currentUser->User_ID,
             'coaches_ids' => $coaches->pluck('User_ID')->toArray(),
             'test_coach' => $testCoach ? $testCoach->toArray() : 'Not found',
+            'query_debug' => $coachesQuery->toSql(),
+            'bindings' => $coachesQuery->getBindings(),
         ]);
 
         return CoachResource::collection($coaches);
