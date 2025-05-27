@@ -154,10 +154,6 @@ class AuthController extends Controller
             ], 201);
         });
     } catch (\Exception $e) {
-        \Log::error('Failed to submit coach registration request', [
-            'error' => $e->getMessage(),
-            'trace' => $e->getTraceAsString(),
-        ]);
         return response()->json([
             'message' => 'Failed to submit registration request',
             'error' => $e->getMessage(),
@@ -214,13 +210,12 @@ class AuthController extends Controller
         ]));
         
         return DB::transaction(function () use ($validated, $request) {
-            // رفع الصورة إلى Cloudinary إذا وُجدت
             $photoPath = null;
             if ($request->hasFile('Photo')) {
                 $uploadedFile = $request->file('Photo');
                 $result = Cloudinary::upload($uploadedFile->getRealPath(), [
                     'folder' => 'trainee_photos', // مجلد في Cloudinary
-                    'public_id' => 'trainee_' . time(), // اسم فريد للصورة
+                    'public_id' => 'trainee_' . time(), 
                     'transformation' => [
                         'quality' => 'auto',
                         'fetch_format' => 'auto',
@@ -284,16 +279,12 @@ class AuthController extends Controller
             'Password' => 'required_without:password',
             'password' => 'required_without:Password',
         ]);
-
-        // جلب الإيميل والباسوورد بغض النظر عن الحالة (uppercase أو lowercase)
         $email = strtolower($request->Email ?? $request->email);
         $password = $request->Password ?? $request->password;
 
-        // ابحث عن الـ admin في جدول admins (case-insensitive)
         $admin = Admin::whereRaw('LOWER(Email) = ?', [$email])->first();
 
         if ($admin) {
-            // التحقق من الباسوورد للـ admin (مقارنة مباشرة، case-insensitive، وتنظيف المسافات)
             $requestPassword = trim(strtolower($password));
             $adminPassword = trim(strtolower($admin->getRawOriginal('Password')));
 
@@ -305,7 +296,6 @@ class AuthController extends Controller
                 ], 401);
             }
 
-            // إنشاء token للـ admin
             $token = $admin->createToken('admin-token')->plainTextToken;
 
             return response()->json([
@@ -314,8 +304,6 @@ class AuthController extends Controller
                 'admin_id' => $admin->id,
             ], 200);
         }
-
-        // لو مش admin، ابحث في جدول users (Coach/Trainee) مع التعامل مع case-insensitive
         $user = User::whereRaw('LOWER(Email) = ?', [$email])->first();
 
         if (!$user) {
