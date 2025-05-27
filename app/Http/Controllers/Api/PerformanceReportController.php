@@ -44,7 +44,6 @@ class PerformanceReportController extends Controller
     {
         $trainee = auth()->user();
         $reports = PerformanceReport::where('trainee_id', $trainee->User_ID)
-            ->with(['session', 'coach'])
             ->orderBy('created_at', 'desc')
             ->get();
 
