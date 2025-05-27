@@ -85,24 +85,21 @@ public function getServicesCount($coachId)
     }
 
    
-    private function getMentorshipPlans(Request $request, $coachId)
-    {
-      
-        $services = Service::where('coach_id', $coachId)
-            ->where('service_type', 'Mentorship')
-            ->whereHas('mentorship', function($query) {
-                $query->where('mentorship_type', 'Mentorship plan');
-            })
-            ->whereHas('mentorship.mentorshipPlan') 
-            ->with(['mentorship.mentorshipPlan', 'price'])
-            ->get();
-        
-        Log::info('Mentorship Plan services count: ' . $services->count());
-        
-        return response()->json([
-            'services' => MentorshipPlanResource::collection($services)
-        ]);
-    }
+   private function getMentorshipPlans(Request $request, $coachId)
+{
+    $services = Service::where('coach_id', $coachId)
+        ->where('service_type', 'Mentorship')
+        ->whereHas('mentorship', function($query) {
+            $query->where('mentorship_type', 'Mentorship plan');
+        })
+        ->whereHas('mentorship.mentorshipPlan') 
+        ->with(['mentorship.mentorshipPlan', 'price'])
+        ->get();
+    
+    return response()->json([
+        'services' => MentorshipPlanResource::collection($services)
+    ]);
+}
 
    
     private function getMentorshipSessions(Request $request, $coachId)
@@ -115,8 +112,6 @@ public function getServicesCount($coachId)
             ->whereHas('mentorship.mentorshipSession') 
             ->with(['mentorship.mentorshipSession', 'price'])
             ->get();
-        
-        Log::info('Mentorship Session services count: ' . $services->count());
         
         return response()->json([
             'services' => MentorshipSessionResource::collection($services)
@@ -131,9 +126,7 @@ public function getServicesCount($coachId)
         ->whereHas('groupMentorship') 
         ->with(['groupMentorship', 'price'])
         ->get();
-        
-        Log::info('Group Mentorship services count: ' . $services->count());
-        
+
         return response()->json([
             'services' => GroupMentorshipResource::collection($services)
         ]);
@@ -147,9 +140,7 @@ public function getServicesCount($coachId)
             ->whereHas('mockInterview') 
             ->with(['mockInterview', 'price'])
             ->get();
-        
-        Log::info('Mock Interview services count: ' . $services->count());
-        
+    
         return response()->json([
             'services' => MockInterviewResource::collection($services)
         ]);
@@ -196,47 +187,23 @@ public function createService(Request $request, $coachId)
                 'admin_id' => '1'
             ]);
 
-            \Log::info('Service created', [
-                'service_id' => $service->service_id,
-            ]);
              $coach->services()->attach($service->service_id);
-
-        \Log::info('Added service to chooses table', [
-            'coach_id' => $coachId,
-            'service_id' => $service->service_id,
-        ]);
             if ($request->service_type === 'Mentorship') {
               
                 $mentorshipType = ($request->mentorship_type === 'Mentorship plan') ? 'Mentorship plan' : 'Mentorship session';
-                
-              
                 $mentorship = Mentorship::create([
                     'service_id' => $service->service_id,
                     'mentorship_type' => $mentorshipType
                 ]);
 
-                \Log::info('Mentorship created', [
-                    'service_id' => $service->service_id,
-                    'mentorship_type' => $mentorshipType,
-                ]);
 
                 if ($mentorshipType === 'Mentorship plan') {
                     MentorshipPlan::create([
                         'service_id' => $service->service_id,
                         'title' => $request->title,
                     ]);
-
-                    \Log::info('Mentorship Plan created', [
-                        'service_id' => $service->service_id,
-                        'title' => $request->title,
-                    ]);
                 } else {
                     MentorshipSession::create([
-                        'service_id' => $service->service_id,
-                        'session_type' => $request->session_type,
-                    ]);
-
-                    \Log::info('Mentorship Session created', [
                         'service_id' => $service->service_id,
                         'session_type' => $request->session_type,
                     ]);
@@ -248,9 +215,6 @@ public function createService(Request $request, $coachId)
                     'interview_level' => $request->interview_level
                 ]);
 
-                \Log::info('Mock Interview created', [
-                    'service_id' => $service->service_id,
-                ]);
             } elseif ($request->service_type === 'Group_Mentorship') {
                 GroupMentorship::create([
                     'service_id' => $service->service_id,
@@ -260,35 +224,20 @@ public function createService(Request $request, $coachId)
                     'start_time' => $request->start_time,
                     'trainee_ids' => json_encode([]),
                 ]);
-
-                \Log::info('Group Mentorship created', [
-                    'service_id' => $service->service_id,
-                ]);
             }
 
             Price::create([
                 'service_id' => $service->service_id,
                 'price' => $request->price
             ]);
-
-            \Log::info('Price created', [
-                'service_id' => $service->service_id,
-                'price' => $request->price,
-            ]);
-
             $service->load('price');
 
             return response()->json(['message' => 'Service created successfully', 'service' => new ServiceResource($service)], 201);
         } catch (\Exception $e) {
-            \Log::error('Error creating service', [
-                'coach_id' => $coachId,
-                'service_type' => $request->service_type,
-                'error' => $e->getMessage(),
-            ]);
-
             return response()->json(['message' => 'Error creating service', 'error' => $e->getMessage()], 500);
         }
     }
+    
   public function updateService(Request $request, $coachId, $serviceId)
 {
     $coach = Coach::findOrFail($coachId);
