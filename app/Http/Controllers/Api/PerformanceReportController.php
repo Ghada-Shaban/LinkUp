@@ -45,7 +45,7 @@ class PerformanceReportController extends Controller
         $trainee = auth()->user();
         $reports = PerformanceReport::where('trainee_id', $trainee->User_ID)
             ->with(['coach' => function ($query) {
-            $query->select('User_ID', 'full_name','profile_photo_url'); 
+            $query->select('User_ID', 'full_name','photo'); 
         }])
             ->orderBy('created_at', 'desc')
             ->get();
