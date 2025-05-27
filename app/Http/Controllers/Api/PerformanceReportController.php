@@ -49,6 +49,9 @@ class PerformanceReportController extends Controller
         }])
             ->orderBy('created_at', 'desc')
             ->get();
+        ->each(function ($report) {
+            $report->coach->makeHidden(['profile_photo_url', 'photo_url']);
+        });
 
         return response()->json($reports, 200);
     }
