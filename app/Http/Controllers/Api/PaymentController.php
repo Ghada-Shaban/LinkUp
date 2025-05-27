@@ -29,41 +29,34 @@ class PaymentController extends Controller
 
     public function initiatePayment(Request $request, $type, $id)
     {
-        // Validate the type
         if (!in_array($type, ['mentorship_request', 'session'])) {
             return response()->json(['message' => 'Invalid type'], 400);
         }
 
         if ($type === 'mentorship_request') {
-            // Handle payment for mentorship_request (Mentorship Plan and Group Mentorship)
             $mentorshipRequest = MentorshipRequest::find($id);
             if (!$mentorshipRequest) {
                 return response()->json(['message' => 'Mentorship request not found'], 404);
             }
-
-            // Check if the user is authorized to make this payment
+            
             if ($mentorshipRequest->trainee_id !== Auth::user()->User_ID) {
                 return response()->json(['message' => 'This mentorship request does not belong to you.'], 403);
             }
 
-            // Check if the mentorship request is accepted
             if ($mentorshipRequest->status !== 'accepted') {
                 return response()->json(['message' => 'Request must be accepted to proceed with payment'], 400);
             }
 
-            // Check if the mentorship request has already been paid
             $existingPayment = Payment::where('mentorship_request_id', $mentorshipRequest->id)->first();
             if ($existingPayment) {
                 return response()->json(['message' => 'This mentorship request has already been paid'], 400);
             }
 
-            // Check for a pending payment
             $pendingPayment = PendingPayment::where('mentorship_request_id', $mentorshipRequest->id)->first();
             if (!$pendingPayment) {
                 return response()->json(['message' => 'No pending payment found for this request'], 404);
             }
 
-            // Get the requestable entity (Service, GroupMentorship, or MentorshipPlan)
             $requestable = $mentorshipRequest->requestable;
             if (!$requestable) {
                 return response()->json(['message' => 'Requestable entity not found'], 404);
@@ -95,7 +88,6 @@ class PaymentController extends Controller
                     return response()->json(['message' => 'Price not found for this mentorship plan'], 400);
                 }
 
-                // Get all sessions associated with this mentorship request
                 $sessions = NewSession::where('mentorship_request_id', $mentorshipRequest->id)
                     ->where('status', 'Pending')
                     ->get();
@@ -103,8 +95,7 @@ class PaymentController extends Controller
                 if ($sessions->isEmpty()) {
                     return response()->json(['message' => 'No pending sessions found for this mentorship plan'], 400);
                 }
-
-                // Calculate the total amount based on the number of sessions and price per session
+                
                 $amount = $sessions->count() * $priceEntry->price * 100; // Amount in cents
                 $description = "Payment for Mentorship Plan ID: {$mentorshipPlan->id}";
             } else {
@@ -115,13 +106,11 @@ class PaymentController extends Controller
                 return response()->json(['message' => 'Invalid amount'], 400);
             }
 
-            // Validate the payment method
             $request->validate([
                 'payment_method_id' => 'required|string',
             ]);
 
             try {
-                // Create a Payment Intent with Stripe
                 $paymentIntent = PaymentIntent::create([
                     'amount' => $amount,
                     'currency' => $currency,
@@ -140,14 +129,9 @@ class PaymentController extends Controller
                 ]);
 
                 if ($paymentIntent->status !== 'succeeded') {
-                    Log::error('Payment failed with status', [
-                        'status' => $paymentIntent->status,
-                        'mentorship_request_id' => $mentorshipRequest->id,
-                    ]);
                     return response()->json(['message' => 'Payment failed: ' . $paymentIntent->status], 400);
                 }
 
-                // Step 1: Record the payment in the payments table
                 $payment = Payment::create([
                     'mentorship_request_id' => $mentorshipRequest->id,
                     'amount' => $amount / 100,
@@ -158,51 +142,32 @@ class PaymentController extends Controller
                 ]);
 
                 if (!$payment) {
-                    Log::error('Failed to record payment in payments table', [
-                        'mentorship_request_id' => $mentorshipRequest->id,
-                    ]);
                     return response()->json(['message' => 'Payment succeeded but failed to record in payments table'], 500);
                 }
 
-                // Step 2: Handle the sessions and update new_sessions
                 $sessions = [];
                 if ($mentorshipRequest->requestable_type === 'App\\Models\\GroupMentorship') {
                     $groupMentorship = $requestable;
-
-                    // Ensure trainee_ids is an array
                     $traineeIds = json_decode($groupMentorship->trainee_ids, true) ?? [];
                     if (!is_array($traineeIds)) {
                         $traineeIds = [];
-                        Log::warning('trainee_ids is not a valid array, resetting to empty array', [
-                            'group_mentorship_id' => $groupMentorship->id,
-                        ]);
                     }
-
-                    // Check current_participants before proceeding
+                    
                     $currentParticipants = count($traineeIds);
                     if (!in_array($mentorshipRequest->trainee_id, $traineeIds)) {
-                        $currentParticipants++; // Simulate adding the new trainee
+                        $currentParticipants++; 
                     }
 
                     if ($currentParticipants > $groupMentorship->max_participants) {
-                        Log::warning('Group Mentorship is full', [
-                            'group_mentorship_id' => $groupMentorship->id,
-                            'current_participants' => $currentParticipants,
-                            'max_participants' => $groupMentorship->max_participants,
-                        ]);
                         return response()->json(['message' => 'Group Mentorship is full'], 400);
                     }
 
-                    // Parse the day and time, assuming the time in the database is in Africa/Cairo
                     $startDateTime = Carbon::parse($groupMentorship->day . ' ' . $groupMentorship->start_time, 'Africa/Cairo');
                     if ($startDateTime->lt(Carbon::now())) {
                         $startDateTime->addWeek();
                     }
-
-                    // Convert to UTC before storing in the database
                     $startDateTime->setTimezone('UTC');
-
-                    // Create 4 sessions, each one week apart
+                    
                     for ($i = 0; $i < 4; $i++) {
                         $sessionDateTime = $startDateTime->copy()->addWeeks($i);
                         $newSession = NewSession::create([
@@ -218,17 +183,12 @@ class PaymentController extends Controller
                         ]);
 
                         if (!$newSession) {
-                            Log::error('Failed to create new session for Group Mentorship', [
-                                'mentorship_request_id' => $mentorshipRequest->id,
-                                'week' => $i + 1,
-                            ]);
                             return response()->json(['message' => "Payment succeeded but failed to create session for week " . ($i + 1)], 500);
                         }
 
                         $sessions[] = $newSession;
                     }
 
-                    // Update the trainee_ids and current_participants
                     if (!in_array($mentorshipRequest->trainee_id, $traineeIds)) {
                         $traineeIds[] = $mentorshipRequest->trainee_id;
                         $groupMentorship->trainee_ids = json_encode($traineeIds);
@@ -236,15 +196,11 @@ class PaymentController extends Controller
                         $groupMentorship->save();
                     }
                 } elseif ($mentorshipRequest->requestable_type === 'App\\Models\\MentorshipPlan') {
-                    // Update the status of all sessions to 'Scheduled' and payment_status to 'Completed'
                     $sessions = NewSession::where('mentorship_request_id', $mentorshipRequest->id)
                         ->where('status', 'Pending')
                         ->get();
 
                     if ($sessions->isEmpty()) {
-                        Log::warning('No sessions found for Mentorship Plan', [
-                            'mentorship_request_id' => $mentorshipRequest->id,
-                        ]);
                         return response()->json(['message' => 'Payment succeeded but no sessions found'], 500);
                     }
 
@@ -257,54 +213,28 @@ class PaymentController extends Controller
                         ]);
 
                     if ($updated === 0) {
-                        Log::warning('No sessions were updated', [
-                            'mentorship_request_id' => $mentorshipRequest->id,
-                        ]);
                         return response()->json(['message' => 'Payment succeeded but no sessions were updated'], 500);
                     }
                 }
 
-                // Step 3: Send payment confirmation email
                 try {
                     if ($mentorshipRequest->trainee && $mentorshipRequest->trainee->email) {
                         Mail::to($mentorshipRequest->trainee->email)->send(new PaymentConfirmation($mentorshipRequest, $sessions, $payment));
-                        Log::info('Payment confirmation email sent', [
-                            'mentorship_request_id' => $mentorshipRequest->id,
-                            'email' => $mentorshipRequest->trainee->email,
-                        ]);
-                    } else {
-                        Log::warning('Trainee email not found for payment confirmation', [
-                            'mentorship_request_id' => $mentorshipRequest->id,
-                        ]);
-                    }
+                       
+                    } 
                 } catch (\Exception $e) {
-                    Log::error('Failed to send payment confirmation email', [
-                        'error' => $e->getMessage(),
-                        'mentorship_request_id' => $mentorshipRequest->id,
-                    ]);
                 }
-
-                // Step 4: Delete the pending payment record
+                
                 $pendingPayment->delete();
-
-                Log::info('Payment processed successfully for mentorship request', [
-                    'mentorship_request_id' => $mentorshipRequest->id,
-                    'amount' => $amount / 100,
-                ]);
 
                 return response()->json([
                     'message' => 'Payment processed successfully',
                     'entity' => $mentorshipRequest
                 ], 200);
             } catch (\Exception $e) {
-                Log::error('Payment failed', [
-                    'error' => $e->getMessage(),
-                    'mentorship_request_id' => $mentorshipRequest->id,
-                ]);
                 return response()->json(['message' => 'Payment failed: ' . $e->getMessage()], 500);
             }
         } else {
-            // Handle payment for regular session (Mock Interview, Mentorship Sessions)
             $request->validate([
                 'session_data' => 'required|array',
                 'session_data.temp_session_id' => 'required|string',
@@ -318,24 +248,20 @@ class PaymentController extends Controller
 
             $sessionData = $request->input('session_data');
 
-            // Verify the temp_session_id matches
             if ($sessionData['temp_session_id'] !== $id) {
                 return response()->json(['message' => 'Invalid session ID'], 400);
             }
 
-            // Verify the trainee_id matches the authenticated user
             if ($sessionData['trainee_id'] !== Auth::user()->User_ID) {
                 return response()->json(['message' => 'You are not authorized to pay for this session'], 403);
             }
-
-            // Fetch the service to get the price
             $service = Service::findOrFail($sessionData['service_id']);
             $priceEntry = Price::where('service_id', $service->service_id)->first();
             if (!$priceEntry) {
                 return response()->json(['message' => 'Price not found for this service'], 400);
             }
 
-            $amount = $priceEntry->price * 100; // Amount in cents
+            $amount = $priceEntry->price * 100; 
             $currency = 'usd';
             $description = "Payment for Session (Service ID: {$service->service_id})";
 
@@ -344,7 +270,6 @@ class PaymentController extends Controller
             }
 
             try {
-                // Create a Payment Intent with Stripe
                 $paymentIntent = PaymentIntent::create([
                     'amount' => $amount,
                     'currency' => $currency,
@@ -371,7 +296,6 @@ class PaymentController extends Controller
                     return response()->json(['message' => 'Payment failed: ' . $paymentIntent->status], 400);
                 }
 
-                // Step 1: Record the payment in the payments table
                 $payment = Payment::create([
                     'mentorship_request_id' => null,
                     'amount' => $amount / 100,
@@ -382,17 +306,11 @@ class PaymentController extends Controller
                 ]);
 
                 if (!$payment) {
-                    Log::error('Failed to record payment in payments table', [
-                        'temp_session_id' => $sessionData['temp_session_id'],
-                    ]);
                     return response()->json(['message' => 'Payment succeeded but failed to record in payments table'], 500);
                 }
-
-                // Step 2: Parse the date_time to respect the original time in Africa/Cairo
                 $parsedDateTime = Carbon::parse($sessionData['date_time'], 'Africa/Cairo');
                 $parsedDateTime->setTimezone('UTC');
 
-                // Create the session in new_sessions
                 $newSession = NewSession::create([
                     'coach_id' => $sessionData['coach_id'],
                     'trainee_id' => $sessionData['trainee_id'],
@@ -406,13 +324,9 @@ class PaymentController extends Controller
                 ]);
 
                 if (!$newSession) {
-                    Log::error('Failed to create new session', [
-                        'temp_session_id' => $sessionData['temp_session_id'],
-                    ]);
                     return response()->json(['message' => 'Payment succeeded but failed to create session'], 500);
                 }
 
-                // Step 3: Send payment confirmation email for single session
                 try {
                     $trainee = Auth::user();
                     if ($trainee && $trainee->email) {
@@ -427,27 +341,14 @@ class PaymentController extends Controller
                         ]);
                     }
                 } catch (\Exception $e) {
-                    Log::error('Failed to send payment confirmation email for single session', [
-                        'error' => $e->getMessage(),
-                        'temp_session_id' => $sessionData['temp_session_id'],
-                    ]);
+                  
                 }
-
-                Log::info('Payment processed successfully for regular session', [
-                    'temp_session_id' => $sessionData['temp_session_id'],
-                    'amount' => $amount / 100,
-                    'session_id' => $newSession->id,
-                ]);
 
                 return response()->json([
                     'message' => 'Payment processed successfully and session scheduled',
                     'session' => $newSession,
                 ], 200);
             } catch (\Exception $e) {
-                Log::error('Payment failed', [
-                    'error' => $e->getMessage(),
-                    'temp_session_id' => $sessionData['temp_session_id'],
-                ]);
                 return response()->json(['message' => 'Payment failed: ' . $e->getMessage()], 500);
             }
         }
