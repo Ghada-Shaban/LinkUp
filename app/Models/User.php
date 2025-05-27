@@ -112,20 +112,6 @@ public function getPhotoUrlAttribute()
         return $this->hasMany(Review::class, 'coach_id', 'User_ID');
     }
 
-    public function attendedSessions()
-    {
-        return $this->belongsToMany(NewSession::class, 'attends', 'User_ID', 'new_session_id');
-    }
-
-    public function viewedServices()
-    {
-        return $this->belongsToMany(Service::class, 'views', 'User_ID', 'service_id');
-    }
-
-    public function emailNotifications()
-    {
-        return $this->belongsToMany(EmailNotification::class, 'received_by', 'User_ID', 'email_notification_id');
-    }
 
     public function bookings()
     {
