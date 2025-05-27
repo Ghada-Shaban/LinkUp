@@ -186,73 +186,53 @@ class BookingController extends Controller
             'booked_sessions' => $bookedSessions->toArray(),
         ]);
 
-        // Generate time slots for the entire day (from 01:00 to 23:00)
+        // Generate time slots based on each availability range
         $slots = [];
         $durationMinutes = 60; // Fixed duration for all sessions
 
-        // Start from 01:00 of the selected date
-        $startOfDay = Carbon::parse($date)->startOfDay()->addHour(1); // Start at 01:00
-        $endOfDay = Carbon::parse($date)->startOfDay()->addHours(24); // End at 00:00 next day
+        foreach ($availabilityRanges as $range) {
+            $startHour = $range['start_hour'];
+            $startMinute = $range['start_minute'];
+            $endHour = $range['end_hour'];
+            $endMinute = $range['end_minute'];
 
-        $currentTime = $startOfDay->copy();
-        while ($currentTime->lt($endOfDay)) {
-            $slotEnd = $currentTime->copy()->addMinutes($durationMinutes);
-            if ($slotEnd->gt($endOfDay)) {
-                break; // Don't include partial slots at the end of the day
-            }
+            // Start from the beginning of the range on the selected date
+            $currentTime = Carbon::parse($date)->setTime($startHour, $startMinute, 0);
+            $endTime = Carbon::parse($date)->setTime($endHour, $endMinute, 0);
 
-            // Use 24-hour format (H:i)
-            $slotStartFormatted = $currentTime->format('H:i');
-            $slotEndFormatted = $slotEnd->format('H:i');
-
-            // Check if this slot is booked
-            $isBooked = $bookedSessions->filter(function ($session) use ($currentTime, $slotEnd) {
-                $sessionStart = Carbon::parse($session->date_time);
-                $sessionEnd = $sessionStart->copy()->addMinutes($session->duration);
-                return $currentTime->lt($sessionEnd) && $slotEnd->gt($sessionStart);
-            })->isNotEmpty();
-
-            // Check if this slot falls within the coach's availability (compare hours and minutes only)
-            $isWithinAvailability = false;
-            foreach ($availabilityRanges as $range) {
-                $currentHour = $currentTime->hour;
-                $currentMinute = $currentTime->minute;
-                $slotEndHour = $slotEnd->hour;
-                $slotEndMinute = $slotEnd->minute;
-
-                // Convert times to minutes for easier comparison
-                $currentTotalMinutes = ($currentHour * 60) + $currentMinute;
-                $slotEndTotalMinutes = ($slotEndHour * 60) + $slotEndMinute;
-                $rangeStartTotalMinutes = ($range['start_hour'] * 60) + $range['start_minute'];
-                $rangeEndTotalMinutes = ($range['end_hour'] * 60) + $range['end_minute'];
-
-                // Handle the edge case for the last slot (23:00 to 00:00)
-                if ($slotEndHour == 0 && $slotEndMinute == 0) {
-                    $slotEndTotalMinutes = 1440; // 24:00 in minutes
+            while ($currentTime->lt($endTime)) {
+                $slotEnd = $currentTime->copy()->addMinutes($durationMinutes);
+                if ($slotEnd->gt($endTime)) {
+                    break; // Don't include partial slots
                 }
 
-                // Check if the slot falls within the availability range
-                if ($currentTotalMinutes >= $rangeStartTotalMinutes && $slotEndTotalMinutes <= $rangeEndTotalMinutes) {
-                    $isWithinAvailability = true;
-                    break;
+                // Use 24-hour format (H:i)
+                $slotStartFormatted = $currentTime->format('H:i');
+                $slotEndFormatted = $slotEnd->format('H:i');
+
+                // Check if this slot is booked
+                $isBooked = $bookedSessions->filter(function ($session) use ($currentTime, $slotEnd) {
+                    $sessionStart = Carbon::parse($session->date_time);
+                    $sessionEnd = $sessionStart->copy()->addMinutes($session->duration);
+                    return $currentTime->lt($sessionEnd) && $slotEnd->gt($sessionStart);
+                })->isNotEmpty();
+
+                // Determine the status
+                $status = 'unavailable'; // Default status
+                if ($isBooked) {
+                    $status = 'booked';
+                } else {
+                    $status = 'available';
                 }
+
+                $slots[] = [
+                    'start_time' => $slotStartFormatted,
+                    'end_time' => $slotEndFormatted,
+                    'status' => $status,
+                ];
+
+                $currentTime->addMinutes($durationMinutes);
             }
-
-            // Determine the status
-            $status = 'unavailable'; // Default status
-            if ($isBooked) {
-                $status = 'booked';
-            } elseif ($isWithinAvailability) {
-                $status = 'available';
-            }
-
-            $slots[] = [
-                'start_time' => $slotStartFormatted,
-                'end_time' => $slotEndFormatted,
-                'status' => $status,
-            ];
-
-            $currentTime->addMinutes($durationMinutes);
         }
 
         return response()->json($slots);
