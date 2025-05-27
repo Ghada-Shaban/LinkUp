@@ -48,11 +48,11 @@ public function getServicesCount($coachId)
         return response()->json($countData);
     }
 
-    // دالة رئيسية لجلب الخدمات بناءً على service_type
+ 
     public function getServices(Request $request, $coachId)
     {
         $coach = Coach::findOrFail($coachId);
-        $serviceType = $request->query('service_type', 'all'); // القيمة الافتراضية هي 'all'
+        $serviceType = $request->query('service_type', 'all');
 
         switch ($serviceType) {
             case 'all':
@@ -70,7 +70,7 @@ public function getServicesCount($coachId)
         }
     }
 
-    // دالة لجلب كل الخدمات (زي قسم "all")
+  
     private function getAllServices(Request $request, $coachId)
     {
         $coach = Coach::findOrFail($coachId);
@@ -84,16 +84,16 @@ public function getServicesCount($coachId)
         ]);
     }
 
-    // دالة لجلب خدمات Mentorship Plans فقط
+   
     private function getMentorshipPlans(Request $request, $coachId)
     {
-        // استخدام Eager Loading بشكل أكثر تحديدًا
+      
         $services = Service::where('coach_id', $coachId)
             ->where('service_type', 'Mentorship')
             ->whereHas('mentorship', function($query) {
                 $query->where('mentorship_type', 'Mentorship plan');
             })
-            ->whereHas('mentorship.mentorshipPlan') // تأكد من وجود mentorshipPlan
+            ->whereHas('mentorship.mentorshipPlan') 
             ->with(['mentorship.mentorshipPlan', 'price'])
             ->get();
         
@@ -104,7 +104,7 @@ public function getServicesCount($coachId)
         ]);
     }
 
-    // دالة لجلب خدمات Mentorship Sessions فقط
+   
     private function getMentorshipSessions(Request $request, $coachId)
     {
         $services = Service::where('coach_id', $coachId)
@@ -112,7 +112,7 @@ public function getServicesCount($coachId)
             ->whereHas('mentorship', function($query) {
                 $query->where('mentorship_type', 'Mentorship session');
             })
-            ->whereHas('mentorship.mentorshipSession') // تأكد من وجود mentorshipSession
+            ->whereHas('mentorship.mentorshipSession') 
             ->with(['mentorship.mentorshipSession', 'price'])
             ->get();
         
@@ -123,12 +123,12 @@ public function getServicesCount($coachId)
         ]);
     }
 
-    // دالة لجلب خدمات Group Mentorship فقط
+  
    private function getGroupMentorshipServices(Request $request, $coachId)
 {
     $services = Service::where('coach_id', $coachId)
         ->where('service_type', 'Group_Mentorship')
-        ->whereHas('groupMentorship') // تأكد من وجود groupMentorship
+        ->whereHas('groupMentorship') 
         ->with(['groupMentorship', 'price'])
         ->get();
         
@@ -139,12 +139,12 @@ public function getServicesCount($coachId)
         ]);
     }
 
-    // دالة لجلب خدمات Mock Interview فقط
+   
     private function getMockInterviewServices(Request $request, $coachId)
     {
         $services = Service::where('coach_id', $coachId)
             ->where('service_type', 'Mock_Interview')
-            ->whereHas('mockInterview') // تأكد من وجود mockInterview
+            ->whereHas('mockInterview') 
             ->with(['mockInterview', 'price'])
             ->get();
         
@@ -206,10 +206,10 @@ public function createService(Request $request, $coachId)
             'service_id' => $service->service_id,
         ]);
             if ($request->service_type === 'Mentorship') {
-                // تأكد من أن القيمة تطابق بالضبط ما هو معرف في الـ enum
+              
                 $mentorshipType = ($request->mentorship_type === 'Mentorship plan') ? 'Mentorship plan' : 'Mentorship session';
                 
-                // إنشاء Mentorship باستخدام الكائن مباشرة بدلاً من Raw Query
+              
                 $mentorship = Mentorship::create([
                     'service_id' => $service->service_id,
                     'mentorship_type' => $mentorshipType
@@ -377,16 +377,16 @@ public function createService(Request $request, $coachId)
         ],
     ]);
 
-    // تحديث الـ price
+   
     if ($request->has('price')) {
         $service->price()->updateOrCreate([], ['price' => $request->price]);
     }
 
-    // تحديث service_type لو موجود في الـ request
+   
     $serviceType = $request->service_type ?? $service->service_type;
 
     if ($serviceType === 'Mentorship') {
-        // تحديث mentorship_type لو موجود في الـ request
+        
         if ($request->has('mentorship_type')) {
             $service->mentorship->update(['mentorship_type' => $request->mentorship_type]);
             if ($request->mentorship_type === 'Mentorship plan') {
@@ -431,43 +431,43 @@ public function createService(Request $request, $coachId)
  
     public function joinGroupMentorship(Request $request, $coachId, $groupMentorshipId)
     {
-        // التأكد من وجود الـ Coach
+        
         $coach = Coach::findOrFail($coachId);
 
-        // التأكد من وجود الـ Group Mentorship
+      
         $groupMentorship = GroupMentorship::where('service_id', $groupMentorshipId)->firstOrFail();
 
-        // التأكد إن الـ Group Mentorship تابعة للـ Coach
+      
         $service = Service::where('service_id', $groupMentorship->service_id)
             ->where('coach_id', $coach->User_ID)
             ->where('service_type', 'Group_Mentorship')
             ->firstOrFail();
 
-        // جلب الـ Trainee اللي بيعمل Join
+    
         $trainee = Auth::guard('api')->user()->trainee;
 
-        // التحقق من وجود max_participants
+       
         if (is_null($groupMentorship->max_participants)) {
             return response()->json(['message' => 'Max participants not set for this group mentorship.'], 400);
         }
 
-        // حساب عدد الـ Slots المتاحة
+     
         $availableSlots = $groupMentorship->max_participants - $groupMentorship->current_participants;
 
-        // التحقق إذا كان فيه Slots متاحة
+      
         if ($availableSlots <= 0) {
             return response()->json(['message' => 'This group mentorship is full.', 'available_slots' => 0], 400);
         }
    
-        // جلب قائمة الـ Trainees المسجلين
+     
         $traineeIds = $groupMentorship->trainee_ids ? json_decode($groupMentorship->trainee_ids, true) : [];
 
-        // التأكد إن الـ Trainee مش مسجل بالفعل
+       
         if (in_array($trainee->User_ID, $traineeIds)) {
             return response()->json(['message' => 'Trainee is already joined to this group mentorship', 'available_slots' => $availableSlots], 400);
         }
 
-        // إضافة الـ Trainee لقائمة الـ Trainees
+       
         $traineeIds[] = $trainee->User_ID;
 
      $newParticipantCount = $groupMentorship->current_participants + 1;
@@ -477,10 +477,10 @@ public function createService(Request $request, $coachId)
         'is_active' => $newParticipantCount >= 2, // لو عدد الـ trainees بقى 2 أو أكتر، الـ Group Mentorship هتبقى نشطة
     ]);
 
-        // تحديث الـ Model عشان يجيب القيم الجديدة
+       
         $groupMentorship->refresh();
 
-        // حساب عدد الـ Slots المتاحة بعد التحديث
+        
         $availableSlots = $groupMentorship->available_slots;
 
         return response()->json([
@@ -504,6 +504,6 @@ public function createService(Request $request, $coachId)
         return response()->json(['message' => 'Service deleted successfully']);
     }
 
-    // دالة تشخيصية للتحقق من البيانات والعلاقات
+    
    
 }
