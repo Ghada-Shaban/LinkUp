@@ -84,4 +84,8 @@ class Coach extends Model
     {
         return $this->hasMany(MentorshipRequest::class, 'coach_id', 'User_ID');
     }
+    public function performanceReports()
+{
+    return $this->hasMany(PerformanceReport::class, 'coach_id', 'User_ID');
+}
 }
