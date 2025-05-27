@@ -10,15 +10,9 @@ use Illuminate\Support\Facades\Log;
 
 class CoachController extends Controller
 {
-    /**
-     * Fetch coaches with their details for the Explore Coaches page (All coaches)
-     */
     public function exploreCoaches(Request $request)
     {
-        // جلب المستخدم المسجل حاليًا
         $currentUser = auth()->user();
-
-        // التحقق إن المستخدم هو Trainee
         if ($currentUser->role_profile !== 'Trainee') {
             return response()->json(['message' => 'Unauthorized: Only Trainees can access this endpoint'], 403);
         }
@@ -52,24 +46,9 @@ class CoachController extends Controller
             ->first();
 
         $coaches = $coachesQuery->paginate($perPage);
-
-        Log::info('Fetching coaches for Explore Coaches page', [
-            'search' => $search,
-            'service_type' => $serviceType,
-            'coaches_count' => $coaches->total(),
-            'trainee_id' => $currentUser->User_ID,
-            'coaches_ids' => $coaches->pluck('User_ID')->toArray(),
-            'test_coach' => $testCoach ? $testCoach->toArray() : 'Not found',
-            'query_debug' => $coachesQuery->toSql(),
-            'bindings' => $coachesQuery->getBindings(),
-        ]);
-
-        return CoachResource::collection($coaches);
+         return CoachResource::collection($coaches);
     }
 
-    /**
-     * Fetch coaches filtered by service type (No authentication required)
-     */
     public function exploreServices(Request $request)
     {
         $search = $request->query('search', '');
@@ -129,15 +108,6 @@ class CoachController extends Controller
             });
 
         $coaches = $coachesQuery->paginate($perPage);
-
-        Log::info('Fetching coaches for Explore Services page', [
-            'search' => $search,
-            'service_type' => $serviceType,
-            'coaches_count' => $coaches->total(),
-            'query_debug' => $coachesQuery->toSql(),
-            'bindings' => $coachesQuery->getBindings(),
-        ]);
-
         return CoachResource::collection($coaches);
     }
    
