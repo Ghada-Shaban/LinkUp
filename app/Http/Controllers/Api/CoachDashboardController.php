@@ -24,7 +24,6 @@ class CoachDashboardController extends Controller
         }
 
         try {
-            // 1. Get all completed payments for this coach
             $completedPayments = Payment::where('payment_status', 'Completed')
                 ->whereHas('service', function ($query) use ($authCoach) {
                     $query->where('coach_id', $authCoach->User_ID)
@@ -34,11 +33,8 @@ class CoachDashboardController extends Controller
                 ->with('service.mentorship')
                 ->get();
 
-            // 2. Total Revenue (80%) - Only for this coach's completed payments
             $totalRevenue = $completedPayments->sum('amount');
             $revenue80Percent = round($totalRevenue * 0.8, 2);
-
-            // 3. Get completed sessions for this coach that have a corresponding completed payment
             $completedSessions = NewSession::where('status', NewSession::STATUS_COMPLETED)
                 ->where('coach_id', $authCoach->User_ID)
                 ->whereHas('service', function ($query) {
@@ -51,16 +47,10 @@ class CoachDashboardController extends Controller
                 ->with('service.mentorship')
                 ->get();
             $totalCompletedSessionsCount = $completedSessions->count();
-
-            // 4. Total Mentoring Time (Sum of durations of completed sessions in hours)
             $totalMentoringTime = $completedSessions->sum('duration') / 60; // Convert minutes to hours
-
-            // 5. Average Rating for this coach
             $averageRating = Review::where('coach_id', $authCoach->User_ID)
                 ->avg('rating');
             $averageRating = $averageRating ? round($averageRating, 2) : 0.0;
-
-            // 6. Percentage of Sessions by Service based on revenue for this coach
             $allServiceTypes = ['Mentorship Session', 'Mentorship Plan', 'Mock_Interview', 'Group_Mentorship'];
             $revenueByService = collect($allServiceTypes)->mapWithKeys(function ($serviceType) use ($completedPayments) {
                 $paymentsForService = $completedPayments->filter(function ($payment) use ($serviceType) {
@@ -79,8 +69,7 @@ class CoachDashboardController extends Controller
                 $percentage = $totalRevenue80 > 0 ? ($revenue / $totalRevenue80) * 100 : 0;
                 return [$serviceType => round($percentage, 2) . '%'];
             });
-
-            // 7. Revenue by Service (80% of each service's payments for this coach)
+            
             $revenueByService = collect($allServiceTypes)->mapWithKeys(function ($serviceType) use ($completedPayments) {
                 $paymentsForService = $completedPayments->filter(function ($payment) use ($serviceType) {
                     if ($serviceType === 'Mentorship Session') {
@@ -93,8 +82,7 @@ class CoachDashboardController extends Controller
                 $serviceRevenue = $paymentsForService->sum('amount') * 0.8;
                 return [$serviceType => round($serviceRevenue, 2)];
             });
-
-            // 8. Upcoming Sessions (Top 5 Scheduled Sessions)
+            
             $upcomingSessions = NewSession::where('status', 'Scheduled')
                 ->where('coach_id', $authCoach->User_ID)
                 ->where('date_time', '>=', Carbon::now())
@@ -124,8 +112,7 @@ class CoachDashboardController extends Controller
                         'session_type' => $sessionType,
                     ];
                 });
-
-            // 9. Pending Mentorship Requests
+            
             $pendingMentorshipRequests = MentorshipRequest::where('status', 'pending')
                 ->where('coach_id', $authCoach->User_ID)
                 ->with(['trainee'])
@@ -145,8 +132,6 @@ class CoachDashboardController extends Controller
                         'created_at' => Carbon::parse($request->created_at)->setTimezone('Africa/Cairo')->format('Y-m-d H:i:s'),
                     ];
                 });
-
-            // Return the response
             return response()->json([
                 'revenue' => $revenue80Percent,
                 'completed_sessions' => $totalCompletedSessionsCount,
@@ -158,10 +143,6 @@ class CoachDashboardController extends Controller
                 'pending_mentorship_requests' => $pendingMentorshipRequests,
             ], 200);
         } catch (\Exception $e) {
-            Log::error('Failed to retrieve coach dashboard stats', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-            ]);
             return response()->json([
                 'message' => 'Failed to retrieve coach dashboard stats',
                 'error' => $e->getMessage(),
