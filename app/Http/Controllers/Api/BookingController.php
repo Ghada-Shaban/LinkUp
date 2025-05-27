@@ -157,9 +157,9 @@ class BookingController extends Controller
             $status = 'unavailable';
             if ($isWithinAvailability) {
                 $isBooked = $bookedSessions->filter(function ($session) use ($slotStartWithDate, $slotEndWithDate) {
-                    $sessionStart = Carbon::parse($session->date_time);
+                    $sessionStart = Carbon::parse($session->date_time)->setTimezone('UTC');
                     $sessionEnd = $sessionStart->copy()->addMinutes($session->duration);
-                    return $slotStartWithDate->lt($sessionEnd) && $slotEndWithDate->gt($sessionStart);
+                    return $slotStartWithDate->setTimezone('UTC')->lt($sessionEnd) && $slotEndWithDate->setTimezone('UTC')->gt($sessionStart);
                 })->isNotEmpty();
 
                 $status = $isBooked ? 'booked' : 'available';
@@ -264,9 +264,9 @@ class BookingController extends Controller
             $status = 'unavailable';
             if ($isWithinAvailability) {
                 $isBooked = $bookedSessions->filter(function ($session) use ($slotStartWithDate, $slotEndWithDate) {
-                    $sessionStart = Carbon::parse($session->date_time);
+                    $sessionStart = Carbon::parse($session->date_time)->setTimezone('UTC');
                     $sessionEnd = $sessionStart->copy()->addMinutes($session->duration);
-                    return $slotStartWithDate->lt($sessionEnd) && $slotEndWithDate->gt($sessionStart);
+                    return $slotStartWithDate->setTimezone('UTC')->lt($sessionEnd) && $slotEndWithDate->setTimezone('UTC')->gt($sessionStart);
                 })->isNotEmpty();
 
                 $status = $isBooked ? 'booked' : 'available';
