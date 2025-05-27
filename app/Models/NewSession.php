@@ -88,4 +88,8 @@ class NewSession extends Model
     {
         return $this->status === self::STATUS_SCHEDULED;
     }
+    public function isCompleted()
+    {
+        return $this->status === self::STATUS_COMPLETED;
+    }
 }
