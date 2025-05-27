@@ -48,7 +48,7 @@ class PerformanceReportController extends Controller
             $query->select('User_ID', 'full_name','photo'); 
         }])
             ->orderBy('created_at', 'desc')
-            ->get();
+            ->get()
         ->each(function ($report) {
             $report->coach->makeHidden(['profile_photo_url', 'photo_url']);
         });
