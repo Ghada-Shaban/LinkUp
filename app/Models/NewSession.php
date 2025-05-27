@@ -59,15 +59,7 @@ class NewSession extends Model
                     ->where('role_profile', 'Trainee');
     }
 
-    public function attendees()
-    {
-        return $this->belongsToMany(
-            User::class,
-            'attends',
-            'session_id',
-            'user_id'
-        );
-    }
+
 
     public function books()
     {
