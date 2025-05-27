@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\CoachController;
 use App\Http\Controllers\Api\AdminController;
 use App\Http\Controllers\Api\BookingController;
+use App\Http\Controllers\Api\PerformanceReportController;
 use App\Http\Controllers\Api\CoachDashboardController;
 use App\Http\Controllers\Api\TraineeDashboardController;
 
