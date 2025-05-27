@@ -105,19 +105,22 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/trainee/profile/{user_id}', [ProfileController::class, 'getTraineeProfile']);
 });
 
-Route::get('/admin/coach-requests', [AdminController::class, 'getPendingCoachRequests']);
-Route::post('/admin/coach-requests/{coachId}/handle', [AdminController::class, 'handleCoachRequest']);
-Route::get('/admin/top-coaches', [AdminController::class, 'getTopCoaches']);
-Route::get('/admin/Approved-coaches', [AdminController::class, 'getApprovedCoaches']);
-Route::get('/admin/Approved-coaches-count', [AdminController::class, 'getApprovedCoachesCount']);
-Route::get('/admin/Pending-coaches-count', [AdminController::class, 'getPendingCoachesCount']);
-Route::get('/admin/DashboardStats', [AdminController::class, 'getDashboardStats']);
-Route::get('/admin/trainees', [AdminController::class, 'getAllTrainees']);
-Route::get('/admin/trainees-count', [AdminController::class, 'getTraineesCount']);
-Route::get('/admin/session-trends', [AdminController::class, 'getSessionCompletionTrends']);
-Route::delete('/admin/delete-users/{userId}', [AdminController::class, 'deleteUser']);
-Route::get('/admin/trainees/search', [AdminController::class, 'searchTrainees']);
-Route::get('/admin/coaches/search', [AdminController::class, 'searchCoaches']);
+// Routes for Admin
+Route::prefix('admin')->group(function () {
+Route::get('/coach-requests', [AdminController::class, 'getPendingCoachRequests']);
+Route::post('/coach-requests/{coachId}/handle', [AdminController::class, 'handleCoachRequest']);
+Route::get('/top-coaches', [AdminController::class, 'getTopCoaches']);
+Route::get('/Approved-coaches', [AdminController::class, 'getApprovedCoaches']);
+Route::get('/Approved-coaches-count', [AdminController::class, 'getApprovedCoachesCount']);
+Route::get('/Pending-coaches-count', [AdminController::class, 'getPendingCoachesCount']);
+Route::get('/DashboardStats', [AdminController::class, 'getDashboardStats']);
+Route::get('/trainees', [AdminController::class, 'getAllTrainees']);
+Route::get('/trainees-count', [AdminController::class, 'getTraineesCount']);
+Route::get('/session-trends', [AdminController::class, 'getSessionCompletionTrends']);
+Route::delete('/delete-users/{userId}', [AdminController::class, 'deleteUser']);
+Route::get('/trainees/search', [AdminController::class, 'searchTrainees']);
+Route::get('/coaches/search', [AdminController::class, 'searchCoaches']);
+});
 
 // Routes for performance reports
 Route::group(['prefix' => 'performance-reports', 'middleware' => 'auth:api'], function () {
