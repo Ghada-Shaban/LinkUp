@@ -18,10 +18,10 @@ class Service extends Model
         'service_type',
         'admin_id',
         'coach_id',
-        // أي حقول أخرى قد تحتاجها
+     
     ];
 
-    // إضافة العلاقات المفقودة
+   
     public function user()
     {
         return $this->belongsTo(User::class, 'coach_id', 'User_ID');
@@ -37,7 +37,7 @@ class Service extends Model
         return $this->hasOne(Price::class, 'service_id');
     }
 
-    // الحفاظ على العلاقات الموجودة
+  
     public function admin()
     {
         return $this->belongsTo(Admin::class, 'admin_id');
