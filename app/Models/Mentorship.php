@@ -18,7 +18,7 @@ class Mentorship extends Model
         'mentorship_type'
     ];
     protected $casts = [
-        'mentorship_type' => 'string', // التأكد إن mentorship_type معرف كـ string
+        'mentorship_type' => 'string', 
     ];
     public function service()
     {
