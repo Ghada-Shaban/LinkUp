@@ -21,29 +21,24 @@ class TraineeDashboardController extends Controller
         }
 
         try {
-            // 1. Completed Sessions Count
             $completedSessionsCount = NewSession::where('status', NewSession::STATUS_COMPLETED)
                 ->where('trainee_id', $authTrainee->User_ID)
                 ->count();
-
-            // 2. Total Learning Time (Sum of durations of completed sessions in hours)
+            
             $completedSessions = NewSession::where('status', NewSession::STATUS_COMPLETED)
                 ->where('trainee_id', $authTrainee->User_ID)
                 ->get();
             $totalLearningTime = $completedSessions->sum('duration') / 60; // Convert minutes to hours
-
-            // 3. Pending Session Requests Count
             $pendingSessionRequests = MentorshipRequest::where('status', 'pending')
                 ->where('trainee_id', $authTrainee->User_ID)
                 ->count();
 
-            // 4. Top 5 Coaches based on average rating
             $topCoaches = User::with(['coach', 'services.sessions', 'reviewsAsCoach'])
                 ->where('role_profile', 'Coach')
                 ->whereHas('coach', function ($query) {
                     $query->where('status', 'approved');
                 })
-                ->whereHas('reviewsAsCoach') // Ensure the coach has reviews
+                ->whereHas('reviewsAsCoach') 
                 ->withCount(['reviewsAsCoach as average_rating' => function ($query) {
                     $query->select(\DB::raw('avg(rating)'));
                 }])
@@ -65,7 +60,6 @@ class TraineeDashboardController extends Controller
                     ];
                 });
 
-            // 5. Upcoming Sessions (Top 5 Scheduled Sessions for the Trainee)
             $upcomingSessions = NewSession::where('status', 'Scheduled')
                 ->where('trainee_id', $authTrainee->User_ID)
                 ->where('date_time', '>=', Carbon::now())
@@ -100,7 +94,6 @@ class TraineeDashboardController extends Controller
                     ];
                 });
 
-            // Return the response without pending_mentorship_requests
             return response()->json([
                 'completed_sessions' => $completedSessionsCount,
                 'total_learning_time' => round($totalLearningTime, 2),
@@ -109,10 +102,6 @@ class TraineeDashboardController extends Controller
                 'upcoming_sessions' => $upcomingSessions,
             ], 200);
         } catch (\Exception $e) {
-            Log::error('Failed to retrieve trainee dashboard stats', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-            ]);
             return response()->json([
                 'message' => 'Failed to retrieve trainee dashboard stats',
                 'error' => $e->getMessage(),
