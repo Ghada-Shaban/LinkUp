@@ -27,7 +27,6 @@ class Payment extends Model
         'amount' => 'decimal:2',
     ];
 
-    // علاقة مع MentorshipRequest
     public function mentorshipRequest()
     {
         return $this->belongsTo(MentorshipRequest::class, 'mentorship_request_id', 'id');
