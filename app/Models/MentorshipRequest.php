@@ -33,58 +33,41 @@ class MentorshipRequest extends Model
     const STATUS_ACCEPTED = 'accepted';
     const STATUS_REJECTED = 'rejected';
 
-    /**
-     * الـ Default Attributes
-     */
     protected $attributes = [
         'status' => self::STATUS_PENDING,
     ];
 
-    /**
-     * علاقة مع الـ Requestable (Polymorphic)
-     */
     public function requestable()
     {
         return $this->morphTo();
     }
 
-    /**
-     * علاقة مع الـ Trainee
-     */
+    
     public function trainee()
     {
         return $this->belongsTo(User::class, 'trainee_id', 'User_ID')
             ->where('role_profile', 'Trainee');
     }
 
-    /**
-     * علاقة مع الـ Coach
-     */
+    
     public function coach()
     {
         return $this->belongsTo(User::class, 'coach_id', 'User_ID')
             ->where('role_profile', 'Coach');
     }
 
-    /**
-     * دالة مساعدة للتحقق إذا كان الطلب Pending
-     */
+    
     public function isPending()
     {
         return $this->status === self::STATUS_PENDING;
     }
 
-    /**
-     * دالة مساعدة للتحقق إذا كان الطلب Accepted
-     */
     public function isAccepted()
     {
         return $this->status === self::STATUS_ACCEPTED;
     }
 
-    /**
-     * تعديل شكل البيانات عند تحويل الموديل لـ Array/JSON
-     */
+    
     public function toArray()
     {
         $array = parent::toArray();
