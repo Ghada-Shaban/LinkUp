@@ -49,7 +49,7 @@ class Coach extends Model
                     ->withPivot('coach_id', 'service_id');
     }
 
-    // إضافة علاقة hasMany مع جدول services
+  
     public function servicesDirect()
     {
         return $this->hasMany(Service::class, 'coach_id', 'User_ID');
