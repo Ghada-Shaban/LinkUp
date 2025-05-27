@@ -9,16 +9,13 @@ use Illuminate\Http\Request;
 
 class ReviewController extends Controller
 {
-   
-        // عرض جميع المراجعات
-        public function index()
+public function index()
         {
             $reviews = Review::with(['trainee.user', 'coach.user'])->get();
             return response()->json($reviews);
         }
     
-        // عرض مراجعات مدرب معين
-        public function show($coach_id)
+public function show($coach_id)
        {
     $currentUser = auth()->user();
     if ($currentUser->role_profile !== 'Coach') {
@@ -37,8 +34,8 @@ class ReviewController extends Controller
 
     return ReviewResource::collection($reviews);
 }
-        // إضافة مراجعة جديدة
-       public function store(Request $request)
+       
+public function store(Request $request)
 {
     $currentUser = auth()->user();
     if ($currentUser->role_profile !== 'Trainee') {
