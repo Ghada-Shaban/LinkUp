@@ -87,8 +87,8 @@ class BookingController extends Controller
                 continue;
             }
 
-            // Check if the date is fully booked
-            $isBooked = false;
+            // Check if there are any available slots (rely on getAvailableSlots logic)
+            $hasAvailableSlots = true; // Assume available unless proven otherwise
             if (isset($bookedSessions[$dateString])) {
                 $sessionsOnDate = $bookedSessions[$dateString];
                 $startTime = Carbon::parse($availability->Start_Time);
@@ -103,11 +103,11 @@ class BookingController extends Controller
 
                 $bookedSlots = $bookedMinutes / $durationMinutes;
                 if ($bookedSlots >= $totalSlots) {
-                    $isBooked = true;
+                    $hasAvailableSlots = false; // Only set to unavailable if all slots are booked
                 }
             }
 
-            $status = $isBooked ? 'booked' : 'available';
+            $status = $hasAvailableSlots ? 'available' : 'booked';
             $dates[] = [
                 'date' => $dateString,
                 'day_of_week' => $dayOfWeek,
