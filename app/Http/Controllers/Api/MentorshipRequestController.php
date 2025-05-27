@@ -39,11 +39,7 @@ class MentorshipRequestController extends Controller
         $serviceTypeInput = $request->input('service_type');
         $modelClass = $typeMap[$serviceTypeInput];
         $serviceId = $request->input('service_id');
-
-        // Get the actual service (plan or group mentorship)
         $service = $modelClass::findOrFail($serviceId);
-
-        // Pull the coach from the service relationship
         $coachId = $service->service->coach_id;
 
         $mentorshipRequest = MentorshipRequest::create([
@@ -54,23 +50,13 @@ class MentorshipRequestController extends Controller
             'status' => 'pending',
         ]);
 
-        // Load trainee data for the response
         $trainee = User::findOrFail(Auth::user()->User_ID);
 
-        // Send email to the Coach
         try {
             $coach = User::findOrFail($coachId);
             Mail::to($coach->email)->send(new NewMentorshipRequest($mentorshipRequest));
-            Log::info('New mentorship request email sent to coach', [
-                'request_id' => $mentorshipRequest->id,
-                'coach_id' => $coachId,
-            ]);
+           
         } catch (\Exception $e) {
-            Log::error('Failed to send new mentorship request email', [
-                'error' => $e->getMessage(),
-                'request_id' => $mentorshipRequest->id,
-                'coach_id' => $coachId,
-            ]);
         }
 
         return response()->json([
@@ -97,7 +83,6 @@ class MentorshipRequestController extends Controller
             return response()->json(['message' => 'Only trainees can view their requests.'], 403);
         }
 
-        // استرجاع الطلبات مع استبعاد اللي الدفع تم ليها
         $requests = MentorshipRequest::with('coach', 'requestable')
             ->where('trainee_id', $user->User_ID)
             ->whereNotIn('id', function ($query) {
@@ -148,7 +133,6 @@ class MentorshipRequestController extends Controller
         $request->responded_at = now();
         $request->save();
 
-        // إنشاء سجل في جدول pending_payments
         PendingPayment::create([
             'mentorship_request_id' => $request->id,
             'trainee_id' => $request->trainee_id,
@@ -156,23 +140,14 @@ class MentorshipRequestController extends Controller
             'payment_due_at' => now()->addHours(24), // تاريخ الاستحقاق بعد 24 ساعة من دلوقتي
         ]);
 
-        // إرسال الإيميل للـ Trainee بناءً على نوع الطلب
         try {
             if ($request->requestable_type === \App\Models\MentorshipPlan::class) {
                 Mail::to($request->trainee->email)->send(new MentorshipPlanRequestAccepted($request));
             } else {
                 Mail::to($request->trainee->email)->send(new GroupMentorshipRequestAccepted($request));
             }
-            Log::info('Acceptance email sent to trainee', [
-                'request_id' => $request->id,
-                'trainee_id' => $request->trainee_id,
-            ]);
+           
         } catch (\Exception $e) {
-            Log::error('Failed to send acceptance email', [
-                'error' => $e->getMessage(),
-                'request_id' => $request->id,
-                'trainee_id' => $request->trainee_id,
-            ]);
         }
 
         $nextStepMessage = $request->requestable_type === \App\Models\MentorshipPlan::class
@@ -189,65 +164,29 @@ class MentorshipRequestController extends Controller
         $user = auth()->user();
 
         if ($user->role_profile !== 'Coach') {
-            Log::warning('Unauthorized attempt to reject mentorship request', [
-                'user_id' => $user->User_ID,
-                'request_id' => $id,
-                'role' => $user->role_profile
-            ]);
             return response()->json(['message' => 'Only coaches can reject requests.'], 403);
         }
 
-        // استرجاع الطلب مع الـ trainee وrequestable
         $request = MentorshipRequest::with(['trainee', 'requestable'])->find($id);
 
         if (!$request) {
-            Log::warning('Mentorship request not found', [
-                'request_id' => $id,
-                'user_id' => $user->User_ID
-            ]);
             return response()->json(['message' => 'Request not found.'], 404);
         }
 
         if ($request->coach_id !== $user->User_ID) {
-            Log::warning('Unauthorized attempt to reject mentorship request', [
-                'user_id' => $user->User_ID,
-                'request_id' => $id,
-                'coach_id' => $request->coach_id
-            ]);
             return response()->json(['message' => 'This request does not belong to you.'], 403);
         }
 
         $request->status = 'rejected';
         $request->save();
 
-        // إرسال الإيميل للـ Trainee
         try {
             if ($request->trainee && $request->trainee->email) {
                 Mail::to($request->trainee->email)->send(new RequestRejected($request));
-                Log::info('Rejection email sent to trainee', [
-                    'request_id' => $request->id,
-                    'trainee_id' => $request->trainee_id,
-                    'trainee_email' => $request->trainee->email,
-                ]);
-            } else {
-                Log::warning('Trainee email not found for rejection email', [
-                    'request_id' => $request->id,
-                    'trainee_id' => $request->trainee_id,
-                ]);
-            }
+                
+            } 
         } catch (\Exception $e) {
-            Log::error('Failed to send rejection email', [
-                'error' => $e->getMessage(),
-                'request_id' => $request->id,
-                'trainee_id' => $request->trainee_id,
-            ]);
         }
-
-        Log::info('Mentorship request rejected successfully', [
-            'request_id' => $id,
-            'user_id' => $user->User_ID
-        ]);
-
         return response()->json(['message' => 'Request rejected successfully.']);
     }
 }
