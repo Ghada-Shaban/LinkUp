@@ -10,7 +10,7 @@ class PerformanceReport extends Model
     protected $fillable = [
         'session_id', 'coach_id', 'trainee_id', 'overall_rating', 'strengths', 'weaknesses', 'comments'
     ];
-
+    protected $hidden = ['created_at', 'updated_at'];
     public function session()
     {
         return $this->belongsTo(NewSession::class, 'session_id', 'new_session_id');
