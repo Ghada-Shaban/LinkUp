@@ -41,7 +41,7 @@ class User extends Authenticatable
         'profile_photo_url',
      'photo_url',
     ];
-   // تعيين خريطة بين أسماء الحقول في النموذج وأسماء الأعمدة في قاعدة البيانات
+  
     public function getAttributeMap()
     {
         return [
@@ -51,13 +51,11 @@ class User extends Authenticatable
             'Linkedin_Link' => 'linkedin_link',
             'Photo' => 'photo',
             'Role_Profile' => 'role_profile',
-            // الحقول الأخرى تبقى كما هي
+         
         ];
     }
 
-    /**
-     * تجاوز دالة الحصول على قيمة الحقل لاستخدام الاسم الصحيح في قاعدة البيانات
-     */
+   
     public function getAttribute($key)
     {
         $map = $this->getAttributeMap();
@@ -69,9 +67,7 @@ class User extends Authenticatable
         return parent::getAttribute($key);
     }
 
-    /**
-     * تجاوز دالة تعيين قيمة الحقل لاستخدام الاسم الصحيح في قاعدة البيانات
-     */
+  
     public function setAttribute($key, $value)
     {
         $map = $this->getAttributeMap();
@@ -82,10 +78,7 @@ class User extends Authenticatable
         
         return parent::setAttribute($key, $value);
     }
-    
-    /**
-     * تجاوز الدالة التي تحدد وجود الخاصية
-     */
+ 
     public function __isset($key)
     {
         $map = $this->getAttributeMap();
@@ -95,7 +88,7 @@ class User extends Authenticatable
         }
         
         return parent::__isset($key);
-    }  // أضف هذه الدالة داخل class User مباشرة
+    } 
 public function getPhotoUrlAttribute()
 {
     return $this->photo ? Storage::url($this->photo) : null;
@@ -152,13 +145,13 @@ public function getPhotoUrlAttribute()
                     ->count();
     }
 
-    // إضافة العلاقة مع جدول services
+
     public function services()
     {
         return $this->hasMany(Service::class, 'coach_id', 'User_ID');
     }
 
-    // إضافة العلاقة مع جدول coach_skills
+
     public function skills()
     {
         return $this->hasMany(CoachSkill::class, 'coach_id', 'User_ID');
