@@ -61,4 +61,8 @@ use Illuminate\Database\Eloquent\Model;
     {
         return $this->hasMany(NewSession::class, 'trainee_id', 'User_ID');
     }
+        public function performanceReports()
+{
+    return $this->hasMany(PerformanceReport::class, 'trainee_id', 'User_ID');
+}
 }
