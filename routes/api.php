@@ -59,7 +59,7 @@ Route::prefix('coach/{coachId}')->middleware(['auth:api', 'check.trainee'])->gro
     Route::post('group-mentorship/{groupMentorshipId}/join', [CoachServiceController::class, 'joinGroupMentorship']);
     Route::get('available-dates', [BookingController::class, 'getAvailableDates']);
     Route::get('available-slots', [BookingController::class, 'getAvailableSlots']);
-    Route::post('book', [BookingController::class, 'bookService']); // Used for booking regular services and MentorshipPlan sessions
+    Route::post('book', [BookingController::class, 'bookService']);
 });
 
 // Routes الخاصة بـ NewSessionController
@@ -72,91 +72,56 @@ Route::middleware('auth:sanctum')->group(function () {
 
 // Routes الخاصة بـ MentorshipRequestController
 Route::middleware('auth:sanctum')->group(function () {
-    // Trainee routes
     Route::post('/trainee/mentorship-requests', [MentorshipRequestController::class, 'requestMentorship']);
     Route::get('/traineerequest', [MentorshipRequestController::class, 'traineegetrequest']);
-    
-    // Coach routes
     Route::get('/coach/requests', [MentorshipRequestController::class, 'viewRequests']);
     Route::post('/coach/requests/{id}/accept', [MentorshipRequestController::class, 'acceptRequest']);
     Route::post('/coach/requests/{id}/reject', [MentorshipRequestController::class, 'rejectRequest']);
-
-    // Trainee review
     Route::post('/trainee/reviews', [ReviewController::class, 'store']);
 });
 
 // Payment routes for all types of services
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/payment/initiate/{type}/{id}', [PaymentController::class, 'initiatePayment']);
-    Route::post('/payment/confirm/{type}/{id}', [PaymentController::class, 'confirmPayment']); // Added route for confirming payment
+    Route::post('/payment/confirm/{type}/{id}', [PaymentController::class, 'confirmPayment']);
 });
 
-// Route لجلب الخدمات بناءً على service_type
 Route::get('coach/{coachId}/services', [CoachServiceController::class, 'getServices']);
-// Get Coach profile for all
 Route::get('/coachprofile/{user_id}', [ProfileController::class, 'getCoachProfile2']);
 
-// Route الخاصة بـ Explore Coaches
+// Route الخاصة بـ Explore Coaches (All coaches, requires authentication)
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/coaches/explore', [CoachController::class, 'exploreCoaches']);
-    // New routes for Explore Coaches with specific service types
-    Route::get('/coaches/explore/mentorship-sessions', function (Request $request) {
-        $request->merge(['service_type' => 'Mentorship sessions']);
-        return app(CoachController::class)->exploreCoaches($request);
-    });
-    Route::get('/coaches/explore/mock-interviews', function (Request $request) {
-        $request->merge(['service_type' => 'Mock interviews']);
-        return app(CoachController::class)->exploreCoaches($request);
-    });
-    Route::get('/coaches/explore/group-mentorship', function (Request $request) {
-        $request->merge(['service_type' => 'Group mentorship']);
-        return app(CoachController::class)->exploreCoaches($request);
-    });
-    Route::get('/coaches/explore/mentorship', function (Request $request) {
-        $request->merge(['service_type' => 'Mentorship']);
-        return app(CoachController::class)->exploreCoaches($request);
-    });
-    Route::get('/coaches/explore/mentorship-plan', function (Request $request) {
-        $request->merge(['service_type' => 'Mentorship plan']);
-        return app(CoachController::class)->exploreCoaches($request);
-    });
 });
 
+// Route الخاصة بـ Explore Services (Filtered by service type, no authentication)
+Route::get('/coaches/explore-services', [CoachController::class, 'exploreServices']);
+
 Route::middleware('auth:sanctum')->group(function () {
-    // Update profile (Coach & Trainee)
     Route::post('/coach/profile/update/{user_id}', [ProfileController::class, 'updateCoachProfile']);
     Route::post('/trainee/profile/update/{user_id}', [ProfileController::class, 'updateTraineeProfile']);
-
-    // Get Coach profile
     Route::get('/coach/profile/{user_id}', [ProfileController::class, 'getCoachProfile']);
-
-    // Get Trainee profile
     Route::get('/trainee/profile/{user_id}', [ProfileController::class, 'getTraineeProfile']);
 });
 
-// Admin routes
-Route::prefix('admin')->group(function () {
-Route::get('/coach-requests', [AdminController::class, 'getPendingCoachRequests']);
-Route::post('/coach-requests/{coachId}/handle', [AdminController::class, 'handleCoachRequest']);
-Route::get('/top-coaches', [AdminController::class, 'getTopCoaches']);
-Route::get('/Approved-coaches', [AdminController::class, 'getApprovedCoaches']);
-Route::get('/Approved-coaches-count', [AdminController::class, 'getApprovedCoachesCount']);
-Route::get('/Pending-coaches-count', [AdminController::class, 'getPendingCoachesCount']);
-Route::get('/DashboardStats', [AdminController::class, 'getDashboardStats']);
-Route::get('/trainees', [AdminController::class, 'getAllTrainees']);
-Route::get('/trainees-count', [AdminController::class, 'getTraineesCount']);
-Route::get('/session-trends', [AdminController::class, 'getSessionCompletionTrends']);
-Route::delete('/delete-users/{userId}', [AdminController::class, 'deleteUser']);
-Route::get('/trainees/search', [AdminController::class, 'searchTrainees']);
-Route::get('/coaches/search', [AdminController::class, 'searchCoaches']);
-});
+Route::get('/admin/coach-requests', [AdminController::class, 'getPendingCoachRequests']);
+Route::post('/admin/coach-requests/{coachId}/handle', [AdminController::class, 'handleCoachRequest']);
+Route::get('/admin/top-coaches', [AdminController::class, 'getTopCoaches']);
+Route::get('/admin/Approved-coaches', [AdminController::class, 'getApprovedCoaches']);
+Route::get('/admin/Approved-coaches-count', [AdminController::class, 'getApprovedCoachesCount']);
+Route::get('/admin/Pending-coaches-count', [AdminController::class, 'getPendingCoachesCount']);
+Route::get('/admin/DashboardStats', [AdminController::class, 'getDashboardStats']);
+Route::get('/admin/trainees', [AdminController::class, 'getAllTrainees']);
+Route::get('/admin/trainees-count', [AdminController::class, 'getTraineesCount']);
+Route::get('/admin/session-trends', [AdminController::class, 'getSessionCompletionTrends']);
+Route::delete('/admin/delete-users/{userId}', [AdminController::class, 'deleteUser']);
+Route::get('/admin/trainees/search', [AdminController::class, 'searchTrainees']);
+Route::get('/admin/coaches/search', [AdminController::class, 'searchCoaches']);
 
-// New route for Coach Dashboard Stats
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/coach-dashboard/stats', [CoachDashboardController::class, 'getCoachDashboardStats']);
 });
 
-// New route for Trainee Dashboard Stats
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/trainee-dashboard/stats', [TraineeDashboardController::class, 'getTraineeDashboardStats']);
 });
