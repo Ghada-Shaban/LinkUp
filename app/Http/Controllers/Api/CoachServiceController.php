@@ -359,7 +359,6 @@ public function createService(Request $request, $coachId)
                 ]);
             }
         }
-        Log::info('Updating service ID: ' . $service->service_id . ' Has Plan: ' . ($hasPlan ? 'Yes' : 'No'));
     } elseif ($serviceType === 'Mock_Interview') {
         $service->mockInterview()->update([
             'interview_type' => $request->interview_type,
