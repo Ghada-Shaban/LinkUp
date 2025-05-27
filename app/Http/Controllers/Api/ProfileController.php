@@ -22,13 +22,6 @@ use CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary;
 
 class ProfileController extends Controller
 {
-    /**
-     * Get ENUM values from a database table column.
-     *
-     * @param string $table
-     * @param string $column
-     * @return array
-     */
     private function getEnumValues(string $table, string $column): array
     {
         $type = DB::select("SHOW COLUMNS FROM {$table} WHERE Field = ?", [$column])[0]->Type;
@@ -37,12 +30,6 @@ class ProfileController extends Controller
     }
 
     
-  /**
- * تحديث بيانات المدرب
- */
-/**
- * تحديث بيانات المدرب
- */
 public function updateCoachProfile(Request $request)
 {
     $user = auth('sanctum')->user();
@@ -56,11 +43,6 @@ public function updateCoachProfile(Request $request)
 
     try {
         DB::beginTransaction();
-
-        // تسجيل البيانات الواردة من الـ Request
-        \Log::info('Raw request data', ['data' => $request->all()]);
-
-        // التحقق من البيانات للتحديث
         $validated = $request->validate([
             'Full_Name' => 'sometimes|string|max:255',
             'Email' => [
@@ -87,22 +69,15 @@ public function updateCoachProfile(Request $request)
             'availability.time_slots.*.*.end_time' => 'required_with:availability|date_format:H:i|after:availability.time_slots.*.*.start_time',
         ]);
 
-        \Log::info('Validated data before update', ['validated' => $validated]);
-
-        // معالجة الصورة إذا تم تقديمها
         if ($request->hasFile('Photo')) {
-            // إذا كانت هناك صورة قديمة، احذفها أولاً
             if ($user->Photo) {
                 if ($user->Photo_Public_ID) {
-                    // حذف الصورة من Cloudinary إذا كان هناك معرف عام
                     Cloudinary::destroy($user->Photo_Public_ID);
                 } else {
-                    // حذف الصورة من التخزين المحلي
                     Storage::disk('public')->delete($user->Photo);
                 }
             }
 
-            // رفع الصورة الجديدة إلى Cloudinary
             $uploadedFile = $request->file('Photo');
             $result = Cloudinary::upload($uploadedFile->getRealPath(), [
                 'folder' => 'coach_photos',
@@ -119,11 +94,9 @@ public function updateCoachProfile(Request $request)
             $validated['Photo'] = $result->getSecurePath();
             $validated['Photo_Public_ID'] = $result->getPublicId();
         }
-
-        // تحديث بيانات المستخدم
+        
         $user->update($validated);
 
-        // تحديث المعلومات الخاصة بالمدرب
         if ($user->coach) {
             $coachData = [];
             if ($request->has('Title')) {
@@ -146,9 +119,7 @@ public function updateCoachProfile(Request $request)
                 $user->coach()->update($coachData);
             }
             
-            // تحديث المهارات إذا تم تقديمها
             if ($request->has('Skills')) {
-                // التحقق من المهارات تم داخل الـ Validation
                 CoachSkill::where('coach_id', $user->User_ID)->delete();
                 foreach ($request->input('Skills', []) as $skill) {
                     CoachSkill::create([
@@ -158,9 +129,7 @@ public function updateCoachProfile(Request $request)
                 }
             }
             
-            // تحديث اللغات إذا تم تقديمها
             if ($request->has('Languages')) {
-                // التحقق من اللغات تم داخل الـ Validation
                 CoachLanguage::where('coach_id', $user->User_ID)->delete();
                 foreach ($request->input('Languages', []) as $language) {
                     CoachLanguage::create([
@@ -170,17 +139,13 @@ public function updateCoachProfile(Request $request)
                 }
             }
             
-            // تحديث أوقات التوفر إذا تم تقديمها
             if ($request->has('availability')) {
-                // التحقق من التوفر تم داخل الـ Validation
                 CoachAvailability::where('coach_id', $user->User_ID)->delete();
                 $this->setAvailability($user->User_ID, $request->input('availability'));
             }
         }
 
         DB::commit();
-        
-        // إعادة تحميل علاقات المستخدم للحصول على البيانات المحدثة
         $user->load('coach', 'coach.skills', 'coach.languages', 'coach.availableTimes');
         
         return response()->json([
@@ -196,9 +161,7 @@ public function updateCoachProfile(Request $request)
         ], 500);
     }
 }
-/**
- * تحديث بيانات المتدرب
- */
+
 public function updateTraineeProfile(Request $request)
 {
     $user = auth('sanctum')->user();
@@ -212,11 +175,6 @@ public function updateTraineeProfile(Request $request)
 
     try {
         DB::beginTransaction();
-
-        // تسجيل البيانات الواردة من الـ Request
-        \Log::info('Raw request data', ['data' => $request->all(), 'files' => $request->allFiles()]);
-
-        // التحقق من البيانات للتحديث
         $validated = $request->validate([
             'Full_Name' => 'sometimes|string|max:255',
             'Email' => [
@@ -237,11 +195,7 @@ public function updateTraineeProfile(Request $request)
             'Areas_Of_Interest.*' => ['string', Rule::in($this->getEnumValues('trainee_areas_of_interest', 'Area_Of_Interest'))],
         ]);
 
-        \Log::info('Validated data before update', ['validated' => $validated]);
-
-        // معالجة الصورة إذا تم تقديمها
         if ($request->hasFile('Photo')) {
-            // إذا كانت هناك صورة قديمة، احذفها أولاً
             if ($user->Photo) {
                 if ($user->Photo_Public_ID) {
                     Cloudinary::destroy($user->Photo_Public_ID);
@@ -249,8 +203,7 @@ public function updateTraineeProfile(Request $request)
                     Storage::disk('public')->delete($user->Photo);
                 }
             }
-
-            // رفع الصورة الجديدة إلى Cloudinary
+            
             $uploadedFile = $request->file('Photo');
             $result = Cloudinary::upload($uploadedFile->getRealPath(), [
                 'folder' => 'trainee_photos',
@@ -268,10 +221,7 @@ public function updateTraineeProfile(Request $request)
             $validated['Photo_Public_ID'] = $result->getPublicId();
         }
 
-        // تحديث بيانات المستخدم
         $user->update($validated);
-
-        // تحديث المعلومات الخاصة بالمتدرب
         if ($user->trainee) {
             $traineeData = [];
             if ($request->has('Education_Level')) {
@@ -297,7 +247,6 @@ public function updateTraineeProfile(Request $request)
                 $user->trainee()->update($traineeData);
             }
             
-            // تحديث اللغات المفضلة إذا تم تقديمها
             if ($request->has('Preferred_Languages')) {
                 TraineePreferredLanguage::where('trainee_id', $user->User_ID)->delete();
                 foreach ($request->input('Preferred_Languages', []) as $lang) {
@@ -308,7 +257,6 @@ public function updateTraineeProfile(Request $request)
                 }
             }
             
-            // تحديث مجالات الاهتمام إذا تم تقديمها
             if ($request->has('Areas_Of_Interest')) {
                 TraineeAreaOfInterest::where('trainee_id', $user->User_ID)->delete();
                 foreach ($request->input('Areas_Of_Interest', []) as $interest) {
@@ -321,10 +269,7 @@ public function updateTraineeProfile(Request $request)
         }
 
         DB::commit();
-        
-        // إعادة تحميل علاقات المستخدم للحصول على البيانات المحدثة
-        $user->load('trainee', 'trainee.preferredLanguages', 'trainee.areasOfInterest');
-        
+        $user->load('trainee', 'trainee.preferredLanguages', 'trainee.areasOfInterest');  
         return response()->json([
             'message' => 'Trainee profile updated successfully',
             
@@ -385,12 +330,7 @@ public function updateTraineeProfile(Request $request)
 
         return $savedSlots;
     }
-    /**
-     * Get Coach profile data.
-     *
-     * @param int $user_id
-     * @return \Illuminate\Http\JsonResponse
-     */
+   
     public function getCoachProfile(int $user_id)
     {
         $user = User::where('User_ID', $user_id)->where('Role_Profile', 'Coach')->first();
@@ -436,14 +376,7 @@ public function updateTraineeProfile(Request $request)
             ],
         ], 200);
     }
-
-    /**
-     * Get Trainee profile data.
-     *
-     * @param int $user_id
-     * @return \Illuminate\Http\JsonResponse
-     */
-    public function getTraineeProfile(int $user_id): \Illuminate\Http\JsonResponse
+    public function getTraineeProfile(int $user_id)
     {
         $user = User::where('User_ID', $user_id)->where('Role_Profile', 'Trainee')->first();
         if (!$user) {
@@ -472,16 +405,7 @@ public function updateTraineeProfile(Request $request)
         ], 200);
     }
 
-   
-   
-
-    /**
-     * Get Coach profile data with reviews.
-     *
-     * @param int $user_id
-     * @return \Illuminate\Http\JsonResponse
-     */
-    public function getCoachProfile2(int $user_id): \Illuminate\Http\JsonResponse
+    public function getCoachProfile2(int $user_id)
     {
         $user = User::where('User_ID', $user_id)->where('Role_Profile', 'Coach')->first();
         if (!$user) {
