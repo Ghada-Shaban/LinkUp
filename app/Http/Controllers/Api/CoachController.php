@@ -140,4 +140,32 @@ class CoachController extends Controller
 
         return CoachResource::collection($coaches);
     }
+    public function submitPerformanceReport(Request $request, $sessionId)
+{
+    $coach = auth()->user();
+    $session = NewSession::findOrFail($sessionId);
+
+    if ($session->coach_id !== $coach->User_ID || !$session->isCompleted()) {
+        return response()->json(['message' => 'Unauthorized or session not completed'], 403);
+    }
+
+    $request->validate([
+        'overall_rating' => 'required|integer|min:1|max:5',
+        'strengths' => 'required|string|max:1000',
+        'weaknesses' => 'required|string|max:1000',
+        'comments' => 'nullable|string|max:1000', 
+    ]);
+
+    $report = new PerformanceReport();
+    $report->session_id = $sessionId;
+    $report->coach_id = $coach->User_ID;
+    $report->trainee_id = $session->trainee_id;
+    $report->overall_rating = $request->overall_rating;
+    $report->strengths = $request->strengths;
+    $report->weaknesses = $request->weaknesses;
+    $report->comments = $request->comments ?? null; 
+    $report->save();
+
+    return response()->json(['message' => 'Performance report submitted successfully'], 200);
+}
 }
