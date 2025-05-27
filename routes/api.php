@@ -118,6 +118,12 @@ Route::delete('/admin/delete-users/{userId}', [AdminController::class, 'deleteUs
 Route::get('/admin/trainees/search', [AdminController::class, 'searchTrainees']);
 Route::get('/admin/coaches/search', [AdminController::class, 'searchCoaches']);
 
+// Routes for performance reports
+Route::group(['prefix' => 'performance-reports', 'middleware' => 'auth:api'], function () {
+    Route::post('/sessions/{sessionId}/submit', [PerformanceReportController::class, 'submitPerformanceReport']);
+    Route::get('/trainee', [PerformanceReportController::class, 'getPerformanceReports']); 
+});
+
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/coach-dashboard/stats', [CoachDashboardController::class, 'getCoachDashboardStats']);
 });
