@@ -186,7 +186,7 @@ class BookingController extends Controller
             'booked_sessions' => $bookedSessions->toArray(),
         ]);
 
-        // Generate time slots for the entire day (from 01:00 to 23:00)
+        // Generate time slots for the entire day (from 01:00 to 23:00) in EEST
         $slots = [];
         $durationMinutes = 60; // Fixed duration for all sessions
 
@@ -201,15 +201,16 @@ class BookingController extends Controller
                 break; // Don't include partial slots at the end of the day
             }
 
-            // Convert times to UTC for comparison with database (EEST to UTC: subtract 3 hours)
-            $currentTimeUtc = $currentTime->copy()->subHours(3); // EEST to UTC
-            $slotEndUtc = $slotEnd->copy()->subHours(3); // EEST to UTC
+            // Keep currentTime and slotEnd in EEST for comparison and display
+            $currentTimeEest = $currentTime->copy();
+            $slotEndEest = $slotEnd->copy();
 
-            // Check if this slot is booked (compare in UTC)
-            $isBooked = $bookedSessions->filter(function ($session) use ($currentTimeUtc, $slotEndUtc) {
-                $sessionStart = Carbon::parse($session->date_time); // Already in UTC
+            // Check if this slot is booked (convert database times to EEST for comparison)
+            $isBooked = $bookedSessions->filter(function ($session) use ($currentTimeEest, $slotEndEest) {
+                // Convert session times from UTC to EEST (add 3 hours)
+                $sessionStart = Carbon::parse($session->date_time)->addHours(3); // UTC to EEST
                 $sessionEnd = $sessionStart->copy()->addMinutes($session->duration);
-                return $currentTimeUtc->lt($sessionEnd) && $slotEndUtc->gt($sessionStart);
+                return $currentTimeEest->lt($sessionEnd) && $slotEndEest->gt($sessionStart);
             })->isNotEmpty();
 
             // Check if this slot falls within the coach's availability (compare hours and minutes in EEST)
