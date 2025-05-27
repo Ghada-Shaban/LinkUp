@@ -15,11 +15,11 @@ class Book extends Model
 
     protected $fillable = ['trainee_id', 'session_id'];
 
-    // تعديل العلاقة مع الـ Trainee ليتم الربط مع User وليس Trainee
+    
     public function trainee()
     {
         return $this->belongsTo(User::class, 'trainee_id', 'User_ID')
-                    ->where('role_profile', 'Trainee'); // نجيب بس المستخدمين اللي هم Trainees
+                    ->where('role_profile', 'Trainee');
     }
 
     public function session()
