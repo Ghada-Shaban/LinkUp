@@ -111,7 +111,7 @@ class BookingController extends Controller
                 if ($isWithinAvailability) {
                     // التحقق من أن الـ slot محجوز
                     $isSlotBooked = isset($bookedSessions[$dateString]) && $bookedSessions[$dateString]->filter(function ($session) use ($slot) {
-                        $sessionStart = Carbon::parse($session->date_time)->addHours(3); // إضافة 3 ساعات للتوقيت
+                        $sessionStart = Carbon::parse($session->date_time);
                         $sessionEnd = $sessionStart->copy()->addMinutes($session->duration);
                         return $slot['start']->equalTo($sessionStart) && $slot['end']->equalTo($sessionEnd);
                     })->isNotEmpty();
@@ -212,13 +212,13 @@ class BookingController extends Controller
             $slotStartFormatted = $currentTime->format('H:i');
             $slotEndFormatted = $slotEnd->format('H:i');
 
-            // مقارنة التوقيتات مع إضافة 3 ساعات للجلسات المحجوزة
+            // مقارنة التوقيتات بدون إضافة 3 ساعات
             $isBooked = $bookedSessions->contains(function ($session) use ($currentTime) {
-                $sessionStart = Carbon::parse($session->date_time)->addHours(3);
+                $sessionStart = Carbon::parse($session->date_time);
                 Log::info('Comparing slot with session', [
                     'slot_start' => $currentTime->format('Y-m-d H:i:s'),
                     'session_start_raw' => $session->date_time,
-                    'session_start_adjusted' => $sessionStart->format('Y-m-d H:i:s'),
+                    'session_start' => $sessionStart->format('Y-m-d H:i:s'),
                 ]);
                 return $sessionStart->format('Y-m-d H:i') === $currentTime->format('Y-m-d H:i');
             });
@@ -267,6 +267,10 @@ class BookingController extends Controller
         $startTime = Carbon::parse($request->start_time);
         $dayOfWeek = $startDate->format('l');
         $sessionDateTime = $startDate->setTime($startTime->hour, $startTime->minute, $startTime->second);
+        
+        // تحويل التوقيت من EEST إلى UTC قبل التخزين
+        $sessionDateTime->setTimezone('UTC');
+
         $slotEnd = $sessionDateTime->copy()->addMinutes($durationMinutes);
 
         $availability = CoachAvailability::where('coach_id', (int)$coachId)
@@ -344,6 +348,8 @@ class BookingController extends Controller
                 for ($i = 0; $i < $sessionCount; $i++) {
                     $sessionDate = $startDate->copy()->addWeeks($i);
                     $sessionDateTime = $sessionDate->setTime($startTime->hour, $startTime->minute, $startTime->second);
+                    // تحويل التوقيت من EEST إلى UTC
+                    $sessionDateTime->setTimezone('UTC');
                     $slotEnd = $sessionDateTime->copy()->addMinutes($durationMinutes);
 
                     $availability = CoachAvailability::where('coach_id', (int)$coachId)
