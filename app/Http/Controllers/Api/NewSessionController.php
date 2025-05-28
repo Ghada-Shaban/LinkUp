@@ -162,8 +162,8 @@ class NewSessionController extends Controller
                     ]);
                 }
 
-                // استخدام التوقيت مباشرة (EEST) بدون تحويل
-                $dateTime = Carbon::parse($session->date_time);
+                // تحويل التوقيت إلى EEST (UTC+3)
+                $dateTime = Carbon::parse($session->date_time)->addHours(3);
                 $endTime = $dateTime->copy()->addMinutes($session->duration);
                 
                 // تنسيق التاريخ والوقت بالشكل المطلوب
@@ -279,8 +279,8 @@ class NewSessionController extends Controller
                                 $mentorshipSession = $service->mentorshipSession;
                                 if ($mentorshipSession) {
                                     Log::info('Mentorship session found for service', [
-                                    'service_id' => $service->service_id,
-                                    'mentorship_session' => $mentorshipSession->toArray()
+                                        'service_id' => $service->service_id,
+                                        'mentorship_session' => $mentorshipSession->toArray()
                                     ]);
                                     $serviceTitle = $mentorshipSession->session_type; // مثل "CV Review"
                                 } else {
@@ -337,20 +337,20 @@ class NewSessionController extends Controller
                     ]);
                 }
 
-                // استخدام التوقيت مباشرة (EEST) بدون تحويل
-                $dateTime = Carbon::parse($session->date_time);
-                $endTime = $dateTime->copy()->addMinutes($session->duration); //
+                // تحويل التوقيت إلى EEST (UTC+3)
+                $dateTime = Carbon::parse($session->date_time)->addHours(3);
+                $endTime = $dateTime->copy()->addMinutes($session->duration);
                 
                 // تنسيق التاريخ والوقت بالشكل المطلوب
                 $date = $dateTime->format('D, M d');
                 $startTimeFormatted = $dateTime->format('h:i A');
                 $endTimeFormatted = $endTime->format('h:i A');
                 $timeRange = "$startTimeFormatted - $endTimeFormatted";
-                
+
                 // تنسيق created_at و updated_at
                 $createdAt = Carbon::parse($session->created_at);
                 $updatedAt = Carbon::parse($session->updated_at);
-                
+
                 // تصحيح التاريخ لو في يوم زيادة
                 if ($createdAt->format('Y-m-d') === '2025-05-29') {
                     $createdAt->subDay();
@@ -360,9 +360,8 @@ class NewSessionController extends Controller
                 }
 
                 $sessionData = [
-                    'new_session_id' => $session->new_session_id, // التصحيح هنا
+                    'new_session_id' => $session->new_session_id,
                     'session_type' => $sessionType,
-                    'sessionType',
                     'title' => $serviceTitle,
                     'date' => $date,
                     'time_range' => $timeRange,
@@ -374,29 +373,28 @@ class NewSessionController extends Controller
                 ];
 
                 // إضافة current_participants إذا كان الـ session من نوع GroupMentorship
-                if ($session->service && $service->service_type === 'Group_Mentorship') {
+                if ($service && $service->service_type === 'Group_Mentorship') {
                     $sessionData['current_participants'] = $currentParticipants;
                 }
 
                 return $sessionData;
-
             });
 
             Log::info("Fetching $type sessions for Trainee", [
-                    'user_id' => $user->User_ID,
-                    'sessions_count' => $sessions->count(),
-                    'sessions' => $sessions->toArray()
-                ]);
+                'user_id' => $user->User_ID,
+                'sessions_count' => $sessions->count(),
+                'sessions' => $sessions->toArray(),
+            ]);
         } else {
             Log::warning('Unauthorized access to sessions', [
                 'user_id' => $user->User_ID,
-                'role' => $user->role_profile
+                'role' => $user->role_profile,
             ]);
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
         return response()->json([
-            'sessions' => $sessions
+            'sessions' => $sessions']
         ]);
     }
 
@@ -408,7 +406,7 @@ class NewSessionController extends Controller
         $user = Auth::user();
         $session = NewSession::findOrFail($sessionId);
 
-        // التأكد أن المستخدم هو الكوتش أو الترايني لهذهذه الجلسة
+        // التأكد أن المستخدم هو الكوتش أو الترايني لهذه الجلسة
         $isAuthorized = false;
         if ($user->role_profile === 'Coach') {
             $isAuthorized = $session->coach_id == $user->User_ID;
@@ -419,7 +417,7 @@ class NewSessionController extends Controller
         if (!$isAuthorized) {
             Log::warning('Unauthorized attempt to complete session', [
                 'user_id' => $user->User_ID,
-                'session_id' => $sessionId
+                'session_id' => $sessionId,
             ]);
             return response()->json(['message' => 'Unauthorized'], 403);
         }
@@ -427,7 +425,7 @@ class NewSessionController extends Controller
         if ($session->status !== 'Scheduled') {
             Log::warning('Session cannot be completed', [
                 'session_id' => $sessionId,
-                'status' => $session->status
+                'status' => $session->status,
             ]);
             return response()->json(['message' => 'Session cannot be completed'], 400);
         }
@@ -436,7 +434,7 @@ class NewSessionController extends Controller
         if (Carbon::now()->lt($sessionEndTime)) {
             Log::warning('Session cannot be completed yet', [
                 'session_id' => $sessionId,
-                'end_time' => $sessionEndTime
+                'end_time' => $sessionEndTime,
             ]);
             return response()->json(['message' => 'Session cannot be completed yet. It has not ended.'], 400);
         }
@@ -445,12 +443,12 @@ class NewSessionController extends Controller
         $session->save();
 
         Log::info('Session marked as completed', [
-            'session_id' => $sessionId
+            'session_id' => $sessionId,
         ]);
 
         return response()->json([
             'message' => 'Session marked as completed successfully!',
-            'session' => $session
+            'session' => $session,
         ]);
     }
 
@@ -472,7 +470,7 @@ class NewSessionController extends Controller
         if (!$isAuthorized) {
             Log::warning('Unauthorized attempt to cancel session', [
                 'user_id' => $user->User_ID,
-                'session_id' => $sessionId
+                'session_id' => $sessionId,
             ]);
             return response()->json(['message' => 'Unauthorized'], 403);
         }
@@ -480,7 +478,7 @@ class NewSessionController extends Controller
         if ($session->status !== 'Scheduled' && $session->status !== 'pending') {
             Log::warning('Session cannot be cancelled', [
                 'session_id' => $sessionId,
-                'status' => $session->status
+                'status' => $session->status,
             ]);
             return response()->json(['message' => 'Session cannot be cancelled'], 400);
         }
@@ -489,12 +487,12 @@ class NewSessionController extends Controller
         $session->save();
 
         Log::info('Session cancelled', [
-            'session_id' => $sessionId
+            'session_id' => $sessionId,
         ]);
 
         return response()->json([
             'message' => 'Session cancelled successfully!',
-            'session' => $session
+            'session' => $session,
         ]);
     }
 
@@ -504,7 +502,7 @@ class NewSessionController extends Controller
     public function updateMeetingLink(Request $request, $sessionId)
     {
         $request->validate([
-            'meeting_link' => 'required|url'
+            'meeting_link' => 'required|url',
         ]);
 
         $user = Auth::user();
@@ -513,7 +511,7 @@ class NewSessionController extends Controller
         if ($session->coach_id != $user->User_ID) {
             Log::warning('Unauthorized attempt to update meeting link', [
                 'user_id' => $user->User_ID,
-                'session_id' => $sessionId
+                'session_id' => $sessionId,
             ]);
             return response()->json(['message' => 'Unauthorized'], 403);
         }
@@ -523,12 +521,12 @@ class NewSessionController extends Controller
 
         Log::info('Meeting link updated', [
             'session_id' => $sessionId,
-            'meeting_link' => $session->meeting_link
+            'meeting_link' => $session->meeting_link,
         ]);
 
         return response()->json([
             'message' => 'Meeting link updated successfully!',
-            'meeting_link' => $session->meeting_link
+            'meeting_link' => $session->meeting_link,
         ]);
     }
 }
