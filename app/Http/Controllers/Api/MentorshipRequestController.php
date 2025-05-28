@@ -40,7 +40,10 @@ class MentorshipRequestController extends Controller
         $modelClass = $typeMap[$serviceTypeInput];
         $serviceId = $request->input('service_id');
         $service = $modelClass::findOrFail($serviceId);
-        $coachId = $service->service->coach_id;
+        $coachId = optional($service->service)->coach_id;
+        if (!$coachId) {
+            return response()->json(['message' => 'Coach ID not found for this service.'], 404);
+        }
 
         $mentorshipRequest = MentorshipRequest::create([
             'requestable_id' => $serviceId,
