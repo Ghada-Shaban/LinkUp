@@ -102,7 +102,7 @@ class BookingController extends Controller
 
             $allSlotsBooked = !empty($availableSlots); // Initialize as true only if there are slots
             foreach ($availableSlots as $slot) {
-                $isSlotBooked = isset($bookedSessions[$dateString]) && $bookedSessions[$dateString]->contains(function ($session) use ($slot) {
+                $isSlotBooked = isset($bookedSessions[$dateString]) && $bookedSessions[$dateString]->contains(function ($session) use ($slot, $dateString) {
                     $sessionStart = Carbon::parse($session->date_time);
                     $sessionEnd = $sessionStart->copy()->addMinutes($session->duration);
                     // Compare only hours and minutes to avoid millisecond issues
