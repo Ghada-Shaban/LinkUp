@@ -379,7 +379,7 @@ class BookingController extends Controller
 
                 // Verify the mentorship request is accepted
                 if ($mentorshipRequest->status !== 'accepted') {
-                    return response()->json['message' => 'Mentorship request must be accepted to book sessions.'], 400);
+                    return response()->json(['message' => 'Mentorship request must be accepted to book sessions.'], 400);
                 }
 
                 // Verify the service matches the mentorship request
