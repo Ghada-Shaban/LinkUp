@@ -162,8 +162,12 @@ class NewSessionController extends Controller
                     ]);
                 }
 
-                // تحويل التوقيت إلى EEST (UTC+3)
-                $dateTime = Carbon::parse($session->date_time)->addHours(3);
+                // تحويل التوقيت إلى EEST (UTC+3) إلا لو الجلسة تابعة لـ Mentorship Plan
+                $isMentorshipPlan = $session->mentorshipRequest && $session->mentorshipRequest->requestable_type === \App\Models\MentorshipPlan::class;
+                $dateTime = Carbon::parse($session->date_time);
+                if (!$isMentorshipPlan) {
+                    $dateTime->addHours(3); // تحويل إلى EEST للخدمات العادية والـ Mentorship Session
+                }
                 $endTime = $dateTime->copy()->addMinutes($session->duration);
                 
                 // تنسيق التاريخ والوقت بالشكل المطلوب
@@ -337,8 +341,12 @@ class NewSessionController extends Controller
                     ]);
                 }
 
-                // تحويل التوقيت إلى EEST (UTC+3)
-                $dateTime = Carbon::parse($session->date_time)->addHours(3);
+                // تحويل التوقيت إلى EEST (UTC+3) إلا لو الجلسة تابعة لـ Mentorship Plan
+                $isMentorshipPlan = $session->mentorshipRequest && $session->mentorshipRequest->requestable_type === \App\Models\MentorshipPlan::class;
+                $dateTime = Carbon::parse($session->date_time);
+                if (!$isMentorshipPlan) {
+                    $dateTime->addHours(3); // تحويل إلى EEST للخدمات العادية والـ Mentorship Session
+                }
                 $endTime = $dateTime->copy()->addMinutes($session->duration);
                 
                 // تنسيق التاريخ والوقت بالشكل المطلوب
