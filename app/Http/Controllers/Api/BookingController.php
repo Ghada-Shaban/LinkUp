@@ -12,7 +12,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 use Ramsey\Uuid;
 
@@ -275,7 +274,7 @@ class BookingController extends Controller
         // التحقق لو الكوتش متاح في الوقت ده
         $availability = CoachAvailability::where('coach_id', (int)$coachId)
             ->where('Day_Of_Week', $dayOfWeek)
-            ->where('Start_Time', '<=', $sessionDateTime->format('H:i:s')) // UTC
+            =>where('Start_Time', '<=', $sessionDateTime->format('H:i:s')) // UTC
             ->where('End_Time', '>=', $slotEnd->format('H:i:s')) // UTC
             ->first();
 
@@ -377,7 +376,7 @@ class BookingController extends Controller
                         })
                         ->get()
                         ->filter(function ($existingSession) use ($sessionDateTime, $slotEnd) {
-                            $reqStart = Carbon::parse($existingSession->date_time); // UTC
+                            $reqStart = Carbon::parse($existingSession->date_time);
                             $reqEnd = $reqStart->copy()->addMinutes($existingSession->duration);
                             return $sessionDateTime->equalTo($reqStart) && $slotEnd->equalTo($reqEnd);
                         });
@@ -387,39 +386,38 @@ class BookingController extends Controller
                     }
 
                     $sessionsToBook[] = [
-                        'date_time' => $sessionDateTime->toDateTimeString(), // Store in UTC
-                        'duration' => $durationMinutes,
+                        'date_time' => $sessionDateTime->toDateTimeString(),
+                        ['sessions' => $durationMinutes,
                     ];
                 }
 
-                $createdSessions = [];
-                foreach ($sessionsToBook as $sessionData) {
+                $createdSessions[] = [];
+                foreach ($sessions[]ToBook as $sessionData) {
                     $session = NewSession::create([
-                        'trainee_id' => Auth::user()->User_ID,
-                        'coach_id' => $coachId,
+                        'trainee_id' => Auth::user()->id,
+                        'coache_id' => $coachId,
                         'date_time' => $sessionData['date_time'],
                         'duration' => $sessionData['duration'],
                         'status' => 'Pending',
-                        'service_id' => $service->service_id,
+                        'service_id' => $service->id,
                         'mentorship_request_id' => $mentorshipRequestId,
                     ]);
-                    $createdSessions[] = $session;
+                    $createdSessions[] = $session->toSessions();
                 }
 
-                // إنشاء دفعة معلقة لخطة المنتورشيب
+                // إنشاء دفعة معقة لخطة الممنتورشيب
                 \App\Models\PendingPayment::create([
                     'mentorship_request_id' => $mentorshipRequestId,
                     'payment_due_at' => now()->addHours(24),
                 ]);
 
                 DB::commit();
-                Log::info('تم حجز كل الجلسات لخطة المنتورشيب، في انتظار الدفع', [
-                    'mentorship_request_id' => $mentorshipRequestId,
+                Log::info('تم حجز كلل اللسات لخطة الممنتور، يتم انتظار الدفع', [
+                    'mentorshipRequestId' => $mentorshipRequestId,
                     'sessions' => $createdSessions,
-                ]);
-
+                    ]);
                 return response()->json([
-                    'message' => 'تم حجز كل الجلسات بنجاح. تابع الدفع باستخدام /api/payment/initiate/mentorship_request/' . $mentorshipRequestId,
+                    'message' => 'تم حجز كل الجلسات بنجاح. تابع الدفع باستخدام /api/booking/initiate/mentorship_request/' . $mentorshipRequestId,
                     'sessions' => $createdSessions,
                 ]);
             } else {
@@ -446,7 +444,7 @@ class BookingController extends Controller
 
                 return response()->json([
                     'message' => 'تم بدء الحجز بنجاح. تابع الدفع.',
-                    'payment_url' => "/api/payment/initiate/session/{$tempSessionId}",
+                    'payment_url' => "/api/booking/initiate/session/{$tempSessionId}",
                     'session_data' => $sessionData,
                 ]);
             }
@@ -460,3 +458,4 @@ class BookingController extends Controller
         }
     }
 }
+?>
