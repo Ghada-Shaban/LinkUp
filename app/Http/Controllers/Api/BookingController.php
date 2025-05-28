@@ -78,72 +78,60 @@ class BookingController extends Controller
                 continue;
             }
 
-            // إنشاء كل الـ slots للـ 24 ساعة
-            $allSlots = [];
-            $currentTime = Carbon::parse($dateString)->startOfDay();
-            $endOfDay = Carbon::parse($dateString)->endOfDay();
-
-            while ($currentTime->lt($endOfDay)) {
-                $slotEnd = $currentTime->copy()->addMinutes($durationMinutes);
-                
-                $allSlots[] = [
-                    'start' => $currentTime->copy(),
-                    'end' => $slotEnd->copy(),
-                ];
-
-                $currentTime->addMinutes($durationMinutes);
-            }
-
-            // تحديد الـ slots المتاحة والمحجوزة
             $availableSlots = [];
-            $bookedSlots = [];
+            foreach ($dayAvailabilities as $availability) {
+                $startTime = Carbon::parse($availability->Start_Time);
+                $endTime = Carbon::parse($availability->End_Time);
+                $currentTime = Carbon::parse($dateString)->setTime($startTime->hour, $startTime->minute, 0);
+                $endOfAvailability = Carbon::parse($dateString)->setTime($endTime->hour, $endTime->minute, 0);
 
-            foreach ($allSlots as $slot) {
-                // التحقق من أن الـ slot ضمن أوقات العمل
-                $isWithinAvailability = $dayAvailabilities->contains(function ($availability) use ($slot, $dateString) {
-                    $availStart = Carbon::parse($availability->Start_Time);
-                    $availEnd = Carbon::parse($availability->End_Time);
-                    $availStartTime = Carbon::parse($dateString)->setTime($availStart->hour, $availStart->minute, 0);
-                    $availEndTime = Carbon::parse($dateString)->setTime($availEnd->hour, $availEnd->minute, 0);
-                    return $slot['start']->gte($availStartTime) && $slot['end']->lte($availEndTime);
-                });
-
-                if ($isWithinAvailability) {
-                    // التحقق من أن الـ slot محجوز
-                    $isSlotBooked = isset($bookedSessions[$dateString]) && $bookedSessions[$dateString]->filter(function ($session) use ($slot) {
-                        $sessionStart = Carbon::parse($session->date_time);
-                        $sessionEnd = $sessionStart->copy()->addMinutes($session->duration);
-                        return $slot['start']->equalTo($sessionStart) && $slot['end']->equalTo($sessionEnd);
-                    })->isNotEmpty();
-
-                    if ($isSlotBooked) {
-                        $bookedSlots[] = $slot;
-                    } else {
-                        $availableSlots[] = $slot;
+                while ($currentTime->lt($endOfAvailability)) {
+                    $slotEnd = $currentTime->copy()->addMinutes($durationMinutes);
+                    if ($slotEnd->gt($endOfAvailability)) {
+                        break;
                     }
+
+                    $availableSlots[] = [
+                        'start' => $currentTime->copy(),
+                        'end' => $slotEnd->copy(),
+                    ];
+
+                    $currentTime->addMinutes($durationMinutes);
                 }
             }
 
-            // لو مافيش slots متاحة في أوقات العمل، اليوم unavailable
-            if (empty($availableSlots) && empty($bookedSlots)) {
-                $dates[] = [
-                    'date' => $dateString,
-                    'day_of_week' => $dayOfWeek,
-                    'status' => 'unavailable',
-                ];
-                continue;
+            $allSlotsBooked = !empty($availableSlots); // Initialize as true only if there are slots
+            foreach ($availableSlots as $slot) {
+                $isSlotBooked = isset($bookedSessions[$dateString]) && $bookedSessions[$dateString]->contains(function ($session) use ($slot, $dateString) {
+                    $sessionStart = Carbon::parse($session->date_time)->addHours(3); // Adjust for EEST
+                    $sessionEnd = $sessionStart->copy()->addMinutes($session->duration);
+                    // Compare only hours and minutes to avoid millisecond issues
+                    $isMatch = $slot['start']->format('Y-m-d H:i') === $sessionStart->format('Y-m-d H:i')
+                        && $slot['end']->format('Y-m-d H:i') === $sessionEnd->format('Y-m-d H:i');
+                    Log::info('Checking slot booking status', [
+                        'date' => $dateString,
+                        'slot_start' => $slot['start']->toDateTimeString(),
+                        'session_start' => $sessionStart->toDateTimeString(),
+                        'slot_end' => $slot['end']->toDateTimeString(),
+                        'session_end' => $sessionEnd->toDateTimeString(),
+                        'is_booked' => $isMatch,
+                    ]);
+                    return $isMatch;
+                });
+
+                if (!$isSlotBooked) {
+                    $allSlotsBooked = false;
+                    break;
+                }
             }
 
-            // تحديد الـ status بناءً على عدد الـ slots
-            if (!empty($availableSlots) && empty($bookedSlots)) {
-                $status = 'available'; // كل الـ slots متاحة
-            } elseif (!empty($availableSlots) && !empty($bookedSlots)) {
-                $status = 'available'; // بعض الـ slots محجوزة وبعضها متاح
-            } elseif (empty($availableSlots) && !empty($bookedSlots)) {
-                $status = 'booked'; // كل الـ slots محجوزة
-            } else {
-                $status = 'unavailable';
-            }
+            $status = $allSlotsBooked && !empty($availableSlots) ? 'booked' : 'available';
+            Log::info('Day status determined', [
+                'date' => $dateString,
+                'status' => $status,
+                'available_slots_count' => count($availableSlots),
+                'booked_slots_count' => isset($bookedSessions[$dateString]) ? $bookedSessions[$dateString]->count() : 0,
+            ]);
 
             $dates[] = [
                 'date' => $dateString,
@@ -212,7 +200,7 @@ class BookingController extends Controller
             $slotStartFormatted = $currentTime->format('H:i');
             $slotEndFormatted = $slotEnd->format('H:i');
 
-            // مقارنة التوقيتات مع إضافة 3 ساعات لتوقيت الجلسة المحجوزة
+            // Adjust session time for display purposes (EEST = UTC+3)
             $isBooked = $bookedSessions->contains(function ($session) use ($currentTime) {
                 $sessionStart = Carbon::parse($session->date_time)->addHours(3);
                 Log::info('Comparing slot with session', [
