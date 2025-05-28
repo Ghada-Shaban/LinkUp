@@ -207,13 +207,13 @@ class BookingController extends Controller
             'booked_sessions' => $bookedSessions->toArray(),
         ]);
 
-        // Generate time slots for the entire day (from 01:00 to 23:00)
+        // Generate time slots for the entire day (from 01:00 to 23:00) in EEST
         $slots = [];
         $durationMinutes = 60; // Fixed duration for all sessions
 
-        // Start from 01:00 of the selected date
-        $startOfDay = Carbon::parse($date)->startOfDay()->addHour(1); // Start at 01:00
-        $endOfDay = Carbon::parse($date)->startOfDay()->addHours(24); // End at 00:00 next day
+        // Start from 01:00 of the selected date in EEST
+        $startOfDay = Carbon::parse($date)->startOfDay()->addHour(1); // Start at 01:00 EEST
+        $endOfDay = Carbon::parse($date)->startOfDay()->addHours(24); // End at 00:00 next day EEST
 
         $currentTime = $startOfDay->copy();
         while ($currentTime->lt($endOfDay)) {
@@ -222,13 +222,14 @@ class BookingController extends Controller
                 break; // Don't include partial slots at the end of the day
             }
 
-            // Use 24-hour format (H:i)
+            // Use 24-hour format (H:i) in EEST
             $slotStartFormatted = $currentTime->format('H:i');
             $slotEndFormatted = $slotEnd->format('H:i');
 
-            // Check if this slot is booked
+            // Check if this slot is booked (convert session times from UTC to EEST for comparison)
             $isBooked = $bookedSessions->filter(function ($session) use ($currentTime, $slotEnd) {
-                $sessionStart = Carbon::parse($session->date_time);
+                // Convert session times from UTC to EEST (add 3 hours)
+                $sessionStart = Carbon::parse($session->date_time)->addHours(3); // UTC to EEST
                 $sessionEnd = $sessionStart->copy()->addMinutes($session->duration);
                 return $currentTime->lt($sessionEnd) && $slotEnd->gt($sessionStart);
             })->isNotEmpty();
