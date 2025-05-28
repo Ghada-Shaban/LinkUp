@@ -48,13 +48,13 @@ class BookingController extends Controller
         // جلب الجلسات المحجوزة في الشهر (باستثناء جلسات Group Mentorship)
         $bookedSessions = NewSession::where('coach_id', $coachId)
             ->whereIn('status', ['Pending', 'Scheduled'])
-            ->whereBetween('date_time', [$startOfMonth->copy()->subHours(3), $endOfMonth->copy()->subHours(3)]) // UTC to EEST
+            ->whereBetween('date_time', [$startOfMonth, $endOfMonth]) // UTC
             ->whereDoesntHave('mentorshipRequest', function ($query) {
                 $query->where('requestable_type', 'App\\Models\\GroupMentorship');
             })
             ->get()
             ->groupBy(function ($session) {
-                return Carbon::parse($session->date_time)->addHours(3)->toDateString(); // UTC to EEST
+                return Carbon::parse($session->date_time)->toDateString(); // UTC
             });
 
         // مدة الجلسة ثابتة 60 دقيقة
@@ -90,8 +90,8 @@ class BookingController extends Controller
             // التحقق من وجود تايم سلوتس متاحة في كل رينجات الأفايلبيليتي
             $hasAvailableSlots = false;
             foreach ($dayAvailabilities as $availability) {
-                $startTime = Carbon::parse($availability->Start_Time)->addHours(3); // UTC to EEST
-                $endTime = Carbon::parse($availability->End_Time)->addHours(3); // UTC to EEST
+                $startTime = Carbon::parse($availability->Start_Time); // UTC
+                $endTime = Carbon::parse($availability->End_Time); // UTC
                 $currentTime = Carbon::parse($dateString)->setTime($startTime->hour, $startTime->minute);
                 $endOfAvailability = Carbon::parse($dateString)->setTime($endTime->hour, $endTime->minute);
 
@@ -103,7 +103,7 @@ class BookingController extends Controller
 
                     // التحقق لو السلوت محجوز
                     $isSlotBooked = isset($bookedSessions[$dateString]) && $bookedSessions[$dateString]->filter(function ($session) use ($currentTime, $slotEnd) {
-                        $sessionStart = Carbon::parse($session->date_time)->addHours(3); // UTC to EEST
+                        $sessionStart = Carbon::parse($session->date_time); // UTC
                         $sessionEnd = $sessionStart->copy()->addMinutes($session->duration);
                         return $currentTime->lt($sessionEnd) && $slotEnd->gt($sessionStart);
                     })->isNotEmpty();
@@ -163,43 +163,27 @@ class BookingController extends Controller
             ->where('Day_Of_Week', $dayOfWeek)
             ->get();
 
-        // تسجيل الأفايلبيليتي للتأكد من الكود
         Log::info('Coach Availabilities for coach_id: ' . $coachId . ', day: ' . $dayOfWeek, [
             'availabilities' => $availabilities->toArray(),
         ]);
 
-        // جمع كل رينجات الأفايلبيليتي لليوم
-        $availabilityRanges = [];
-        foreach ($availabilities as $availability) {
-            $start = Carbon::parse($availability->Start_Time)->addHours(3); // UTC to EEST
-            $end = Carbon::parse($availability->End_Time)->addHours(3); // UTC to EEST
-            $availabilityRanges[] = [
-                'start_hour' => $start->hour,
-                'start_minute' => $start->minute,
-                'end_hour' => $end->hour,
-                'end_minute' => $end->minute,
-            ];
-        }
-
         // جلب الجلسات المحجوزة للتاريخ (باستثناء جلسات Group Mentorship)
         $bookedSessions = NewSession::where('coach_id', $coachId)
             ->whereIn('status', ['Pending', 'Scheduled'])
-            ->whereDate('date_time', $selectedDate->copy()->subHours(3)->toDateString()) // UTC date
+            ->whereDate('date_time', $selectedDate->toDateString()) // UTC date
             ->whereDoesntHave('mentorshipRequest', function ($query) {
                 $query->where('requestable_type', 'App\\Models\\GroupMentorship');
             })
             ->get();
 
-        // تسجيل الجلسات المحجوزة للتأكد من الكود
         Log::info('Booked Sessions for coach_id: ' . $coachId . ', date: ' . $selectedDate->toDateString(), [
             'booked_sessions' => $bookedSessions->toArray(),
         ]);
 
-        // إنشاء السلوتس لكل اليوم (من 01:00 إلى 23:00)
+        // إنشاء السلوتس لكل اليوم (من 01:00 إلى 23:00 بتوقيت EEST)
         $slots = [];
         $durationMinutes = 60; // مدة الجلسة ثابتة 60 دقيقة
 
-        // بداية من 01:00 في اليوم المختار
         $startOfDay = Carbon::parse($date)->startOfDay()->addHour(1); // 01:00 EEST
         $endOfDay = Carbon::parse($date)->startOfDay()->addHours(24); // 00:00 اليوم التالي
 
@@ -214,45 +198,35 @@ class BookingController extends Controller
             $slotStartFormatted = $currentTime->format('H:i');
             $slotEndFormatted = $slotEnd->format('H:i');
 
+            // تحويل السلوت لتوقيت UTC للمقارنة
+            $slotStartUTC = $currentTime->copy()->subHours(3); // EEST to UTC
+            $slotEndUTC = $slotEnd->copy()->subHours(3); // EEST to UTC
+
             // التحقق لو السلوت محجوز
-            $isBooked = $bookedSessions->filter(function ($session) use ($currentTime, $slotEnd) {
-                $sessionStart = Carbon::parse($session->date_time)->addHours(3); // UTC to EEST
+            $isBooked = $bookedSessions->filter(function ($session) use ($slotStartUTC, $slotEndUTC) {
+                $sessionStart = Carbon::parse($session->date_time); // UTC
                 $sessionEnd = $sessionStart->copy()->addMinutes($session->duration);
-                return $currentTime->lt($sessionEnd) && $slotEnd->gt($sessionStart);
+                return $slotStartUTC->lt($sessionEnd) && $slotEndUTC->gt($sessionStart);
             })->isNotEmpty();
 
             // التحقق لو السلوت جوا رينج أفايلبيليتي
             $isWithinAvailability = false;
-            foreach ($availabilityRanges as $range) {
-                $currentHour = $currentTime->hour;
-                $currentMinute = $currentTime->minute;
-                $slotEndHour = $slotEnd->hour;
-                $slotEndMinute = $slotEnd->minute;
+            foreach ($availabilities as $availability) {
+                $availStart = Carbon::parse($availability->Start_Time); // UTC
+                $availEnd = Carbon::parse($availability->End_Time); // UTC
 
-                // تحويل الأوقات إلى دقايق للمقارنة
-                $currentTotalMinutes = ($currentHour * 60) + $currentMinute;
-                $slotEndTotalMinutes = ($slotEndHour * 60) + $slotEndMinute;
-                $rangeStartTotalMinutes = ($range['start_hour'] * 60) + $range['start_minute'];
-                $rangeEndTotalMinutes = ($range['end_hour'] * 60) + $range['end_minute'];
+                // تحويل أوقات الأفايلبيليتي لنفس اليوم
+                $availStartTime = Carbon::parse($date)->setTime($availStart->hour, $availStart->minute);
+                $availEndTime = Carbon::parse($date)->setTime($availEnd->hour, $availEnd->minute);
 
-                // التعامل مع الحالة الحدية للسلوت الأخير (23:00 إلى 00:00)
-                if ($slotEndHour == 0 && $slotEndMinute == 0) {
-                    $slotEndTotalMinutes = 1440; // 24:00 بالدقايق
-                }
-
-                if ($currentTotalMinutes >= $rangeStartTotalMinutes && $slotEndTotalMinutes <= $rangeEndTotalMinutes) {
+                if ($slotStartUTC->gte($availStartTime) && $slotEndUTC->lte($availEndTime)) {
                     $isWithinAvailability = true;
                     break;
                 }
             }
 
             // تحديد الحالة
-            $status = 'unavailable'; // الحالة الافتراضية
-            if ($isBooked) {
-                $status = 'booked';
-            } elseif ($isWithinAvailability) {
-                $status = 'available';
-            }
+            $status = $isBooked ? 'booked' : ($isWithinAvailability ? 'available' : 'unavailable');
 
             $slots[] = [
                 'start_time' => $slotStartFormatted,
@@ -319,7 +293,7 @@ class BookingController extends Controller
             })
             ->get()
             ->filter(function ($existingSession) use ($sessionDateTime, $slotEnd) {
-                $reqStart = Carbon::parse($existingSession->date_time);
+                $reqStart = Carbon::parse($existingSession->date_time); // UTC
                 $reqEnd = $reqStart->copy()->addMinutes($existingSession->duration);
                 return $sessionDateTime->copy()->subHours(3)->lt($reqEnd) && $slotEnd->copy()->subHours(3)->gt($reqStart);
             });
@@ -396,7 +370,7 @@ class BookingController extends Controller
                         })
                         ->get()
                         ->filter(function ($existingSession) use ($sessionDateTime, $slotEnd) {
-                            $reqStart = Carbon::parse($existingSession->date_time);
+                            $reqStart = Carbon::parse($existingSession->date_time); // UTC
                             $reqEnd = $reqStart->copy()->addMinutes($existingSession->duration);
                             return $sessionDateTime->copy()->subHours(3)->lt($reqEnd) && $slotEnd->copy()->subHours(3)->gt($reqStart);
                         });
