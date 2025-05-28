@@ -124,8 +124,8 @@ class BookingController extends Controller
                     $currentTime->addMinutes($durationMinutes);
                 }
 
-                // If no slots are available, mark the day as booked
-                if ($availableSlotsCount == 0) {
+                // If no slots are available (all booked slots are occupied), mark the day as booked
+                if ($availableSlotsCount == 0 && $totalSlots > 0) {
                     $status = 'booked';
                 }
             }
