@@ -136,16 +136,16 @@ class BookingController extends Controller
         $date = $request->query('date');
         $serviceId = $request->query('service_id');
         $dayOfWeek = Carbon::parse($date)->format('l');
+        $selectedDate = Carbon::parse($date);
 
         $service = Service::where('service_id', $serviceId)
             ->where('coach_id', $coachId)
             ->first();
 
         if (!$service) {
-            return response()->json(['message' => 'الخدمة دي مش تابعة للكوش ده'], 403);
+            return response()->json(['message' => 'الخدمة دي مش تابعة للكوتش ده'], 403);
         }
 
-        $selectedDate = Carbon::parse($date);
         if ($selectedDate->lt(Carbon::today())) {
             return response()->json(['message' => 'لا يمكن حجز مواعيد في تواريخ سابقة'], 400);
         }
@@ -153,10 +153,6 @@ class BookingController extends Controller
         $availabilities = CoachAvailability::where('coach_id', $coachId)
             ->where('Day_Of_Week', $dayOfWeek)
             ->get();
-
-        Log::info('Coach Availabilities for coach_id: ' . $coachId . ', day: ' . $dayOfWeek, [
-            'availabilities' => $availabilities->toArray(),
-        ]);
 
         $bookedSessions = NewSession::where('coach_id', $coachId)
             ->whereIn('status', ['Pending', 'Scheduled'])
@@ -166,59 +162,30 @@ class BookingController extends Controller
             })
             ->get();
 
-        Log::info('Booked Sessions for coach_id: ' . $coachId . ', date: ' . $selectedDate->toDateString(), [
-            'booked_sessions' => $bookedSessions->toArray(),
-        ]);
-
         $slots = [];
         $durationMinutes = 60;
+        $currentTime = $selectedDate->copy()->startOfDay();
+        $endOfDay = $selectedDate->copy()->endOfDay();
 
-        $startOfDay = Carbon::parse($date)->startOfDay()->addHour(1);
-        $endOfDay = Carbon::parse($date)->startOfDay()->addHours(24);
-
-        $currentTime = $startOfDay->copy();
         while ($currentTime->lt($endOfDay)) {
             $slotEnd = $currentTime->copy()->addMinutes($durationMinutes);
-            if ($slotEnd->gt($endOfDay)) {
-                break;
-            }
 
             $slotStartFormatted = $currentTime->format('H:i');
             $slotEndFormatted = $slotEnd->format('H:i');
 
-            $slotStartUTC = $currentTime->copy();
-            $slotEndUTC = $slotEnd->copy();
-
-            $isBooked = $bookedSessions->filter(function ($session) use ($slotStartUTC, $slotEndUTC) {
+            $isBooked = $bookedSessions->contains(function ($session) use ($currentTime, $slotEnd) {
                 $sessionStart = Carbon::parse($session->date_time);
                 $sessionEnd = $sessionStart->copy()->addMinutes($session->duration);
-                
-                // Log للتأكد من الأوقات
-                Log::info('Comparing times:', [
-                    'slot_start' => $slotStartUTC->format('Y-m-d H:i:s'),
-                    'slot_end' => $slotEndUTC->format('Y-m-d H:i:s'),
-                    'session_start' => $sessionStart->format('Y-m-d H:i:s'),
-                    'session_end' => $sessionEnd->format('Y-m-d H:i:s'),
-                ]);
-                
-                // استخدم format للمقارنة بدلاً من equalTo عشان نتجنب مشاكل الـ timezone
-                return $slotStartUTC->format('Y-m-d H:i:s') === $sessionStart->format('Y-m-d H:i:s') && 
-                       $slotEndUTC->format('Y-m-d H:i:s') === $sessionEnd->format('Y-m-d H:i:s');
-            })->isNotEmpty();
+                return $sessionStart->eq($currentTime) && $sessionEnd->eq($slotEnd);
+            });
 
-            $isWithinAvailability = false;
-            foreach ($availabilities as $availability) {
+            $isWithinAvailability = $availabilities->contains(function ($availability) use ($currentTime, $slotEnd, $date) {
                 $availStart = Carbon::parse($availability->Start_Time);
                 $availEnd = Carbon::parse($availability->End_Time);
-
                 $availStartTime = Carbon::parse($date)->setTime($availStart->hour, $availStart->minute, 0);
                 $availEndTime = Carbon::parse($date)->setTime($availEnd->hour, $availEnd->minute, 0);
-
-                if ($slotStartUTC->gte($availStartTime) && $slotEndUTC->lte($availEndTime)) {
-                    $isWithinAvailability = true;
-                    break;
-                }
-            }
+                return $currentTime->gte($availStartTime) && $slotEnd->lte($availEndTime);
+            });
 
             $status = $isBooked ? 'booked' : ($isWithinAvailability ? 'available' : 'unavailable');
 
@@ -329,7 +296,7 @@ class BookingController extends Controller
                     return response()->json(['message' => 'خطة المنتورشيب بتتطلب حجز 4 جلسات مرة واحدة'], 400);
                 }
 
-                $sessionsToBook = [];
+                $sessionsToBook[] = [];
                 for ($i = 0; $i < $sessionCount; $i++) {
                     $sessionDate = $startDate->copy()->addWeeks($i);
                     $sessionDateTime = $sessionDate->setTime($startTime->hour, $startTime->minute, $startTime->second);
@@ -347,15 +314,15 @@ class BookingController extends Controller
 
                     $conflictingSessions = NewSession::where('coach_id', (int)$coachId)
                         ->whereIn('status', ['Pending', 'Scheduled'])
-                        ->whereDate('date_time', $sessionDateTime->toDateString())
-                        ->whereDoesntHave('mentorshipRequest', function ($query) {
+                        ->whereDate'date_time', ($sessionDateTime->toDateString())
+                        ->whereDoesn'tHave('mentorshipRequest', function ($query) {
                             $query->where('requestable_type', GroupMentorship::class);
                         })
                         ->get()
                         ->filter(function ($existingSession) use ($sessionDateTime, $slotEnd) {
-                            $reqStart = Carbon::parse($existingSession->date_time);
+                            $reqStart = Carbon::parse($existingSession->dateTime);
                             $reqEnd = $reqStart->copy()->addMinutes($existingSession->duration);
-                            return $sessionDateTime->equalTo($reqStart) && $slotEnd->equalTo($reqEnd);
+                            return $sessionDateTime->equalTo($reqStart) && $slotEnd->equalTo($reqEnd));
                         });
 
                     if ($conflictingSessions->isNotEmpty()) {
@@ -389,7 +356,7 @@ class BookingController extends Controller
 
                 DB::commit();
                 Log::info('تم حجز كل الجلسات لخطة المنتورشيب، في انتظار الدفع', [
-                    'mentorship_request_id' => $mentorshipRequestId,
+                    'mentorshipRequestId' => $mentorshipRequestId,
                     'sessions' => $createdSessions,
                 ]);
 
@@ -418,15 +385,15 @@ class BookingController extends Controller
 
                 return response()->json([
                     'message' => 'تم بدء الحجز بنجاح. تابع الدفع.',
-                    'payment_url' => "/api/payment/initiate/session/{$tempSessionId}",
+                    'payment_url' => "/api/payment/initiate/{$tempSessionId}",
                     'session_data' => $sessionData,
                 ]);
             }
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('فشل بدء الحجز', [
-                'coach_id' => $coachId,
                 'error' => $e->getMessage(),
+                'coach_id' => $coachId,
             ]);
             return response()->json(['error' => $e->getMessage()], 500);
         }
