@@ -98,7 +98,7 @@ class BookingController extends Controller
                 $totalMinutesAvailable = $endTime->diffInMinutes($startTime);
                 $totalSlots = $totalMinutesAvailable / $durationMinutes;
 
-                // Generate slots for the day and check their status
+                // Generate slots for the day and check their status (in EEST)
                 $currentTime = Carbon::parse($dateString)->setTime($startTime->hour, $startTime->minute);
                 $endOfAvailability = Carbon::parse($dateString)->setTime($endTime->hour, $endTime->minute);
                 $availableSlotsCount = 0;
@@ -109,9 +109,10 @@ class BookingController extends Controller
                         break; // Don't include partial slots
                     }
 
-                    // Check if this slot is booked
+                    // Check if this slot is booked (convert session times from UTC to EEST for comparison)
                     $isSlotBooked = $sessionsOnDate->filter(function ($session) use ($currentTime, $slotEnd) {
-                        $sessionStart = Carbon::parse($session->date_time);
+                        // Convert session times from UTC to EEST (add 3 hours)
+                        $sessionStart = Carbon::parse($session->date_time)->addHours(3); // UTC to EEST
                         $sessionEnd = $sessionStart->copy()->addMinutes($session->duration);
                         return $currentTime->lt($sessionEnd) && $slotEnd->gt($sessionStart);
                     })->isNotEmpty();
