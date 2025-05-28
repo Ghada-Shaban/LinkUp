@@ -162,14 +162,19 @@ class NewSessionController extends Controller
                     ]);
                 }
 
-                // حساب وقت النهاية بناءً على المدة
-                $endTime = Carbon::parse($session->date_time)->addMinutes($session->duration);
+                // تحويل التوقيت من UTC إلى EEST للعرض
+                $dateTime = Carbon::parse($session->date_time)->setTimezone('Africa/Cairo');
+                $endTime = $dateTime->copy()->addMinutes($session->duration);
                 
                 // تنسيق التاريخ والوقت بالشكل المطلوب
-                $date = Carbon::parse($session->date_time)->format('D, M d');
-                $startTimeFormatted = Carbon::parse($session->date_time)->format('h:i A');
+                $date = $dateTime->format('D, M d');
+                $startTimeFormatted = $dateTime->format('h:i A');
                 $endTimeFormatted = $endTime->format('h:i A');
                 $timeRange = "$startTimeFormatted - $endTimeFormatted";
+
+                // تحويل created_at و updated_at إلى EEST
+                $createdAt = Carbon::parse($session->created_at)->setTimezone('Africa/Cairo');
+                $updatedAt = Carbon::parse($session->updated_at)->setTimezone('Africa/Cairo');
 
                 $sessionData = [
                     'new_session_id' => $session->new_session_id,
@@ -180,6 +185,8 @@ class NewSessionController extends Controller
                     'status' => $session->status,
                     'meeting_link' => $session->meeting_link,
                     'trainee_name' => $traineeName,
+                    'created_at' => $createdAt->toDateTimeString(),
+                    'updated_at' => $updatedAt->toDateTimeString(),
                 ];
 
                 // إضافة current_participants إذا كان الـ session من نوع GroupMentorship
@@ -253,7 +260,7 @@ class NewSessionController extends Controller
 
                     // تحديد الـ service_title بناءً على الجداول الفرعية
                     if ($service->service_type === 'Mentorship') {
-                        $mentorship = $service->mentorship;
+                        $mentorship = $session->service->mentorship;
                         if ($mentorship) {
                             Log::info('Mentorship found for service', [
                                 'service_id' => $service->service_id,
@@ -322,14 +329,19 @@ class NewSessionController extends Controller
                     ]);
                 }
 
-                // حساب وقت النهاية بناءً على المدة
-                $endTime = Carbon::parse($session->date_time)->addMinutes($session->duration);
+                // تحويل التوقيت من UTC إلى EEST للعرض
+                $dateTime = Carbon::parse($session->date_time)->setTimezone('Africa/Cairo');
+                $endTime = $dateTime->copy()->addMinutes($session->duration);
                 
                 // تنسيق التاريخ والوقت بالشكل المطلوب
-                $date = Carbon::parse($session->date_time)->format('D, M d');
-                $startTimeFormatted = Carbon::parse($session->date_time)->format('h:i A');
+                $date = $dateTime->format('D, M d');
+                $startTimeFormatted = $dateTime->format('h:i A');
                 $endTimeFormatted = $endTime->format('h:i A');
                 $timeRange = "$startTimeFormatted - $endTimeFormatted";
+
+                // تحويل created_at و updated_at إلى EEST
+                $createdAt = Carbon::parse($session->created_at)->setTimezone('Africa/Cairo');
+                $updatedAt = Carbon::parse($session->updated_at)->setTimezone('Africa/Cairo');
 
                 $sessionData = [
                     'new_session_id' => $session->new_session_id,
@@ -340,6 +352,8 @@ class NewSessionController extends Controller
                     'status' => $session->status,
                     'meeting_link' => $session->meeting_link,
                     'coach_name' => $coachName,
+                    'created_at' => $createdAt->toDateTimeString(),
+                    'updated_at' => $updatedAt->toDateTimeString(),
                 ];
 
                 // إضافة current_participants إذا كان الـ session من نوع GroupMentorship
