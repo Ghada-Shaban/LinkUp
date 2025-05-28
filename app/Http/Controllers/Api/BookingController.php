@@ -212,13 +212,13 @@ class BookingController extends Controller
             $slotStartFormatted = $currentTime->format('H:i');
             $slotEndFormatted = $slotEnd->format('H:i');
 
-            // مقارنة التوقيتات في EEST
+            // مقارنة التوقيتات مع إضافة 3 ساعات لتوقيت الجلسة المحجوزة
             $isBooked = $bookedSessions->contains(function ($session) use ($currentTime) {
-                $sessionStart = Carbon::parse($session->date_time);
+                $sessionStart = Carbon::parse($session->date_time)->addHours(3);
                 Log::info('Comparing slot with session', [
                     'slot_start' => $currentTime->format('Y-m-d H:i:s'),
                     'session_start_raw' => $session->date_time,
-                    'session_start' => $sessionStart->format('Y-m-d H:i:s'),
+                    'session_start_adjusted' => $sessionStart->format('Y-m-d H:i:s'),
                 ]);
                 return $sessionStart->format('Y-m-d H:i') === $currentTime->format('Y-m-d H:i');
             });
