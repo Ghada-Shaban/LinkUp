@@ -52,7 +52,6 @@ class BookingController extends Controller
             ->whereDoesntHave('mentorshipRequest', function ($query) {
                 $query->where('requestable_type', 'App\\Models\\GroupMentorship');
             })
-            ->fresh() // Ensure we get fresh data from the database
             ->get()
             ->groupBy(function ($session) {
                 return Carbon::parse($session->date_time)->toDateString();
