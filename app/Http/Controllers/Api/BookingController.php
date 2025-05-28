@@ -85,9 +85,9 @@ class BookingController extends Controller
                 $currentTime = Carbon::parse($dateString)->setTime($startTime->hour, $startTime->minute);
                 $endOfAvailability = Carbon::parse($dateString)->setTime($endTime->hour, $endTime->minute);
 
-                while ($currentTime->lt($endOfAvailability)) {
+                while ($currentTime->isBefore($endOfAvailability)) {
                     $slotEnd = $currentTime->copy()->addMinutes($durationMinutes);
-                    if ($slotEnd->gt($endOfAvailability)) {
+                    if ($slotEnd->isAfter($endOfAvailability)) {
                         break;
                     }
 
@@ -143,7 +143,7 @@ class BookingController extends Controller
             ->first();
 
         if (!$service) {
-            return response()->json(['message' => 'الخدمة دي مش تابعة للكوتش ده'], 403);
+            return response()->json(['message' => 'الخدمة دي مش تابعة للكوتش'], 403);
         }
 
         if ($selectedDate->lt(Carbon::today())) {
@@ -158,7 +158,7 @@ class BookingController extends Controller
             'availabilities' => $availabilities->toArray(),
         ]);
 
-        // جلب الجلسات المحجوزة للتاريخ المحدد فقط
+        // جلب الجلسات المحجوزة للتاريخ المحدد
         $bookedSessions = NewSession::where('coach_id', $coachId)
             ->whereIn('status', ['Pending', 'Scheduled'])
             ->where('date_time', '>=', $selectedDate->startOfDay()->toDateTimeString())
@@ -210,6 +210,8 @@ class BookingController extends Controller
             ];
 
             $currentTime->addMinutes($durationMinutes);
+        }
+
         return response()->json($slots);
     }
 
