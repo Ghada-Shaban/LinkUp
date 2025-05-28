@@ -158,11 +158,6 @@ class BookingController extends Controller
             'availabilities' => $availabilities->toArray(),
         ]);
 
-        // لو مافيش availability لليوم ده، ارجع array فاضي
-        if ($availabilities->isEmpty()) {
-            return response()->json([]);
-        }
-
         $bookedSessions = NewSession::where('coach_id', $coachId)
             ->whereIn('status', ['Pending', 'Scheduled'])
             ->whereDate('date_time', $selectedDate->toDateString())
@@ -178,42 +173,51 @@ class BookingController extends Controller
         $slots = [];
         $durationMinutes = 60;
 
-        // بدلاً من توليد slots لكل اليوم، هنولد slots بس جوا الـ availability periods
-        foreach ($availabilities as $availability) {
-            $startTime = Carbon::parse($availability->Start_Time);
-            $endTime = Carbon::parse($availability->End_Time);
-            
-            $currentTime = Carbon::parse($date)->setTime($startTime->hour, $startTime->minute, 0);
-            $endOfAvailability = Carbon::parse($date)->setTime($endTime->hour, $endTime->minute, 0);
+        $startOfDay = Carbon::parse($date)->startOfDay()->addHour(1);
+        $endOfDay = Carbon::parse($date)->startOfDay()->addHours(24);
 
-            while ($currentTime->lt($endOfAvailability)) {
-                $slotEnd = $currentTime->copy()->addMinutes($durationMinutes);
-                if ($slotEnd->gt($endOfAvailability)) {
+        $currentTime = $startOfDay->copy();
+        while ($currentTime->lt($endOfDay)) {
+            $slotEnd = $currentTime->copy()->addMinutes($durationMinutes);
+            if ($slotEnd->gt($endOfDay)) {
+                break;
+            }
+
+            $slotStartFormatted = $currentTime->format('H:i');
+            $slotEndFormatted = $slotEnd->format('H:i');
+
+            $slotStartUTC = $currentTime->copy();
+            $slotEndUTC = $slotEnd->copy();
+
+            $isBooked = $bookedSessions->filter(function ($session) use ($slotStartUTC, $slotEndUTC) {
+                $sessionStart = Carbon::parse($session->date_time);
+                $sessionEnd = $sessionStart->copy()->addMinutes($session->duration);
+                return $slotStartUTC->equalTo($sessionStart) && $slotEndUTC->equalTo($sessionEnd);
+            })->isNotEmpty();
+
+            $isWithinAvailability = false;
+            foreach ($availabilities as $availability) {
+                $availStart = Carbon::parse($availability->Start_Time);
+                $availEnd = Carbon::parse($availability->End_Time);
+
+                $availStartTime = Carbon::parse($date)->setTime($availStart->hour, $availStart->minute, 0);
+                $availEndTime = Carbon::parse($date)->setTime($availEnd->hour, $availEnd->minute, 0);
+
+                if ($slotStartUTC->gte($availStartTime) && $slotEndUTC->lte($availEndTime)) {
+                    $isWithinAvailability = true;
                     break;
                 }
-
-                $slotStartFormatted = $currentTime->format('H:i');
-                $slotEndFormatted = $slotEnd->format('H:i');
-
-                $slotStartUTC = $currentTime->copy();
-                $slotEndUTC = $slotEnd->copy();
-
-                $isBooked = $bookedSessions->filter(function ($session) use ($slotStartUTC, $slotEndUTC) {
-                    $sessionStart = Carbon::parse($session->date_time);
-                    $sessionEnd = $sessionStart->copy()->addMinutes($session->duration);
-                    return $slotStartUTC->equalTo($sessionStart) && $slotEndUTC->equalTo($sessionEnd);
-                })->isNotEmpty();
-
-                $status = $isBooked ? 'booked' : 'available';
-
-                $slots[] = [
-                    'start_time' => $slotStartFormatted,
-                    'end_time' => $slotEndFormatted,
-                    'status' => $status,
-                ];
-
-                $currentTime->addMinutes($durationMinutes);
             }
+
+            $status = $isBooked ? 'booked' : ($isWithinAvailability ? 'available' : 'unavailable');
+
+            $slots[] = [
+                'start_time' => $slotStartFormatted,
+                'end_time' => $slotEndFormatted,
+                'status' => $status,
+            ];
+
+            $currentTime->addMinutes($durationMinutes);
         }
 
         return response()->json($slots);
