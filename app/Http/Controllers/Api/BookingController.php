@@ -296,7 +296,7 @@ class BookingController extends Controller
                     return response()->json(['message' => 'خطة المنتورشيب بتتطلب حجز 4 جلسات مرة واحدة'], 400);
                 }
 
-                $sessionsToBook[] = [];
+                $sessionsToBook = [];
                 for ($i = 0; $i < $sessionCount; $i++) {
                     $sessionDate = $startDate->copy()->addWeeks($i);
                     $sessionDateTime = $sessionDate->setTime($startTime->hour, $startTime->minute, $startTime->second);
@@ -314,15 +314,15 @@ class BookingController extends Controller
 
                     $conflictingSessions = NewSession::where('coach_id', (int)$coachId)
                         ->whereIn('status', ['Pending', 'Scheduled'])
-                        ->whereDate'date_time', ($sessionDateTime->toDateString())
-                        ->whereDoesn'tHave('mentorshipRequest', function ($query) {
+                        ->whereDate('date_time', $sessionDateTime->toDateString())
+                        ->whereDoesntHave('mentorshipRequest', function ($query) {
                             $query->where('requestable_type', GroupMentorship::class);
                         })
                         ->get()
                         ->filter(function ($existingSession) use ($sessionDateTime, $slotEnd) {
-                            $reqStart = Carbon::parse($existingSession->dateTime);
+                            $reqStart = Carbon::parse($existingSession->date_time);
                             $reqEnd = $reqStart->copy()->addMinutes($existingSession->duration);
-                            return $sessionDateTime->equalTo($reqStart) && $slotEnd->equalTo($reqEnd));
+                            return $sessionDateTime->equalTo($reqStart) && $slotEnd->equalTo($reqEnd);
                         });
 
                     if ($conflictingSessions->isNotEmpty()) {
@@ -356,7 +356,7 @@ class BookingController extends Controller
 
                 DB::commit();
                 Log::info('تم حجز كل الجلسات لخطة المنتورشيب، في انتظار الدفع', [
-                    'mentorshipRequestId' => $mentorshipRequestId,
+                    'mentorship_request_id' => $mentorshipRequestId,
                     'sessions' => $createdSessions,
                 ]);
 
@@ -385,15 +385,15 @@ class BookingController extends Controller
 
                 return response()->json([
                     'message' => 'تم بدء الحجز بنجاح. تابع الدفع.',
-                    'payment_url' => "/api/payment/initiate/{$tempSessionId}",
+                    'payment_url' => "/api/payment/initiate/session/{$tempSessionId}",
                     'session_data' => $sessionData,
                 ]);
             }
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('فشل بدء الحجز', [
-                'error' => $e->getMessage(),
                 'coach_id' => $coachId,
+                'error' => $e->getMessage(),
             ]);
             return response()->json(['error' => $e->getMessage()], 500);
         }
