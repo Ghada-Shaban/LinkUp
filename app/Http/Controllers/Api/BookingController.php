@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
-use Ramsey\Uuid;
+use Ramsey\Uuid\Uuid;
 
 class BookingController extends Controller
 {
@@ -154,13 +154,23 @@ class BookingController extends Controller
             ->where('Day_Of_Week', $dayOfWeek)
             ->get();
 
+        Log::info('Coach Availabilities for coach_id: ' . $coachId . ', day: ' . $dayOfWeek, [
+            'availabilities' => $availabilities->toArray(),
+        ]);
+
+        // جلب الجلسات المحجوزة للتاريخ المحدد فقط
         $bookedSessions = NewSession::where('coach_id', $coachId)
             ->whereIn('status', ['Pending', 'Scheduled'])
-            ->whereDate('date_time', $selectedDate->toDateString())
+            ->where('date_time', '>=', $selectedDate->startOfDay()->toDateTimeString())
+            ->where('date_time', '<', $selectedDate->endOfDay()->toDateTimeString())
             ->whereDoesntHave('mentorshipRequest', function ($query) {
                 $query->where('requestable_type', GroupMentorship::class);
             })
             ->get();
+
+        Log::info('Booked Sessions for coach_id: ' . $coachId . ', date: ' . $selectedDate->toDateString(), [
+            'booked_sessions' => $bookedSessions->toArray(),
+        ]);
 
         $slots = [];
         $durationMinutes = 60;
@@ -173,10 +183,14 @@ class BookingController extends Controller
             $slotStartFormatted = $currentTime->format('H:i');
             $slotEndFormatted = $slotEnd->format('H:i');
 
-            $isBooked = $bookedSessions->contains(function ($session) use ($currentTime, $slotEnd) {
+            // مقارنة التوقيتات بصيغة دقيقة
+            $isBooked = $bookedSessions->contains(function ($session) use ($currentTime) {
                 $sessionStart = Carbon::parse($session->date_time);
-                $sessionEnd = $sessionStart->copy()->addMinutes($session->duration);
-                return $sessionStart->eq($currentTime) && $sessionEnd->eq($slotEnd);
+                Log::info('Comparing slot with session', [
+                    'slot_start' => $currentTime->format('Y-m-d H:i:s'),
+                    'session_start' => $sessionStart->format('Y-m-d H:i:s'),
+                ]);
+                return $sessionStart->format('Y-m-d H:i') === $currentTime->format('Y-m-d H:i');
             });
 
             $isWithinAvailability = $availabilities->contains(function ($availability) use ($currentTime, $slotEnd, $date) {
@@ -196,8 +210,6 @@ class BookingController extends Controller
             ];
 
             $currentTime->addMinutes($durationMinutes);
-        }
-
         return response()->json($slots);
     }
 
