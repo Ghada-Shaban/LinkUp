@@ -87,7 +87,7 @@ class BookingController extends Controller
                 continue;
             }
 
-            // Check if the date is fully booked by checking available slots
+            // Calculate the status based on available slots
             $status = 'available'; // Default to available
             if (isset($bookedSessions[$dateString])) {
                 $sessionsOnDate = $bookedSessions[$dateString];
@@ -95,19 +95,18 @@ class BookingController extends Controller
                 // Get availability range for the day
                 $startTime = Carbon::parse($availability->Start_Time);
                 $endTime = Carbon::parse($availability->End_Time);
-                $totalMinutesAvailable = $endTime->diffInMinutes($startTime);
-                $totalSlots = $totalMinutesAvailable / $durationMinutes;
-
-                // Generate slots for the day and check their status
                 $currentTime = Carbon::parse($dateString)->setTime($startTime->hour, $startTime->minute);
                 $endOfAvailability = Carbon::parse($dateString)->setTime($endTime->hour, $endTime->minute);
                 $availableSlotsCount = 0;
+                $totalSlots = 0;
 
                 while ($currentTime->lt($endOfAvailability)) {
                     $slotEnd = $currentTime->copy()->addMinutes($durationMinutes);
                     if ($slotEnd->gt($endOfAvailability)) {
                         break; // Don't include partial slots
                     }
+
+                    $totalSlots++;
 
                     // Check if this slot is booked
                     $isSlotBooked = $sessionsOnDate->filter(function ($session) use ($currentTime, $slotEnd) {
@@ -123,8 +122,8 @@ class BookingController extends Controller
                     $currentTime->addMinutes($durationMinutes);
                 }
 
-                // If no slots are available, mark the day as booked
-                if ($availableSlotsCount == 0) {
+                // If all slots are booked, mark the day as booked
+                if ($availableSlotsCount == 0 && $totalSlots > 0) {
                     $status = 'booked';
                 }
             }
@@ -177,20 +176,20 @@ class BookingController extends Controller
         ]);
 
         if ($availabilities->isEmpty()) {
-            $availabilityRanges = [];
-        } else {
-            // Collect all availability ranges for the day (only hours and minutes)
-            $availabilityRanges = [];
-            foreach ($availabilities as $availability) {
-                $start = Carbon::parse($availability->Start_Time);
-                $end = Carbon::parse($availability->End_Time);
-                $availabilityRanges[] = [
-                    'start_hour' => $start->hour,
-                    'start_minute' => $start->minute,
-                    'end_hour' => $end->hour,
-                    'end_minute' => $end->minute,
-                ];
-            }
+            return response()->json([]);
+        }
+
+        // Collect all availability ranges for the day (only hours and minutes)
+        $availabilityRanges = [];
+        foreach ($availabilities as $availability) {
+            $start = Carbon::parse($availability->Start_Time);
+            $end = Carbon::parse($availability->End_Time);
+            $availabilityRanges[] = [
+                'start_hour' => $start->hour,
+                'start_minute' => $start->minute,
+                'end_hour' => $end->hour,
+                'end_minute' => $end->minute,
+            ];
         }
 
         // Fetch booked sessions for the date (exclude Group Mentorship sessions)
@@ -207,74 +206,41 @@ class BookingController extends Controller
             'booked_sessions' => $bookedSessions->toArray(),
         ]);
 
-        // Generate time slots for the entire day (from 01:00 to 23:00) in EEST
+        // Generate time slots only within the coach's availability range
         $slots = [];
         $durationMinutes = 60; // Fixed duration for all sessions
 
-        // Start from 01:00 of the selected date in EEST
-        $startOfDay = Carbon::parse($date)->startOfDay()->addHour(1); // Start at 01:00 EEST
-        $endOfDay = Carbon::parse($date)->startOfDay()->addHours(24); // End at 00:00 next day EEST
+        foreach ($availabilityRanges as $range) {
+            $currentTime = Carbon::parse($date)->setTime($range['start_hour'], $range['start_minute']);
+            $endOfAvailability = Carbon::parse($date)->setTime($range['end_hour'], $range['end_minute']);
 
-        $currentTime = $startOfDay->copy();
-        while ($currentTime->lt($endOfDay)) {
-            $slotEnd = $currentTime->copy()->addMinutes($durationMinutes);
-            if ($slotEnd->gt($endOfDay)) {
-                break; // Don't include partial slots at the end of the day
-            }
-
-            // Use 24-hour format (H:i) in EEST
-            $slotStartFormatted = $currentTime->format('H:i');
-            $slotEndFormatted = $slotEnd->format('H:i');
-
-            // Check if this slot is booked (convert session times from UTC to EEST for comparison)
-            $isBooked = $bookedSessions->filter(function ($session) use ($currentTime, $slotEnd) {
-                // Convert session times from UTC to EEST (add 3 hours)
-                $sessionStart = Carbon::parse($session->date_time)->addHours(3); // UTC to EEST
-                $sessionEnd = $sessionStart->copy()->addMinutes($session->duration);
-                return $currentTime->lt($sessionEnd) && $slotEnd->gt($sessionStart);
-            })->isNotEmpty();
-
-            // Check if this slot falls within the coach's availability (compare hours and minutes only)
-            $isWithinAvailability = false;
-            foreach ($availabilityRanges as $range) {
-                $currentHour = $currentTime->hour;
-                $currentMinute = $currentTime->minute;
-                $slotEndHour = $slotEnd->hour;
-                $slotEndMinute = $slotEnd->minute;
-
-                // Convert times to minutes for easier comparison
-                $currentTotalMinutes = ($currentHour * 60) + $currentMinute;
-                $slotEndTotalMinutes = ($slotEndHour * 60) + $slotEndMinute;
-                $rangeStartTotalMinutes = ($range['start_hour'] * 60) + $range['start_minute'];
-                $rangeEndTotalMinutes = ($range['end_hour'] * 60) + $range['end_minute'];
-
-                // Handle the edge case for the last slot (23:00 to 00:00)
-                if ($slotEndHour == 0 && $slotEndMinute == 0) {
-                    $slotEndTotalMinutes = 1440; // 24:00 in minutes
+            while ($currentTime->lt($endOfAvailability)) {
+                $slotEnd = $currentTime->copy()->addMinutes($durationMinutes);
+                if ($slotEnd->gt($endOfAvailability)) {
+                    break; // Don't include partial slots
                 }
 
-                // Check if the slot falls within the availability range
-                if ($currentTotalMinutes >= $rangeStartTotalMinutes && $slotEndTotalMinutes <= $rangeEndTotalMinutes) {
-                    $isWithinAvailability = true;
-                    break;
-                }
+                // Use 24-hour format (H:i)
+                $slotStartFormatted = $currentTime->format('H:i');
+                $slotEndFormatted = $slotEnd->format('H:i');
+
+                // Check if this slot is booked
+                $isBooked = $bookedSessions->filter(function ($session) use ($currentTime, $slotEnd) {
+                    $sessionStart = Carbon::parse($session->date_time);
+                    $sessionEnd = $sessionStart->copy()->addMinutes($session->duration);
+                    return $currentTime->lt($sessionEnd) && $slotEnd->gt($sessionStart);
+                })->isNotEmpty();
+
+                $status = $isBooked ? 'booked' : 'available';
+
+                $slots[] = [
+                    'start_time' => $slotStartFormatted,
+                    'end_time' => $slotEndFormatted,
+                    'status' => $status,
+                ];
+
+                $currentTime->addMinutes($durationMinutes);
             }
-
-            // Determine the status
-            $status = 'unavailable'; // Default status
-            if ($isBooked) {
-                $status = 'booked';
-            } elseif ($isWithinAvailability) {
-                $status = 'available';
-            }
-
-            $slots[] = [
-                'start_time' => $slotStartFormatted,
-                'end_time' => $slotEndFormatted,
-                'status' => $status,
-            ];
-
-            $currentTime->addMinutes($durationMinutes);
         }
 
         return response()->json($slots);
