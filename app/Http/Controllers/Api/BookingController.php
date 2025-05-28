@@ -186,11 +186,11 @@ class BookingController extends Controller
             'booked_sessions' => $bookedSessions->toArray(),
         ]);
 
-        // Generate time slots for the entire day (from 01:00 to 23:00) in EEST
+        // Generate time slots for the entire day (from 01:00 to 23:00)
         $slots = [];
         $durationMinutes = 60; // Fixed duration for all sessions
 
-        // Start from 01:00 of the selected date in EEST
+        // Start from 01:00 of the selected date
         $startOfDay = Carbon::parse($date)->startOfDay()->addHour(1); // Start at 01:00 EEST
         $endOfDay = Carbon::parse($date)->startOfDay()->addHours(24); // End at 00:00 next day EEST
 
@@ -201,9 +201,9 @@ class BookingController extends Controller
                 break; // Don't include partial slots at the end of the day
             }
 
-            // Keep currentTime and slotEnd in EEST for comparison and display
-            $currentTimeEest = $currentTime->copy();
-            $slotEndEest = $slotEnd->copy();
+            // Convert times to UTC for comparison with database (EEST to UTC: subtract 3 hours)
+            $currentTimeUtc = $currentTime->copy()->subHours(3); // EEST to UTC
+            $slotEndUtc = $slotEnd->copy()->subHours(3); // EEST to UTC
 
             // Check if this slot falls within the coach's availability (compare hours and minutes in EEST)
             $isWithinAvailability = false;
@@ -235,12 +235,11 @@ class BookingController extends Controller
             if (!$isWithinAvailability) {
                 $status = 'unavailable';
             } else {
-                // Check if this slot is booked (convert database times to EEST for comparison)
-                $isBooked = $bookedSessions->filter(function ($session) use ($currentTimeEest, $slotEndEest) {
-                    // Convert session times from UTC to EEST (add 3 hours)
-                    $sessionStart = Carbon::parse($session->date_time)->addHours(3); // UTC to EEST
+                // Check if this slot is booked (compare in UTC)
+                $isBooked = $bookedSessions->filter(function ($session) use ($currentTimeUtc, $slotEndUtc) {
+                    $sessionStart = Carbon::parse($session->date_time); // Already in UTC
                     $sessionEnd = $sessionStart->copy()->addMinutes($session->duration);
-                    return $currentTimeEest->lt($sessionEnd) && $slotEndEest->gt($sessionStart);
+                    return $currentTimeUtc->lt($sessionEnd) && $slotEndUtc->gt($sessionStart);
                 })->isNotEmpty();
 
                 // Determine the status for slots within availability
