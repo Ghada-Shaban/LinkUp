@@ -26,11 +26,11 @@ class NewSessionController extends Controller
 
         if ($type === 'upcoming') {
             $statuses = ['Scheduled'];
-            $timeCondition = ['date_time', '>=', now()];
-        } elseif ($type === 'pending') {
-            $statuses = ['pending'];
-            $timeCondition = ['date_time', '>=', now()];
-        } elseif ($type === 'history') {
+            $timeCondition = ['date_time', '>=', Carbon::now()];
+        } else if ($type === 'pending') {
+            $statuses = ['Pending'];
+            $timeCondition = ['date_time', '>=', Carbon::now()];
+        } else if ($type === 'history') {
             $statuses = ['completed', 'cancelled'];
             $timeCondition = null;
         } else {
@@ -44,15 +44,15 @@ class NewSessionController extends Controller
         $sessions = collect();
 
         if ($user->role_profile === 'Coach') {
-            $query = NewSession::with(['service', 'trainees'])
+            $query = NewSession::query()->with(['service', 'trainees'])
                 ->where('coach_id', $user->User_ID)
                 ->whereIn('status', $statuses);
 
             if ($timeCondition) {
-                $query->where($timeCondition[0], $timeCondition[1], $timeCondition[2]);
+                $query->where($timeCondition[0], $timeCondition[1], $timeCondition[2]->copy()->addHours(3)); // UTC to EEST
             }
 
-            $sessions = $query->get()->map(function ($session) {
+            $sessions = $query->get()->map(function($session) {
                 // جلب الـ trainee من العلاقة
                 $trainee = $session->trainees; // العلاقة هترجّع كائن User أو null
                 $traineeName = 'N/A';
@@ -162,12 +162,13 @@ class NewSessionController extends Controller
                     ]);
                 }
 
-                // حساب وقت النهاية بناءً على المدة
-                $endTime = Carbon::parse($session->date_time)->addMinutes($session->duration);
+                // حساب وقت النهاية بناءً على المدة مع تحويل إلى EEST
+                $startTime = Carbon::parse($session->date_time)->addHours(3); // UTC to EEST
+                $endTime = $startTime->copy()->addMinutes($session->duration);
                 
                 // تنسيق التاريخ والوقت بالشكل المطلوب
-                $date = Carbon::parse($session->date_time)->format('D, M d');
-                $startTimeFormatted = Carbon::parse($session->date_time)->format('h:i A');
+                $date = $startTime->format('D, M d');
+                $startTimeFormatted = $startTime->format('h:i A');
                 $endTimeFormatted = $endTime->format('h:i A');
                 $timeRange = "$startTimeFormatted - $endTimeFormatted";
 
@@ -196,12 +197,12 @@ class NewSessionController extends Controller
                 'sessions' => $sessions->toArray()
             ]);
         } elseif ($user->role_profile === 'Trainee') {
-            $query = NewSession::with(['service', 'coach.user'])
+            $query = NewSession::query()->with(['service', 'coach.user'])
                 ->where('trainee_id', $user->User_ID)
                 ->whereIn('status', $statuses);
 
             if ($timeCondition) {
-                $query->where($timeCondition[0], $timeCondition[1], $timeCondition[2]);
+                $query->where($timeCondition[0], $timeCondition[1], $timeCondition[2]->copy()->addHours(3)); // UTC to EEST
             }
 
             $sessions = $query->get()->map(function ($session) {
@@ -231,7 +232,7 @@ class NewSessionController extends Controller
                     ]);
                 }
                 
-                // جلب الـ service من العلاقة
+                // جلب الـ_service من العلاقة
                 $service = $session->service;
                 $sessionType = 'N/A'; // سيتم استخدامه لـ service_type
                 $serviceTitle = 'N/A'; // حقل جديد للـ title
@@ -322,12 +323,13 @@ class NewSessionController extends Controller
                     ]);
                 }
 
-                // حساب وقت النهاية بناءً على المدة
-                $endTime = Carbon::parse($session->date_time)->addMinutes($session->duration);
+                // حساب وقت النهاية بناءً على المدة مع تحويل إلى EEST
+                $startTime = Carbon::parse($session->date_time)->addHours(3); // UTC to EEST
+                $endTime = $startTime->copy()->addMinutes($session->duration);
                 
                 // تنسيق التاريخ والوقت بالشكل المطلوب
-                $date = Carbon::parse($session->date_time)->format('D, M d');
-                $startTimeFormatted = Carbon::parse($session->date_time)->format('h:i A');
+                $date = $startTime->format('D, M d');
+                $startTimeFormatted = $startTime->format('h:i A');
                 $endTimeFormatted = $endTime->format('h:i A');
                 $timeRange = "$startTimeFormatted - $endTimeFormatted";
 
@@ -400,11 +402,11 @@ class NewSessionController extends Controller
             return response()->json(['message' => 'Session cannot be completed'], 400);
         }
 
-        $sessionEndTime = Carbon::parse($session->date_time)->addMinutes($session->duration);
+        $sessionEndTime = Carbon::parse($session->date_time)->addHours(3)->addMinutes($session->duration); // UTC to EEST
         if (Carbon::now()->lt($sessionEndTime)) {
             Log::warning('Session cannot be completed yet', [
                 'session_id' => $sessionId,
-                'end_time' => $sessionEndTime
+                'end_time' => $sessionEndTime->toDateTimeString()
             ]);
             return response()->json(['message' => 'Session cannot be completed yet. It has not ended.'], 400);
         }
@@ -496,7 +498,7 @@ class NewSessionController extends Controller
 
         return response()->json([
             'message' => 'Meeting link updated successfully!',
-            'meeting_link' => $session->meeting_link
+            'session' => $session
         ]);
     }
 }
