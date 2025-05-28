@@ -103,6 +103,13 @@ class BookingController extends Controller
             $totalMinutesAvailable = $endTime->diffInMinutes($startTime);
             $totalSlots = $totalMinutesAvailable / $durationMinutes;
 
+            // Log availability details
+            Log::info('Availability for date: ' . $dateString, [
+                'start_time' => $startTime->format('H:i'),
+                'end_time' => $endTime->format('H:i'),
+                'total_slots' => $totalSlots,
+            ]);
+
             // Generate slots for the day and check their status (in EEST)
             $currentTime = Carbon::parse($dateString)->setTime($startTime->hour, $startTime->minute);
             $endOfAvailability = Carbon::parse($dateString)->setTime($endTime->hour, $endTime->minute);
@@ -114,6 +121,12 @@ class BookingController extends Controller
                         break; // Don't include partial slots
                     }
 
+                    // Log the slot being checked
+                    Log::info('Checking slot for date: ' . $dateString, [
+                        'slot_start' => $currentTime->format('Y-m-d H:i'),
+                        'slot_end' => $slotEnd->format('Y-m-d H:i'),
+                    ]);
+
                     // Check if this slot is booked (convert session times from UTC to EEST for comparison)
                     $isSlotBooked = false;
                     if (isset($bookedSessions[$dateString])) {
@@ -121,6 +134,14 @@ class BookingController extends Controller
                         $isSlotBooked = $sessionsOnDate->filter(function ($session) use ($currentTime, $slotEnd) {
                             $sessionStart = Carbon::parse($session->date_time)->addHours(3); // UTC to EEST
                             $sessionEnd = $sessionStart->copy()->addMinutes($session->duration);
+                            // Log session times for debugging
+                            Log::info('Comparing with booked session', [
+                                'session_start' => $sessionStart->format('Y-m-d H:i'),
+                                'session_end' => $sessionEnd->format('Y-m-d H:i'),
+                                'slot_start' => $currentTime->format('Y-m-d H:i'),
+                                'slot_end' => $slotEnd->format('Y-m-d H:i'),
+                                'overlaps' => $currentTime->lt($sessionEnd) && $slotEnd->gt($sessionStart),
+                            ]);
                             return $currentTime->lt($sessionEnd) && $slotEnd->gt($sessionStart);
                         })->isNotEmpty();
                     }
