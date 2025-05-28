@@ -45,10 +45,9 @@ class BookingController extends Controller
         // Fetch coach's availability
         $availabilities = CoachAvailability::where('coach_id', $coachId)->get();
 
-        // Fetch booked sessions for the month (exclude Group Mentorship sessions and cancelled/completed sessions)
+        // Fetch booked sessions for the month (exclude Group Mentorship sessions)
         $bookedSessions = NewSession::where('coach_id', $coachId)
-            ->whereIn('status', ['Pending', 'Scheduled', 'Confirmed'])
-            ->whereNotIn('status', ['Cancelled', 'Completed', 'Deleted'])
+            ->whereIn('status', ['Pending', 'Scheduled'])
             ->whereBetween('date_time', [$startOfMonth, $endOfMonth])
             ->whereDoesntHave('mentorshipRequest', function ($query) {
                 $query->where('requestable_type', 'App\\Models\\GroupMentorship');
@@ -88,8 +87,47 @@ class BookingController extends Controller
                 continue;
             }
 
-            // Calculate the status based on available slots
-            $status = $this->calculateDayStatus($availability, $bookedSessions[$dateString] ?? collect(), $dateString, $durationMinutes);
+            // Check if the date is fully booked by checking available slots
+            $status = 'available'; // Default to available
+            if (isset($bookedSessions[$dateString])) {
+                $sessionsOnDate = $bookedSessions[$dateString];
+
+                // Get availability range for the day
+                $startTime = Carbon::parse($availability->Start_Time);
+                $endTime = Carbon::parse($availability->End_Time);
+                $totalMinutesAvailable = $endTime->diffInMinutes($startTime);
+                $totalSlots = $totalMinutesAvailable / $durationMinutes;
+
+                // Generate slots for the day and check their status
+                $currentTime = Carbon::parse($dateString)->setTime($startTime->hour, $startTime->minute);
+                $endOfAvailability = Carbon::parse($dateString)->setTime($endTime->hour, $endTime->minute);
+                $availableSlotsCount = 0;
+
+                while ($currentTime->lt($endOfAvailability)) {
+                    $slotEnd = $currentTime->copy()->addMinutes($durationMinutes);
+                    if ($slotEnd->gt($endOfAvailability)) {
+                        break; // Don't include partial slots
+                    }
+
+                    // Check if this slot is booked
+                    $isSlotBooked = $sessionsOnDate->filter(function ($session) use ($currentTime, $slotEnd) {
+                        $sessionStart = Carbon::parse($session->date_time);
+                        $sessionEnd = $sessionStart->copy()->addMinutes($session->duration);
+                        return $currentTime->lt($sessionEnd) && $slotEnd->gt($sessionStart);
+                    })->isNotEmpty();
+
+                    if (!$isSlotBooked) {
+                        $availableSlotsCount++;
+                    }
+
+                    $currentTime->addMinutes($durationMinutes);
+                }
+
+                // If no slots are available, mark the day as booked
+                if ($availableSlotsCount == 0) {
+                    $status = 'booked';
+                }
+            }
 
             $dates[] = [
                 'date' => $dateString,
@@ -99,53 +137,6 @@ class BookingController extends Controller
         }
 
         return response()->json($dates);
-    }
-
-    /**
-     * Calculate day status based on availability and booked sessions
-     */
-    private function calculateDayStatus($availability, $sessionsOnDate, $dateString, $durationMinutes)
-    {
-        // Get availability range for the day
-        $startTime = Carbon::parse($availability->Start_Time, 'UTC')->setTimezone('Europe/Athens');
-        $endTime = Carbon::parse($availability->End_Time, 'UTC')->setTimezone('Europe/Athens');
-        
-        // Generate slots for the day and check their status
-        $currentTime = Carbon::parse($dateString)->setTimezone('Europe/Athens')->setTime($startTime->hour, $startTime->minute);
-        $endOfAvailability = Carbon::parse($dateString)->setTimezone('Europe/Athens')->setTime($endTime->hour, $endTime->minute);
-        $availableSlotsCount = 0;
-        $totalSlots = 0;
-
-        while ($currentTime->lt($endOfAvailability)) {
-            $slotEnd = $currentTime->copy()->addMinutes($durationMinutes);
-            if ($slotEnd->gt($endOfAvailability)) {
-                break; // Don't include partial slots
-            }
-
-            $totalSlots++;
-
-            // Check if this slot is booked
-            $isSlotBooked = $sessionsOnDate->filter(function ($session) use ($currentTime, $slotEnd) {
-                $sessionStart = Carbon::parse($session->date_time, 'UTC')->setTimezone('Europe/Athens');
-                $sessionEnd = $sessionStart->copy()->addMinutes($session->duration);
-                return $currentTime->lt($sessionEnd) && $slotEnd->gt($sessionStart);
-            })->isNotEmpty();
-
-            if (!$isSlotBooked) {
-                $availableSlotsCount++;
-            }
-
-            $currentTime->addMinutes($durationMinutes);
-        }
-
-        // Determine status based on available slots count
-        if ($totalSlots == 0) {
-            return 'unavailable'; // No slots available at all
-        } elseif ($availableSlotsCount == 0) {
-            return 'booked'; // All slots are booked
-        } else {
-            return 'available'; // At least one slot is available
-        }
     }
 
     public function getAvailableSlots(Request $request, $coachId)
@@ -186,26 +177,25 @@ class BookingController extends Controller
         ]);
 
         if ($availabilities->isEmpty()) {
-            return response()->json([]);
+            $availabilityRanges = [];
+        } else {
+            // Collect all availability ranges for the day (only hours and minutes)
+            $availabilityRanges = [];
+            foreach ($availabilities as $availability) {
+                $start = Carbon::parse($availability->Start_Time);
+                $end = Carbon::parse($availability->End_Time);
+                $availabilityRanges[] = [
+                    'start_hour' => $start->hour,
+                    'start_minute' => $start->minute,
+                    'end_hour' => $end->hour,
+                    'end_minute' => $end->minute,
+                ];
+            }
         }
 
-        // Collect all availability ranges for the day (only hours and minutes)
-        $availabilityRanges = [];
-        foreach ($availabilities as $availability) {
-            $start = Carbon::parse($availability->Start_Time, 'UTC')->setTimezone('Europe/Athens');
-            $end = Carbon::parse($availability->End_Time, 'UTC')->setTimezone('Europe/Athens');
-            $availabilityRanges[] = [
-                'start_hour' => $start->hour,
-                'start_minute' => $start->minute,
-                'end_hour' => $end->hour,
-                'end_minute' => $end->minute,
-            ];
-        }
-
-        // Fetch booked sessions for the date (exclude Group Mentorship sessions and cancelled/completed sessions)
+        // Fetch booked sessions for the date (exclude Group Mentorship sessions)
         $bookedSessions = NewSession::where('coach_id', $coachId)
-            ->whereIn('status', ['Pending', 'Scheduled', 'Confirmed'])
-            ->whereNotIn('status', ['Cancelled', 'Completed', 'Deleted'])
+            ->whereIn('status', ['Pending', 'Scheduled'])
             ->whereDate('date_time', $selectedDate->toDateString())
             ->whereDoesntHave('mentorshipRequest', function ($query) {
                 $query->where('requestable_type', 'App\\Models\\GroupMentorship');
@@ -217,13 +207,13 @@ class BookingController extends Controller
             'booked_sessions' => $bookedSessions->toArray(),
         ]);
 
-        // Generate time slots for the entire day (from 01:00 to 23:00) in EEST
+        // Generate time slots for the entire day (from 01:00 to 23:00)
         $slots = [];
         $durationMinutes = 60; // Fixed duration for all sessions
 
-        // Start from 01:00 of the selected date in EEST
-        $startOfDay = Carbon::parse($date)->setTimezone('Europe/Athens')->startOfDay()->addHour(1); // Start at 01:00 EEST
-        $endOfDay = Carbon::parse($date)->setTimezone('Europe/Athens')->startOfDay()->addHours(24); // End at 00:00 next day EEST
+        // Start from 01:00 of the selected date
+        $startOfDay = Carbon::parse($date)->startOfDay()->addHour(1); // Start at 01:00
+        $endOfDay = Carbon::parse($date)->startOfDay()->addHours(24); // End at 00:00 next day
 
         $currentTime = $startOfDay->copy();
         while ($currentTime->lt($endOfDay)) {
@@ -232,11 +222,18 @@ class BookingController extends Controller
                 break; // Don't include partial slots at the end of the day
             }
 
-            // Use 24-hour format (H:i) in EEST
+            // Use 24-hour format (H:i)
             $slotStartFormatted = $currentTime->format('H:i');
             $slotEndFormatted = $slotEnd->format('H:i');
 
-            // Check if this slot falls within the coach's availability
+            // Check if this slot is booked
+            $isBooked = $bookedSessions->filter(function ($session) use ($currentTime, $slotEnd) {
+                $sessionStart = Carbon::parse($session->date_time);
+                $sessionEnd = $sessionStart->copy()->addMinutes($session->duration);
+                return $currentTime->lt($sessionEnd) && $slotEnd->gt($sessionStart);
+            })->isNotEmpty();
+
+            // Check if this slot falls within the coach's availability (compare hours and minutes only)
             $isWithinAvailability = false;
             foreach ($availabilityRanges as $range) {
                 $currentHour = $currentTime->hour;
@@ -244,6 +241,7 @@ class BookingController extends Controller
                 $slotEndHour = $slotEnd->hour;
                 $slotEndMinute = $slotEnd->minute;
 
+                // Convert times to minutes for easier comparison
                 $currentTotalMinutes = ($currentHour * 60) + $currentMinute;
                 $slotEndTotalMinutes = ($slotEndHour * 60) + $slotEndMinute;
                 $rangeStartTotalMinutes = ($range['start_hour'] * 60) + $range['start_minute'];
@@ -254,32 +252,19 @@ class BookingController extends Controller
                     $slotEndTotalMinutes = 1440; // 24:00 in minutes
                 }
 
-                Log::info('Availability Check', [
-                    'current_total_minutes' => $currentTotalMinutes,
-                    'slot_end_total_minutes' => $slotEndTotalMinutes,
-                    'range_start_total_minutes' => $rangeStartTotalMinutes,
-                    'range_end_total_minutes' => $rangeEndTotalMinutes,
-                ]);
-
+                // Check if the slot falls within the availability range
                 if ($currentTotalMinutes >= $rangeStartTotalMinutes && $slotEndTotalMinutes <= $rangeEndTotalMinutes) {
                     $isWithinAvailability = true;
                     break;
                 }
             }
 
-            // Default status is unavailable
-            $status = 'unavailable';
-
-            // Only check for booking status if the slot is within availability
-            if ($isWithinAvailability) {
-                // Check if this slot is booked
-                $isBooked = $bookedSessions->filter(function ($session) use ($currentTime, $slotEnd) {
-                    $sessionStart = Carbon::parse($session->date_time, 'UTC')->setTimezone('Europe/Athens');
-                    $sessionEnd = $sessionStart->copy()->addMinutes($session->duration);
-                    return $currentTime->lt($sessionEnd) && $slotEnd->gt($sessionStart);
-                })->isNotEmpty();
-
-                $status = $isBooked ? 'booked' : 'available';
+            // Determine the status
+            $status = 'unavailable'; // Default status
+            if ($isBooked) {
+                $status = 'booked';
+            } elseif ($isWithinAvailability) {
+                $status = 'available';
             }
 
             $slots[] = [
@@ -338,19 +323,18 @@ class BookingController extends Controller
             return response()->json(['message' => "Selected slot is not available on {$sessionDateTime->toDateString()}"], 400);
         }
 
-        // Check for conflicts with existing sessions (exclude Group Mentorship sessions and cancelled/completed sessions)
+        // Check for conflicts with existing sessions (exclude Group Mentorship sessions)
         $conflictingSessions = NewSession::where('coach_id', (int)$coachId)
-            ->whereIn('status', ['Pending', 'Scheduled', 'Confirmed'])
-            ->whereNotIn('status', ['Cancelled', 'Completed', 'Deleted'])
+            ->whereIn('status', ['Pending', 'Scheduled'])
             ->whereDate('date_time', $sessionDateTime->toDateString())
             ->whereDoesntHave('mentorshipRequest', function ($query) {
                 $query->where('requestable_type', 'App\\Models\\GroupMentorship');
             })
             ->get()
             ->filter(function ($existingSession) use ($sessionDateTime, $slotEnd) {
-                $reqStart = Carbon::parse($existingSession->date_time, 'UTC')->setTimezone('Europe/Athens');
+                $reqStart = Carbon::parse($existingSession->date_time);
                 $reqEnd = $reqStart->copy()->addMinutes($existingSession->duration);
-                return $sessionDateTime->lt($reqEnd) && $slotEnd->gt($reqStart);
+                return $sessionDateTime < $reqEnd && $slotEnd > $reqStart;
             });
 
         if ($conflictingSessions->isNotEmpty()) {
@@ -372,7 +356,7 @@ class BookingController extends Controller
             if ($isMentorshipPlanBooking) {
                 // Handle Mentorship Plan booking (4 sessions, pending payment)
                 // Verify the mentorship request belongs to the authenticated user
-                if ($mentorshipRequest->trainee_id !== Auth::id()) {
+                if ($mentorshipRequest->trainee_id !== Auth::user()->User_ID) {
                     return response()->json(['message' => 'This mentorship request does not belong to you.'], 403);
                 }
 
@@ -418,17 +402,16 @@ class BookingController extends Controller
 
                     // Check for conflicts
                     $conflictingSessions = NewSession::where('coach_id', (int)$coachId)
-                        ->whereIn('status', ['Pending', 'Scheduled', 'Confirmed'])
-                        ->whereNotIn('status', ['Cancelled', 'Completed', 'Deleted'])
+                        ->whereIn('status', ['Pending', 'Scheduled'])
                         ->whereDate('date_time', $sessionDateTime->toDateString())
                         ->whereDoesntHave('mentorshipRequest', function ($query) {
                             $query->where('requestable_type', 'App\\Models\\GroupMentorship');
                         })
                         ->get()
                         ->filter(function ($existingSession) use ($sessionDateTime, $slotEnd) {
-                            $reqStart = Carbon::parse($existingSession->date_time, 'UTC')->setTimezone('Europe/Athens');
+                            $reqStart = Carbon::parse($existingSession->date_time);
                             $reqEnd = $reqStart->copy()->addMinutes($existingSession->duration);
-                            return $sessionDateTime->lt($reqEnd) && $slotEnd->gt($reqStart);
+                            return $sessionDateTime < $reqEnd && $slotEnd > $reqStart;
                         });
 
                     if ($conflictingSessions->isNotEmpty()) {
@@ -444,7 +427,7 @@ class BookingController extends Controller
                 $createdSessions = [];
                 foreach ($sessionsToBook as $sessionData) {
                     $session = NewSession::create([
-                        'trainee_id' => Auth::id(),
+                        'trainee_id' => Auth::user()->User_ID,
                         'coach_id' => $coachId,
                         'date_time' => $sessionData['date_time'],
                         'duration' => $sessionData['duration'],
@@ -479,7 +462,7 @@ class BookingController extends Controller
                 // Prepare session data to pass to the payment endpoint
                 $sessionData = [
                     'temp_session_id' => $tempSessionId,
-                    'trainee_id' => Auth::id(),
+                    'trainee_id' => Auth::user()->User_ID,
                     'coach_id' => $coachId,
                     'service_id' => $service->service_id,
                     'date_time' => $sessionDateTime->toDateTimeString(),
@@ -490,7 +473,7 @@ class BookingController extends Controller
                 Log::info('Regular service booking initiated, awaiting payment', [
                     'temp_session_id' => $tempSessionId,
                     'service_id' => $service->service_id,
-                    'trainee_id' => Auth::id(),
+                    'trainee_id' => Auth::user()->User_ID,
                 ]);
 
                 return response()->json([
