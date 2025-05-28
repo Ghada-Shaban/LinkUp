@@ -26,11 +26,11 @@ class NewSessionController extends Controller
 
         if ($type === 'upcoming') {
             $statuses = ['Scheduled'];
-            $timeCondition = ['date_time', '>=', Carbon::now()];
-        } else if ($type === 'pending') {
+            $timeCondition = ['date_time', '>=', Carbon::now()->subHours(3)]; // EEST to UTC
+        } elseif ($type === 'pending') {
             $statuses = ['Pending'];
-            $timeCondition = ['date_time', '>=', Carbon::now()];
-        } else if ($type === 'history') {
+            $timeCondition = ['date_time', '>=', Carbon::now()->subHours(3)]; // EEST to UTC
+        } elseif ($type === 'history') {
             $statuses = ['completed', 'cancelled'];
             $timeCondition = null;
         } else {
@@ -44,17 +44,17 @@ class NewSessionController extends Controller
         $sessions = collect();
 
         if ($user->role_profile === 'Coach') {
-            $query = NewSession::query()->with(['service', 'trainees'])
+            $query = NewSession::with(['service', 'trainees'])
                 ->where('coach_id', $user->User_ID)
                 ->whereIn('status', $statuses);
 
             if ($timeCondition) {
-                $query->where($timeCondition[0], $timeCondition[1], $timeCondition[2]->copy()->addHours(3)); // UTC to EEST
+                $query->where($timeCondition[0], $timeCondition[1], $timeCondition[2]);
             }
 
-            $sessions = $query->get()->map(function($session) {
+            $sessions = $query->get()->map(function ($session) {
                 // جلب الـ trainee من العلاقة
-                $trainee = $session->trainees; // العلاقة هترجّع كائن User أو null
+                $trainee = $session->trainees;
                 $traineeName = 'N/A';
                 if ($trainee) {
                     $traineeName = $trainee->full_name ?? 'N/A';
@@ -70,12 +70,12 @@ class NewSessionController extends Controller
                         'trainee_id' => $session->trainee_id
                     ]);
                 }
-                
+
                 // جلب الـ service من العلاقة
                 $service = $session->service;
-                $sessionType = 'N/A'; // سيتم استخدامه لـ service_type
-                $serviceTitle = 'N/A'; // حقل جديد للـ title
-                $currentParticipants = null; // لإضافة عدد المشاركين الحاليين في GroupMentorship
+                $sessionType = 'N/A';
+                $serviceTitle = 'N/A';
+                $currentParticipants = null;
 
                 if ($service) {
                     Log::info('Service found for session', [
@@ -83,15 +83,13 @@ class NewSessionController extends Controller
                         'service_id' => $session->service_id,
                         'service' => $service->toArray()
                     ]);
-                    
-                    // تحديد الـ session_type بناءً على الـ service_type
+
                     if ($service->service_type === 'Mentorship') {
                         $sessionType = 'mentorship sessions';
                     } else {
-                        $sessionType = strtolower(str_replace('_', ' ', $service->service_type)); // مثل "group mentorship"
+                        $sessionType = strtolower(str_replace('_', ' ', $service->service_type));
                     }
 
-                    // تحديد الـ service_title بناءً على الجداول الفرعية
                     if ($service->service_type === 'Mentorship') {
                         $mentorship = $service->mentorship;
                         if ($mentorship) {
@@ -100,14 +98,13 @@ class NewSessionController extends Controller
                                 'mentorship' => $mentorship->toArray()
                             ]);
                             if ($mentorship->mentorship_type === 'Mentorship session') {
-                                // تحقق من جدول mentorship_sessions
                                 $mentorshipSession = $service->mentorshipSession;
                                 if ($mentorshipSession) {
                                     Log::info('Mentorship session found for service', [
                                         'service_id' => $service->service_id,
                                         'mentorship_session' => $mentorshipSession->toArray()
                                     ]);
-                                    $serviceTitle = $mentorshipSession->session_type; // مثل "CV Review"
+                                    $serviceTitle = $mentorshipSession->session_type;
                                 } else {
                                     Log::warning('Mentorship session not found for service', [
                                         'service_id' => $service->service_id
@@ -143,8 +140,8 @@ class NewSessionController extends Controller
                                 'service_id' => $service->service_id,
                                 'group_mentorship' => $groupMentorship->toArray()
                             ]);
-                            $serviceTitle = $groupMentorship->title; // مثل "Weekly Coding Bootcamp3"
-                            $currentParticipants = $groupMentorship->current_participants; // عدد المشاركين الحاليين
+                            $serviceTitle = $groupMentorship->title;
+                            $currentParticipants = $groupMentorship->current_participants;
                         } else {
                             Log::warning('Group Mentorship not found for service', [
                                 'service_id' => $service->service_id
@@ -162,11 +159,11 @@ class NewSessionController extends Controller
                     ]);
                 }
 
-                // حساب وقت النهاية بناءً على المدة مع تحويل إلى EEST
+                // تحويل التوقيت من UTC إلى EEST
                 $startTime = Carbon::parse($session->date_time)->addHours(3); // UTC to EEST
                 $endTime = $startTime->copy()->addMinutes($session->duration);
-                
-                // تنسيق التاريخ والوقت بالشكل المطلوب
+
+                // تنسيق التاريخ والوقت
                 $date = $startTime->format('D, M d');
                 $startTimeFormatted = $startTime->format('h:i A');
                 $endTimeFormatted = $endTime->format('h:i A');
@@ -183,7 +180,6 @@ class NewSessionController extends Controller
                     'trainee_name' => $traineeName,
                 ];
 
-                // إضافة current_participants إذا كان الـ session من نوع GroupMentorship
                 if ($service && $service->service_type === 'Group_Mentorship') {
                     $sessionData['current_participants'] = $currentParticipants;
                 }
@@ -197,12 +193,12 @@ class NewSessionController extends Controller
                 'sessions' => $sessions->toArray()
             ]);
         } elseif ($user->role_profile === 'Trainee') {
-            $query = NewSession::query()->with(['service', 'coach.user'])
+            $query = NewSession::with(['service', 'coach.user'])
                 ->where('trainee_id', $user->User_ID)
                 ->whereIn('status', $statuses);
 
             if ($timeCondition) {
-                $query->where($timeCondition[0], $timeCondition[1], $timeCondition[2]->copy()->addHours(3)); // UTC to EEST
+                $query->where($timeCondition[0], $timeCondition[1], $timeCondition[2]);
             }
 
             $sessions = $query->get()->map(function ($session) {
@@ -231,12 +227,12 @@ class NewSessionController extends Controller
                         'coach_id' => $session->coach_id
                     ]);
                 }
-                
-                // جلب الـ_service من العلاقة
+
+                // جلب الـ service من العلاقة
                 $service = $session->service;
-                $sessionType = 'N/A'; // سيتم استخدامه لـ service_type
-                $serviceTitle = 'N/A'; // حقل جديد للـ title
-                $currentParticipants = null; // لإضافة عدد المشاركين الحاليين في GroupMentorship
+                $sessionType = 'N/A';
+                $serviceTitle = 'N/A';
+                $currentParticipants = null;
 
                 if ($service) {
                     Log::info('Service found for session', [
@@ -244,15 +240,13 @@ class NewSessionController extends Controller
                         'service_id' => $session->service_id,
                         'service' => $service->toArray()
                     ]);
-                    
-                    // تحديد الـ session_type بناءً على الـ service_type
+
                     if ($service->service_type === 'Mentorship') {
                         $sessionType = 'mentorship sessions';
                     } else {
-                        $sessionType = strtolower(str_replace('_', ' ', $service->service_type)); // مثل "group mentorship"
+                        $sessionType = strtolower(str_replace('_', ' ', $service->service_type));
                     }
 
-                    // تحديد الـ service_title بناءً على الجداول الفرعية
                     if ($service->service_type === 'Mentorship') {
                         $mentorship = $service->mentorship;
                         if ($mentorship) {
@@ -261,14 +255,13 @@ class NewSessionController extends Controller
                                 'mentorship' => $mentorship->toArray()
                             ]);
                             if ($mentorship->mentorship_type === 'Mentorship session') {
-                                // تحقق من جدول mentorship_sessions
                                 $mentorshipSession = $service->mentorshipSession;
                                 if ($mentorshipSession) {
                                     Log::info('Mentorship session found for service', [
                                         'service_id' => $service->service_id,
                                         'mentorship_session' => $mentorshipSession->toArray()
                                     ]);
-                                    $serviceTitle = $mentorshipSession->session_type; // مثل "CV Review"
+                                    $serviceTitle = $mentorshipSession->session_type;
                                 } else {
                                     Log::warning('Mentorship session not found for service', [
                                         'service_id' => $service->service_id
@@ -304,8 +297,8 @@ class NewSessionController extends Controller
                                 'service_id' => $service->service_id,
                                 'group_mentorship' => $groupMentorship->toArray()
                             ]);
-                            $serviceTitle = $groupMentorship->title; // مثل "Weekly Coding Bootcamp3"
-                            $currentParticipants = $groupMentorship->current_participants; // عدد المشاركين الحاليين
+                            $serviceTitle = $groupMentorship->title;
+                            $currentParticipants = $groupMentorship->current_participants;
                         } else {
                             Log::warning('Group Mentorship not found for service', [
                                 'service_id' => $service->service_id
@@ -323,11 +316,11 @@ class NewSessionController extends Controller
                     ]);
                 }
 
-                // حساب وقت النهاية بناءً على المدة مع تحويل إلى EEST
+                // تحويل التوقيت من UTC إلى EEST
                 $startTime = Carbon::parse($session->date_time)->addHours(3); // UTC to EEST
                 $endTime = $startTime->copy()->addMinutes($session->duration);
-                
-                // تنسيق التاريخ والوقت بالشكل المطلوب
+
+                // تنسيق التاريخ والوقت
                 $date = $startTime->format('D, M d');
                 $startTimeFormatted = $startTime->format('h:i A');
                 $endTimeFormatted = $endTime->format('h:i A');
@@ -344,7 +337,6 @@ class NewSessionController extends Controller
                     'coach_name' => $coachName,
                 ];
 
-                // إضافة current_participants إذا كان الـ session من نوع GroupMentorship
                 if ($service && $service->service_type === 'Group_Mentorship') {
                     $sessionData['current_participants'] = $currentParticipants;
                 }
@@ -498,7 +490,7 @@ class NewSessionController extends Controller
 
         return response()->json([
             'message' => 'Meeting link updated successfully!',
-            'session' => $session
+            'meeting_link' => $session->meeting_link
         ]);
     }
 }
