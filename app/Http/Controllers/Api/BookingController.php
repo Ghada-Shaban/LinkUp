@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Api;
+namespace App\Http;
 
 use App\Http\Controllers\Controller;
 use App\Models\CoachAvailability;
@@ -32,7 +32,7 @@ class BookingController extends Controller
             ->first();
 
         if (!$service) {
-            return response()->json(['message' => 'الخدمة دي مش تابعة للكوتش'], 403);
+            return response()->json(['message' => 'الخدمة دي مش تابعة للكوش'], 403);
         }
 
         $startOfMonth = Carbon::parse($month)->startOfMonth();
@@ -105,7 +105,7 @@ class BookingController extends Controller
                 $isSlotBooked = isset($bookedSessions[$dateString]) && $bookedSessions[$dateString]->contains(function ($session) use ($slot) {
                     $sessionStart = Carbon::parse($session->date_time);
                     $sessionEnd = $sessionStart->copy()->addMinutes($session->duration);
-                    $isMatch = $slot['start']->equals($sessionStart) && $slot['end']->equals($sessionEnd);
+                    $isMatch = $slot['start']->equalTo($sessionStart) && $slot['end']->equalTo($sessionEnd);
                     Log::info('Checking slot booking status', [
                         'date' => $slot['start']->toDateString(),
                         'slot_start' => $slot['start']->toDateTimeString(),
@@ -421,3 +421,4 @@ class BookingController extends Controller
         }
     }
 }
+?>
