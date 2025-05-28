@@ -192,7 +192,18 @@ class BookingController extends Controller
             $isBooked = $bookedSessions->filter(function ($session) use ($slotStartUTC, $slotEndUTC) {
                 $sessionStart = Carbon::parse($session->date_time);
                 $sessionEnd = $sessionStart->copy()->addMinutes($session->duration);
-                return $slotStartUTC->equalTo($sessionStart) && $slotEndUTC->equalTo($sessionEnd);
+                
+                // Log للتأكد من الأوقات
+                Log::info('Comparing times:', [
+                    'slot_start' => $slotStartUTC->format('Y-m-d H:i:s'),
+                    'slot_end' => $slotEndUTC->format('Y-m-d H:i:s'),
+                    'session_start' => $sessionStart->format('Y-m-d H:i:s'),
+                    'session_end' => $sessionEnd->format('Y-m-d H:i:s'),
+                ]);
+                
+                // استخدم format للمقارنة بدلاً من equalTo عشان نتجنب مشاكل الـ timezone
+                return $slotStartUTC->format('Y-m-d H:i:s') === $sessionStart->format('Y-m-d H:i:s') && 
+                       $slotEndUTC->format('Y-m-d H:i:s') === $sessionEnd->format('Y-m-d H:i:s');
             })->isNotEmpty();
 
             $isWithinAvailability = false;
