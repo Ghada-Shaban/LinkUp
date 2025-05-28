@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http;
+namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\CoachAvailability;
@@ -32,7 +32,7 @@ class BookingController extends Controller
             ->first();
 
         if (!$service) {
-            return response()->json(['message' => 'الخدمة دي مش تابعة للكوش'], 403);
+            return response()->json(['message' => 'الخدمة دي مش تابعة للكوتش'], 403);
         }
 
         $startOfMonth = Carbon::parse($month)->startOfMonth();
@@ -421,4 +421,3 @@ class BookingController extends Controller
         }
     }
 }
-?>
