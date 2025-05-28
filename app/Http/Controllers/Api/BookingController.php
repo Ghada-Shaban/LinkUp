@@ -257,46 +257,50 @@ class BookingController extends Controller
         $sessionDateTime = $startDate->setTime($startTime->hour, $startTime->minute, $startTime->second);
         $slotEnd = $sessionDateTime->copy()->addMinutes($durationMinutes);
 
+        // Adjust sessionDateTime to UTC for non-Mentorship Plan bookings
+        $adjustedSessionDateTime = $sessionDateTime->copy()->subHours(3);
+        $adjustedSlotEnd = $adjustedSessionDateTime->copy()->addMinutes($durationMinutes);
+
         $availability = CoachAvailability::where('coach_id', (int)$coachId)
             ->where('Day_Of_Week', $dayOfWeek)
-            ->where('Start_Time', '<=', $sessionDateTime->format('H:i:s'))
-            ->where('End_Time', '>=', $slotEnd->format('H:i:s'))
+            ->where('Start_Time', '<=', $adjustedSessionDateTime->format('H:i:s'))
+            ->where('End_Time', '>=', $adjustedSlotEnd->format('H:i:s'))
             ->first();
 
         if (!$availability) {
             Log::warning('السلوت المختار مش متاح', [
                 'trainee_id' => Auth::id(),
                 'coach_id' => $coachId,
-                'date' => $sessionDateTime->toDateString(),
+                'date' => $adjustedSessionDateTime->toDateString(),
                 'day_of_week' => $dayOfWeek,
-                'start_time' => $sessionDateTime->format('H:i'),
+                'start_time' => $adjustedSessionDateTime->format('H:i'),
                 'duration' => $durationMinutes,
             ]);
-            return response()->json(['message' => "السلوت المختار مش متاح في {$sessionDateTime->toDateString()}"], 400);
+            return response()->json(['message' => "السلوت المختار مش متاح في {$adjustedSessionDateTime->toDateString()}"], 400);
         }
 
         $conflictingSessions = NewSession::where('coach_id', (int)$coachId)
             ->whereIn('status', ['Pending', 'Scheduled'])
-            ->whereDate('date_time', $sessionDateTime->toDateString())
+            ->whereDate('date_time', $adjustedSessionDateTime->toDateString())
             ->whereDoesntHave('mentorshipRequest', function ($query) {
                 $query->where('requestable_type', GroupMentorship::class);
             })
             ->get()
-            ->filter(function ($existingSession) use ($sessionDateTime, $slotEnd) {
+            ->filter(function ($existingSession) use ($adjustedSessionDateTime, $adjustedSlotEnd) {
                 $reqStart = Carbon::parse($existingSession->date_time);
                 $reqEnd = $reqStart->copy()->addMinutes($existingSession->duration);
-                return $sessionDateTime->equalTo($reqStart) && $slotEnd->equalTo($reqEnd);
+                return $adjustedSessionDateTime->equalTo($reqStart) && $adjustedSlotEnd->equalTo($reqEnd);
             });
 
         if ($conflictingSessions->isNotEmpty()) {
             Log::warning('السلوت متعارض مع جلسات موجودة', [
                 'trainee_id' => Auth::id(),
                 'coach_id' => $coachId,
-                'date' => $sessionDateTime->toDateString(),
+                'date' => $adjustedSessionDateTime->toDateString(),
                 'day_of_week' => $dayOfWeek,
-                'start_time' => $sessionDateTime->format('H:i'),
+                'start_time' => $adjustedSessionDateTime->format('H:i'),
             ]);
-            return response()->json(['message' => "السلوت المختار محجوز بالفعل في {$sessionDateTime->toDateString()}"], 400);
+            return response()->json(['message' => "السلوت المختار محجوز بالفعل في {$adjustedSessionDateTime->toDateString()}"], 400);
         }
 
         $isMentorshipPlanBooking = $mentorshipRequest && $mentorshipRequest->requestable_type === \App\Models\MentorshipPlan::class;
@@ -334,6 +338,7 @@ class BookingController extends Controller
                     $sessionDateTime = $sessionDate->setTime($startTime->hour, $startTime->minute, $startTime->second);
                     $slotEnd = $sessionDateTime->copy()->addMinutes($durationMinutes);
 
+                    // Check availability using EEST time for Mentorship Plan
                     $availability = CoachAvailability::where('coach_id', (int)$coachId)
                         ->where('Day_Of_Week', $sessionDate->format('l'))
                         ->where('Start_Time', '<=', $sessionDateTime->format('H:i:s'))
@@ -344,6 +349,7 @@ class BookingController extends Controller
                         return response()->json(['message' => "السلوت المختار مش متاح في {$sessionDateTime->toDateString()}"], 400);
                     }
 
+                    // Check conflicting sessions using EEST time for Mentorship Plan
                     $conflictingSessions = NewSession::where('coach_id', (int)$coachId)
                         ->whereIn('status', ['Pending', 'Scheduled'])
                         ->whereDate('date_time', $sessionDateTime->toDateString())
@@ -404,7 +410,7 @@ class BookingController extends Controller
                     'trainee_id' => Auth::user()->User_ID,
                     'coach_id' => $coachId,
                     'service_id' => $service->service_id,
-                    'date_time' => $sessionDateTime->toDateTimeString(),
+                    'date_time' => $adjustedSessionDateTime->toDateTimeString(),
                     'duration' => $durationMinutes,
                 ];
 
