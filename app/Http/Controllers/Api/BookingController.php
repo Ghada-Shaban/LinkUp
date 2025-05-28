@@ -57,7 +57,7 @@ class BookingController extends Controller
                 return Carbon::parse($session->date_time)->toDateString();
             });
 
-        // مدة الجلسة 60 دقيقة
+        // مدة الجلسة ثابتة 60 دقيقة
         $durationMinutes = 60;
 
         // إنشاء قائمة بالتواريخ للشهر
