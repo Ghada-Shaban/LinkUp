@@ -19,7 +19,7 @@ class BookingController extends Controller
 {
     public function getAvailableDates(Request $request, $coachId)
     {
-        // Validate query parameters
+        // التحقق من المدخلات
         $request->validate([
             'service_id' => 'required|exists:services,service_id',
             'month' => 'required|date_format:Y-m',
@@ -28,24 +28,24 @@ class BookingController extends Controller
         $serviceId = $request->query('service_id');
         $month = $request->query('month');
 
-        // Verify that the coach provides the requested service
+        // التحقق إن الخدمة تابعة للكوتش
         $service = Service::where('service_id', $serviceId)
             ->where('coach_id', $coachId)
             ->first();
 
         if (!$service) {
-            return response()->json(['message' => 'Service does not belong to this coach'], 403);
+            return response()->json(['message' => 'الخدمة دي مش تابعة للكوتش ده'], 403);
         }
 
-        // Parse the month and determine the date range
+        // تحديد نطاق الشهر
         $startOfMonth = Carbon::parse($month)->startOfMonth();
         $endOfMonth = Carbon::parse($month)->endOfMonth();
         $currentDate = Carbon::today();
 
-        // Fetch coach's availability
+        // جلب مواعيد أفايلبيليتي الكوتش
         $availabilities = CoachAvailability::where('coach_id', $coachId)->get();
 
-        // Fetch booked sessions for the month (exclude Group Mentorship sessions)
+        // جلب الجلسات المحجوزة في الشهر (باستثناء جلسات Group Mentorship)
         $bookedSessions = NewSession::where('coach_id', $coachId)
             ->whereIn('status', ['Pending', 'Scheduled'])
             ->whereBetween('date_time', [$startOfMonth, $endOfMonth])
@@ -57,16 +57,16 @@ class BookingController extends Controller
                 return Carbon::parse($session->date_time)->toDateString();
             });
 
-        // Duration should be 60 minutes for all sessions
+        // مدة الجلسة 60 دقيقة
         $durationMinutes = 60;
 
-        // Generate list of dates for the month
+        // إنشاء قائمة بالتواريخ للشهر
         $dates = [];
         for ($date = $startOfMonth->copy(); $date->lte($endOfMonth); $date->addDay()) {
             $dayOfWeek = $date->format('l');
             $dateString = $date->toDateString();
 
-            // Check if the date is in the past
+            // التحقق لو التاريخ في الماضي
             if ($date->lt($currentDate)) {
                 $dates[] = [
                     'date' => $dateString,
@@ -76,9 +76,9 @@ class BookingController extends Controller
                 continue;
             }
 
-            // Check if the coach is available on this day
-            $availability = $availabilities->firstWhere('Day_Of_Week', $dayOfWeek);
-            if (!$availability) {
+            // التحقق لو الكوتش متاح في اليوم ده
+            $dayAvailabilities = $availabilities->where('Day_Of_Week', $dayOfWeek);
+            if ($dayAvailabilities->isEmpty()) {
                 $dates[] = [
                     'date' => $dateString,
                     'day_of_week' => $dayOfWeek,
@@ -87,51 +87,44 @@ class BookingController extends Controller
                 continue;
             }
 
-            // Calculate the status based on available slots
-            $status = 'available'; // Default to available
-            if (isset($bookedSessions[$dateString])) {
-                $sessionsOnDate = $bookedSessions[$dateString];
-
-                // Get availability range for the day
+            // التحقق من وجود تايم سلوتس متاحة في كل رينجات الأفايلبيليتي
+            $hasAvailableSlots = false;
+            foreach ($dayAvailabilities as $availability) {
                 $startTime = Carbon::parse($availability->Start_Time);
                 $endTime = Carbon::parse($availability->End_Time);
                 $currentTime = Carbon::parse($dateString)->setTime($startTime->hour, $startTime->minute);
                 $endOfAvailability = Carbon::parse($dateString)->setTime($endTime->hour, $endTime->minute);
-                $availableSlotsCount = 0;
-                $totalSlots = 0;
 
                 while ($currentTime->lt($endOfAvailability)) {
                     $slotEnd = $currentTime->copy()->addMinutes($durationMinutes);
                     if ($slotEnd->gt($endOfAvailability)) {
-                        break; // Don't include partial slots
+                        break; // تجنب السلوتس الجزئية
                     }
 
-                    $totalSlots++;
-
-                    // Check if this slot is booked
-                    $isSlotBooked = $sessionsOnDate->filter(function ($session) use ($currentTime, $slotEnd) {
+                    // التحقق لو السلوت محجوز
+                    $isSlotBooked = isset($bookedSessions[$dateString]) && $bookedSessions[$dateString]->filter(function ($session) use ($currentTime, $slotEnd) {
                         $sessionStart = Carbon::parse($session->date_time);
                         $sessionEnd = $sessionStart->copy()->addMinutes($session->duration);
                         return $currentTime->lt($sessionEnd) && $slotEnd->gt($sessionStart);
                     })->isNotEmpty();
 
                     if (!$isSlotBooked) {
-                        $availableSlotsCount++;
+                        $hasAvailableSlots = true;
+                        break; // لو لقينا سلوت متاح، نوقف اللوب
                     }
 
                     $currentTime->addMinutes($durationMinutes);
                 }
 
-                // If all slots are booked, mark the day as booked
-                if ($availableSlotsCount == 0 && $totalSlots > 0) {
-                    $status = 'booked';
+                if ($hasAvailableSlots) {
+                    break; // لو لقينا سلوت متاح في رينج واحد، نوقف فحص باقي الرينجات
                 }
             }
 
             $dates[] = [
                 'date' => $dateString,
                 'day_of_week' => $dayOfWeek,
-                'status' => $status,
+                'status' => $hasAvailableSlots ? 'available' : 'booked',
             ];
         }
 
