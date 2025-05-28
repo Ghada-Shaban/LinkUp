@@ -52,10 +52,16 @@ class BookingController extends Controller
             ->whereDoesntHave('mentorshipRequest', function ($query) {
                 $query->where('requestable_type', 'App\\Models\\GroupMentorship');
             })
+            ->fresh() // Ensure we get fresh data from the database
             ->get()
             ->groupBy(function ($session) {
                 return Carbon::parse($session->date_time)->toDateString();
             });
+
+        // Log booked sessions for debugging
+        Log::info('Booked Sessions for coach_id: ' . $coachId . ', month: ' . $month, [
+            'booked_sessions' => $bookedSessions->toArray(),
+        ]);
 
         // Duration should be 60 minutes for all sessions
         $durationMinutes = 60;
@@ -87,47 +93,57 @@ class BookingController extends Controller
                 continue;
             }
 
-            // Check if the date is fully booked by checking available slots
-            $status = 'available'; // Default to available
-            if (isset($bookedSessions[$dateString])) {
-                $sessionsOnDate = $bookedSessions[$dateString];
+            // Default status is available if the coach is available on this day
+            $status = 'available';
+            $totalSlots = 0;
+            $availableSlotsCount = 0;
 
-                // Get availability range for the day
-                $startTime = Carbon::parse($availability->Start_Time);
-                $endTime = Carbon::parse($availability->End_Time);
-                $totalMinutesAvailable = $endTime->diffInMinutes($startTime);
-                $totalSlots = $totalMinutesAvailable / $durationMinutes;
+            // Get availability range for the day
+            $startTime = Carbon::parse($availability->Start_Time);
+            $endTime = Carbon::parse($availability->End_Time);
+            $totalMinutesAvailable = $endTime->diffInMinutes($startTime);
+            $totalSlots = $totalMinutesAvailable / $durationMinutes;
 
-                // Generate slots for the day and check their status (in EEST)
-                $currentTime = Carbon::parse($dateString)->setTime($startTime->hour, $startTime->minute);
-                $endOfAvailability = Carbon::parse($dateString)->setTime($endTime->hour, $endTime->minute);
-                $availableSlotsCount = 0;
+            // Generate slots for the day and check their status (in EEST)
+            $currentTime = Carbon::parse($dateString)->setTime($startTime->hour, $startTime->minute);
+            $endOfAvailability = Carbon::parse($dateString)->setTime($endTime->hour, $endTime->minute);
+            $availableSlotsCount = 0;
 
-                while ($currentTime->lt($endOfAvailability)) {
-                    $slotEnd = $currentTime->copy()->addMinutes($durationMinutes);
-                    if ($slotEnd->gt($endOfAvailability)) {
-                        break; // Don't include partial slots
-                    }
+            while ($currentTime->lt($endOfAvailability)) {
+                $slotEnd = $currentTime->copy()->addMinutes($durationMinutes);
+                if ($slotEnd->gt($endOfAvailability)) {
+                    break; // Don't include partial slots
+                }
 
-                    // Check if this slot is booked (convert session times from UTC to EEST for comparison)
+                // Check if this slot is booked (convert session times from UTC to EEST for comparison)
+                $isSlotBooked = false;
+                if (isset($bookedSessions[$dateString])) {
+                    $sessionsOnDate = $bookedSessions[$dateString];
                     $isSlotBooked = $sessionsOnDate->filter(function ($session) use ($currentTime, $slotEnd) {
                         // Convert session times from UTC to EEST (add 3 hours)
                         $sessionStart = Carbon::parse($session->date_time)->addHours(3); // UTC to EEST
                         $sessionEnd = $sessionStart->copy()->addMinutes($session->duration);
                         return $currentTime->lt($sessionEnd) && $slotEnd->gt($sessionStart);
                     })->isNotEmpty();
-
-                    if (!$isSlotBooked) {
-                        $availableSlotsCount++;
-                    }
-
-                    $currentTime->addMinutes($durationMinutes);
                 }
 
-                // If no slots are available (all booked slots are occupied), mark the day as booked
-                if ($availableSlotsCount == 0 && $totalSlots > 0) {
-                    $status = 'booked';
+                if (!$isSlotBooked) {
+                    $availableSlotsCount++;
                 }
+
+                $currentTime->addMinutes($durationMinutes);
+            }
+
+            // Log the slot counts for debugging
+            Log::info('Slot counts for date: ' . $dateString, [
+                'total_slots' => $totalSlots,
+                'available_slots_count' => $availableSlotsCount,
+                'booked_slots' => $totalSlots - $availableSlotsCount,
+            ]);
+
+            // If no slots are available (all slots are booked), mark the day as booked
+            if ($totalSlots > 0 && $availableSlotsCount == 0) {
+                $status = 'booked';
             }
 
             $dates[] = [
