@@ -212,7 +212,7 @@ class BookingController extends Controller
             $slotStartFormatted = $currentTime->format('H:i');
             $slotEndFormatted = $slotEnd->format('H:i');
 
-            // مقارنة التوقيتات بدون إضافة 3 ساعات
+            // مقارنة التوقيتات في EEST
             $isBooked = $bookedSessions->contains(function ($session) use ($currentTime) {
                 $sessionStart = Carbon::parse($session->date_time);
                 Log::info('Comparing slot with session', [
@@ -267,10 +267,6 @@ class BookingController extends Controller
         $startTime = Carbon::parse($request->start_time);
         $dayOfWeek = $startDate->format('l');
         $sessionDateTime = $startDate->setTime($startTime->hour, $startTime->minute, $startTime->second);
-        
-        // تحويل التوقيت من EEST إلى UTC قبل التخزين
-        $sessionDateTime->setTimezone('UTC');
-
         $slotEnd = $sessionDateTime->copy()->addMinutes($durationMinutes);
 
         $availability = CoachAvailability::where('coach_id', (int)$coachId)
@@ -348,8 +344,6 @@ class BookingController extends Controller
                 for ($i = 0; $i < $sessionCount; $i++) {
                     $sessionDate = $startDate->copy()->addWeeks($i);
                     $sessionDateTime = $sessionDate->setTime($startTime->hour, $startTime->minute, $startTime->second);
-                    // تحويل التوقيت من EEST إلى UTC
-                    $sessionDateTime->setTimezone('UTC');
                     $slotEnd = $sessionDateTime->copy()->addMinutes($durationMinutes);
 
                     $availability = CoachAvailability::where('coach_id', (int)$coachId)
