@@ -279,8 +279,8 @@ class NewSessionController extends Controller
                                 $mentorshipSession = $service->mentorshipSession;
                                 if ($mentorshipSession) {
                                     Log::info('Mentorship session found for service', [
-                                        'service_id' => $service->service_id,
-                                        'mentorship_session' => $mentorshipSession->toArray()
+                                    'service_id' => $service->service_id,
+                                    'mentorship_session' => $mentorshipSession->toArray()
                                     ]);
                                     $serviceTitle = $mentorshipSession->session_type; // مثل "CV Review"
                                 } else {
@@ -339,18 +339,18 @@ class NewSessionController extends Controller
 
                 // استخدام التوقيت مباشرة (EEST) بدون تحويل
                 $dateTime = Carbon::parse($session->date_time);
-                $endTime = $dateTime->copy()->addMinutes($session->duration);
+                $endTime = $dateTime->copy()->addMinutes($session->duration); //
                 
                 // تنسيق التاريخ والوقت بالشكل المطلوب
                 $date = $dateTime->format('D, M d');
                 $startTimeFormatted = $dateTime->format('h:i A');
                 $endTimeFormatted = $endTime->format('h:i A');
                 $timeRange = "$startTimeFormatted - $endTimeFormatted";
-
+                
                 // تنسيق created_at و updated_at
                 $createdAt = Carbon::parse($session->created_at);
                 $updatedAt = Carbon::parse($session->updated_at);
-
+                
                 // تصحيح التاريخ لو في يوم زيادة
                 if ($createdAt->format('Y-m-d') === '2025-05-29') {
                     $createdAt->subDay();
@@ -360,8 +360,9 @@ class NewSessionController extends Controller
                 }
 
                 $sessionData = [
-                    'new_session_id' => $session->session_id,
+                    'new_session_id' => $session->new_session_id, // التصحيح هنا
                     'session_type' => $sessionType,
+                    'sessionType',
                     'title' => $serviceTitle,
                     'date' => $date,
                     'time_range' => $timeRange,
@@ -378,13 +379,14 @@ class NewSessionController extends Controller
                 }
 
                 return $sessionData;
+
             });
 
             Log::info("Fetching $type sessions for Trainee", [
-                'user_id' => $user->User_ID,
-                'sessions_count' => $sessions->count(),
-                'sessions' => $sessions->toArray()
-            ]);
+                    'user_id' => $user->User_ID,
+                    'sessions_count' => $sessions->count(),
+                    'sessions' => $sessions->toArray()
+                ]);
         } else {
             Log::warning('Unauthorized access to sessions', [
                 'user_id' => $user->User_ID,
@@ -406,7 +408,7 @@ class NewSessionController extends Controller
         $user = Auth::user();
         $session = NewSession::findOrFail($sessionId);
 
-        // التأكد أن المستخدم هو الكوتش أو الترايني لهذه الجلسة
+        // التأكد أن المستخدم هو الكوتش أو الترايني لهذهذه الجلسة
         $isAuthorized = false;
         if ($user->role_profile === 'Coach') {
             $isAuthorized = $session->coach_id == $user->User_ID;
@@ -469,7 +471,7 @@ class NewSessionController extends Controller
 
         if (!$isAuthorized) {
             Log::warning('Unauthorized attempt to cancel session', [
--login, $user->User_ID,
+                'user_id' => $user->User_ID,
                 'session_id' => $sessionId
             ]);
             return response()->json(['message' => 'Unauthorized'], 403);
