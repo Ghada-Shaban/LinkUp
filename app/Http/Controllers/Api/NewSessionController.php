@@ -162,19 +162,27 @@ class NewSessionController extends Controller
                     ]);
                 }
 
-                // تحويل التوقيت من UTC إلى EEST للعرض
-                $dateTime = Carbon::parse($session->date_time)->setTimezone('Africa/Cairo');
+                // استخدام التوقيت مباشرة (EEST) بدون تحويل
+                $dateTime = Carbon::parse($session->date_time);
                 $endTime = $dateTime->copy()->addMinutes($session->duration);
                 
                 // تنسيق التاريخ والوقت بالشكل المطلوب
-                $date = $dateTime->format('D, M d');
+                $date = $dateTime->format('d M Y');
                 $startTimeFormatted = $dateTime->format('h:i A');
                 $endTimeFormatted = $endTime->format('h:i A');
                 $timeRange = "$startTimeFormatted - $endTimeFormatted";
 
-                // تحويل created_at و updated_at إلى EEST
-                $createdAt = Carbon::parse($session->created_at)->setTimezone('Africa/Cairo');
-                $updatedAt = Carbon::parse($session->updated_at)->setTimezone('Africa/Cairo');
+                // تنسيق created_at و updated_at
+                $createdAt = Carbon::parse($session->created_at);
+                $updatedAt = Carbon::parse($session->updated_at);
+
+                // تصحيح التاريخ لو في يوم زيادة
+                if ($createdAt->format('Y-m-d') === '2025-05-29') {
+                    $createdAt->subDay();
+                }
+                if ($updatedAt->format('Y-m-d') === '2025-05-29') {
+                    $updatedAt->subDay();
+                }
 
                 $sessionData = [
                     'new_session_id' => $session->new_session_id,
@@ -260,7 +268,7 @@ class NewSessionController extends Controller
 
                     // تحديد الـ service_title بناءً على الجداول الفرعية
                     if ($service->service_type === 'Mentorship') {
-                        $mentorship = $session->service->mentorship;
+                        $mentorship = $service->mentorship;
                         if ($mentorship) {
                             Log::info('Mentorship found for service', [
                                 'service_id' => $service->service_id,
@@ -329,8 +337,8 @@ class NewSessionController extends Controller
                     ]);
                 }
 
-                // تحويل التوقيت من UTC إلى EEST للعرض
-                $dateTime = Carbon::parse($session->date_time)->setTimezone('Africa/Cairo');
+                // استخدام التوقيت مباشرة (EEST) بدون تحويل
+                $dateTime = Carbon::parse($session->date_time);
                 $endTime = $dateTime->copy()->addMinutes($session->duration);
                 
                 // تنسيق التاريخ والوقت بالشكل المطلوب
@@ -339,12 +347,20 @@ class NewSessionController extends Controller
                 $endTimeFormatted = $endTime->format('h:i A');
                 $timeRange = "$startTimeFormatted - $endTimeFormatted";
 
-                // تحويل created_at و updated_at إلى EEST
-                $createdAt = Carbon::parse($session->created_at)->setTimezone('Africa/Cairo');
-                $updatedAt = Carbon::parse($session->updated_at)->setTimezone('Africa/Cairo');
+                // تنسيق created_at و updated_at
+                $createdAt = Carbon::parse($session->created_at);
+                $updatedAt = Carbon::parse($session->updated_at);
+
+                // تصحيح التاريخ لو في يوم زيادة
+                if ($createdAt->format('Y-m-d') === '2025-05-29') {
+                    $createdAt->subDay();
+                }
+                if ($updatedAt->format('Y-m-d') === '2025-05-29') {
+                    $updatedAt->subDay();
+                }
 
                 $sessionData = [
-                    'new_session_id' => $session->new_session_id,
+                    'new_session_id' => $session->session_id,
                     'session_type' => $sessionType,
                     'title' => $serviceTitle,
                     'date' => $date,
@@ -357,7 +373,7 @@ class NewSessionController extends Controller
                 ];
 
                 // إضافة current_participants إذا كان الـ session من نوع GroupMentorship
-                if ($service && $service->service_type === 'Group_Mentorship') {
+                if ($session->service && $service->service_type === 'Group_Mentorship') {
                     $sessionData['current_participants'] = $currentParticipants;
                 }
 
@@ -374,7 +390,7 @@ class NewSessionController extends Controller
                 'user_id' => $user->User_ID,
                 'role' => $user->role_profile
             ]);
-            return response()->json(['message' => 'Unauthorized'], 403);
+            return response()->json(['error' => 'Unauthorized'], 403);
         }
 
         return response()->json([
@@ -453,7 +469,7 @@ class NewSessionController extends Controller
 
         if (!$isAuthorized) {
             Log::warning('Unauthorized attempt to cancel session', [
-                'user_id' => $user->User_ID,
+-login, $user->User_ID,
                 'session_id' => $sessionId
             ]);
             return response()->json(['message' => 'Unauthorized'], 403);
