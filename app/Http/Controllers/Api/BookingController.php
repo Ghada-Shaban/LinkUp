@@ -168,10 +168,6 @@ class BookingController extends Controller
             'availabilities' => $availabilities->toArray(),
         ]);
 
-        if ($availabilities->isEmpty()) {
-            return response()->json([]);
-        }
-
         // جمع كل رينجات الأفايلبيليتي لليوم
         $availabilityRanges = [];
         foreach ($availabilities as $availability) {
@@ -199,41 +195,72 @@ class BookingController extends Controller
             'booked_sessions' => $bookedSessions->toArray(),
         ]);
 
-        // إنشاء السلوتس بس جوا رينجات الأفايلبيليتي
+        // إنشاء السلوتس لكل اليوم (من 01:00 إلى 23:00)
         $slots = [];
         $durationMinutes = 60; // مدة الجلسة ثابتة 60 دقيقة
 
-        foreach ($availabilityRanges as $range) {
-            $currentTime = Carbon::parse($date)->setTime($range['start_hour'], $range['start_minute']);
-            $endOfAvailability = Carbon::parse($date)->setTime($range['end_hour'], $range['end_minute']);
+        // بداية من 01:00 في اليوم المختار
+        $startOfDay = Carbon::parse($date)->startOfDay()->addHour(1); // 01:00 EEST
+        $endOfDay = Carbon::parse($date)->startOfDay()->addHours(24); // 00:00 اليوم التالي
 
-            while ($currentTime->lt($endOfAvailability)) {
-                $slotEnd = $currentTime->copy()->addMinutes($durationMinutes);
-                if ($slotEnd->gt($endOfAvailability)) {
-                    break; // تجنب السلوتس الجزئية
+        $currentTime = $startOfDay->copy();
+        while ($currentTime->lt($endOfDay)) {
+            $slotEnd = $currentTime->copy()->addMinutes($durationMinutes);
+            if ($slotEnd->gt($endOfDay)) {
+                break; // تجنب السلوتس الجزئية
+            }
+
+            // تنسيق التوقيت بصيغة 24 ساعة (H:i)
+            $slotStartFormatted = $currentTime->format('H:i');
+            $slotEndFormatted = $slotEnd->format('H:i');
+
+            // التحقق لو السلوت محجوز
+            $isBooked = $bookedSessions->filter(function ($session) use ($currentTime, $slotEnd) {
+                $sessionStart = Carbon::parse($session->date_time);
+                $sessionEnd = $sessionStart->copy()->addMinutes($session->duration);
+                return $currentTime->lt($sessionEnd) && $slotEnd->gt($sessionStart);
+            })->isNotEmpty();
+
+            // التحقق لو السلوت جوا رينج أفايلبيليتي
+            $isWithinAvailability = false;
+            foreach ($availabilityRanges as $range) {
+                $currentHour = $currentTime->hour;
+                $currentMinute = $currentTime->minute;
+                $slotEndHour = $slotEnd->hour;
+                $slotEndMinute = $slotEnd->minute;
+
+                // تحويل الأوقات إلى دقايق للمقارنة
+                $currentTotalMinutes = ($currentHour * 60) + $currentMinute;
+                $slotEndTotalMinutes = ($slotEndHour * 60) + $slotEndMinute;
+                $rangeStartTotalMinutes = ($range['start_hour'] * 60) + $range['start_minute'];
+                $rangeEndTotalMinutes = ($range['end_hour'] * 60) + $range['end_minute'];
+
+                // التعامل مع الحالة الحدية للسلوت الأخير (23:00 إلى 00:00)
+                if ($slotEndHour == 0 && $slotEndMinute == 0) {
+                    $slotEndTotalMinutes = 1440; // 24:00 بالدقايق
                 }
 
-                // تنسيق التوقيت بصيغة 24 ساعة (H:i)
-                $slotStartFormatted = $currentTime->format('H:i');
-                $slotEndFormatted = $slotEnd->format('H:i');
-
-                // التحقق لو السلوت محجوز
-                $isBooked = $bookedSessions->filter(function ($session) use ($currentTime, $slotEnd) {
-                    $sessionStart = Carbon::parse($session->date_time);
-                    $sessionEnd = $sessionStart->copy()->addMinutes($session->duration);
-                    return $currentTime->lt($sessionEnd) && $slotEnd->gt($sessionStart);
-                })->isNotEmpty();
-
-                $status = $isBooked ? 'booked' : 'available';
-
-                $slots[] = [
-                    'start_time' => $slotStartFormatted,
-                    'end_time' => $slotEndFormatted,
-                    'status' => $status,
-                ];
-
-                $currentTime->addMinutes($durationMinutes);
+                if ($currentTotalMinutes >= $rangeStartTotalMinutes && $slotEndTotalMinutes <= $rangeEndTotalMinutes) {
+                    $isWithinAvailability = true;
+                    break;
+                }
             }
+
+            // تحديد الحالة
+            $status = 'unavailable'; // الحالة الافتراضية
+            if ($isBooked) {
+                $status = 'booked';
+            } elseif ($isWithinAvailability) {
+                $status = 'available';
+            }
+
+            $slots[] = [
+                'start_time' => $slotStartFormatted,
+                'end_time' => $slotEndFormatted,
+                'status' => $status,
+            ];
+
+            $currentTime->addMinutes($durationMinutes);
         }
 
         return response()->json($slots);
