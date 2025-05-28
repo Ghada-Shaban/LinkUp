@@ -205,14 +205,6 @@ class BookingController extends Controller
             $currentTimeEest = $currentTime->copy();
             $slotEndEest = $slotEnd->copy();
 
-            // Check if this slot is booked (convert database times to EEST for comparison)
-            $isBooked = $bookedSessions->filter(function ($session) use ($currentTimeEest, $slotEndEest) {
-                // Convert session times from UTC to EEST (add 3 hours)
-                $sessionStart = Carbon::parse($session->date_time)->addHours(3); // UTC to EEST
-                $sessionEnd = $sessionStart->copy()->addMinutes($session->duration);
-                return $currentTimeEest->lt($sessionEnd) && $slotEndEest->gt($sessionStart);
-            })->isNotEmpty();
-
             // Check if this slot falls within the coach's availability (compare hours and minutes in EEST)
             $isWithinAvailability = false;
             foreach ($availabilityRanges as $range) {
@@ -239,12 +231,20 @@ class BookingController extends Controller
                 }
             }
 
-            // Determine the status
-            $status = 'unavailable'; // Default status
-            if ($isBooked) {
-                $status = 'booked';
-            } elseif ($isWithinAvailability) {
-                $status = 'available';
+            // If the slot is not within availability, mark it as unavailable and skip booking check
+            if (!$isWithinAvailability) {
+                $status = 'unavailable';
+            } else {
+                // Check if this slot is booked (convert database times to EEST for comparison)
+                $isBooked = $bookedSessions->filter(function ($session) use ($currentTimeEest, $slotEndEest) {
+                    // Convert session times from UTC to EEST (add 3 hours)
+                    $sessionStart = Carbon::parse($session->date_time)->addHours(3); // UTC to EEST
+                    $sessionEnd = $sessionStart->copy()->addMinutes($session->duration);
+                    return $currentTimeEest->lt($sessionEnd) && $slotEndEest->gt($sessionStart);
+                })->isNotEmpty();
+
+                // Determine the status for slots within availability
+                $status = $isBooked ? 'booked' : 'available';
             }
 
             // Format the times in EEST for the response
