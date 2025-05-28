@@ -32,7 +32,7 @@ class BookingController extends Controller
             ->first();
 
         if (!$service) {
-            return response()->json(['message' => 'الخدمة دي مش تابعة للكوتش ده'], 403);
+            return response()->json(['message' => 'الخدمة دي مش تابعة للكوتش'], 403);
         }
 
         $startOfMonth = Carbon::parse($month)->startOfMonth();
@@ -183,12 +183,13 @@ class BookingController extends Controller
             $slotStartFormatted = $currentTime->format('H:i');
             $slotEndFormatted = $slotEnd->format('H:i');
 
-            // مقارنة التوقيتات بصيغة دقيقة
+            // مقارنة التوقيتات مع إضافة 3 ساعات للجلسات المحجوزة
             $isBooked = $bookedSessions->contains(function ($session) use ($currentTime) {
-                $sessionStart = Carbon::parse($session->date_time);
+                $sessionStart = Carbon::parse($session->date_time)->addHours(3);
                 Log::info('Comparing slot with session', [
                     'slot_start' => $currentTime->format('Y-m-d H:i:s'),
-                    'session_start' => $sessionStart->format('Y-m-d H:i:s'),
+                    'session_start_raw' => $session->date_time,
+                    'session_start_adjusted' => $sessionStart->format('Y-m-d H:i:s'),
                 ]);
                 return $sessionStart->format('Y-m-d H:i') === $currentTime->format('Y-m-d H:i');
             });
@@ -226,7 +227,7 @@ class BookingController extends Controller
 
         $service = Service::findOrFail($request->service_id);
         if ($service->coach_id !== (int)$coachId) {
-            return response()->json(['message' => 'الخدمة دي مش تابعة للكوتش ده'], 403);
+            return response()->json(['message' => 'الخدمة دي مش تابعة للكوتش'], 403);
         }
 
         $mentorshipRequestId = $request->mentorship_request_id;
@@ -287,7 +288,7 @@ class BookingController extends Controller
         try {
             if ($isMentorshipPlanBooking) {
                 if ($mentorshipRequest->trainee_id !== Auth::user()->User_ID) {
-                    return response()->json(['message' => 'طلب المنتورشيب ده مش بتاعك'], 403);
+                    return response()->json(['message' => 'طلب المنتورشيب مش بتاعك'], 403);
                 }
 
                 if ($mentorshipRequest->status !== 'accepted') {
@@ -303,7 +304,7 @@ class BookingController extends Controller
                 $remainingSessions = $sessionCount - $bookedSessionsCount;
 
                 if ($remainingSessions <= 0) {
-                    return response()->json(['message' => 'لقد حجزت بالفعل الحد الأقصى لعدد الجلسات لخطة المنتورشيب دي'], 400);
+                    return response()->json(['message' => 'لقد حجزت بالفعل الحد الأقصى لعدد الجلسات لخطة المنتورشيب'], 400);
                 }
 
                 if ($remainingSessions < $sessionCount) {
