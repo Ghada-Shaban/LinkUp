@@ -85,9 +85,9 @@ class BookingController extends Controller
                 $currentTime = Carbon::parse($dateString)->setTime($startTime->hour, $startTime->minute);
                 $endOfAvailability = Carbon::parse($dateString)->setTime($endTime->hour, $endTime->minute);
 
-                while ($currentTime->isBefore($endOfAvailability)) {
+                while ($currentTime->lt($endOfAvailability)) {
                     $slotEnd = $currentTime->copy()->addMinutes($durationMinutes);
-                    if ($slotEnd->isAfter($endOfAvailability)) {
+                    if ($slotEnd->gt($endOfAvailability)) {
                         break;
                     }
 
@@ -100,13 +100,20 @@ class BookingController extends Controller
                 }
             }
 
-            $allSlotsBooked = true;
+            $allSlotsBooked = !empty($availableSlots); // Only check if there are available slots
             foreach ($availableSlots as $slot) {
-                $isSlotBooked = isset($bookedSessions[$dateString]) && $bookedSessions[$dateString]->filter(function ($session) use ($slot) {
+                $isSlotBooked = isset($bookedSessions[$dateString]) && $bookedSessions[$dateString]->contains(function ($session) use ($slot) {
                     $sessionStart = Carbon::parse($session->date_time);
                     $sessionEnd = $sessionStart->copy()->addMinutes($session->duration);
-                    return $slot['start']->equalTo($sessionStart) && $slot['end']->equalTo($sessionEnd);
-                })->isNotEmpty();
+                    $isMatch = $slot['start']->equals($sessionStart) && $slot['end']->equals($sessionEnd);
+                    Log::info('Checking slot booking status', [
+                        'date' => $slot['start']->toDateString(),
+                        'slot_start' => $slot['start']->toDateTimeString(),
+                        'session_start' => $sessionStart->toDateTimeString(),
+                        'is_booked' => $isMatch,
+                    ]);
+                    return $isMatch;
+                });
 
                 if (!$isSlotBooked) {
                     $allSlotsBooked = false;
@@ -114,7 +121,7 @@ class BookingController extends Controller
                 }
             }
 
-            $status = $allSlotsBooked ? 'booked' : 'available';
+            $status = $allSlotsBooked && !empty($availableSlots) ? 'booked' : 'available';
 
             $dates[] = [
                 'date' => $dateString,
