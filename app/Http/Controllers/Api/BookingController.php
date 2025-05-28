@@ -48,7 +48,7 @@ class BookingController extends Controller
         // جلب الجلسات المحجوزة في الشهر (باستثناء جلسات Group Mentorship)
         $bookedSessions = NewSession::where('coach_id', $coachId)
             ->whereIn('status', ['Pending', 'Scheduled'])
-            ->whereBetween('date_time', [$startOfMonth, $endOfMonth]) // UTC
+            ->whereBetween('date_time', [$startOfMonth, $endOfMonth])
             ->whereDoesntHave('mentorshipRequest', function ($query) {
                 $query->where('requestable_type', 'App\\Models\\GroupMentorship');
             })
@@ -87,8 +87,8 @@ class BookingController extends Controller
                 continue;
             }
 
-            // التحقق من وجود تايم سلوتس متاحة في كل رينجات الأفايلبيليتي
-            $hasAvailableSlots = false;
+            // جمع كل السلوتس المتاحة في اليوم بناءً على الأفايلبيليتي
+            $availableSlots = [];
             foreach ($dayAvailabilities as $availability) {
                 $startTime = Carbon::parse($availability->Start_Time); // UTC
                 $endTime = Carbon::parse($availability->End_Time); // UTC
@@ -101,30 +101,36 @@ class BookingController extends Controller
                         break; // تجنب السلوتس الجزئية
                     }
 
-                    // التحقق لو السلوت محجوز
-                    $isSlotBooked = isset($bookedSessions[$dateString]) && $bookedSessions[$dateString]->filter(function ($session) use ($currentTime, $slotEnd) {
-                        $sessionStart = Carbon::parse($session->date_time); // UTC
-                        $sessionEnd = $sessionStart->copy()->addMinutes($session->duration);
-                        return $currentTime->lt($sessionEnd) && $slotEnd->gt($sessionStart);
-                    })->isNotEmpty();
-
-                    if (!$isSlotBooked) {
-                        $hasAvailableSlots = true;
-                        break; // لو لقينا سلوت متاح، نوقف اللوب
-                    }
+                    $availableSlots[] = [
+                        'start' => $currentTime->copy(),
+                        'end' => $slotEnd->copy(),
+                    ];
 
                     $currentTime->addMinutes($durationMinutes);
                 }
+            }
 
-                if ($hasAvailableSlots) {
-                    break; // لو لقينا سلوت متاح في رينج واحد، نوقف فحص باقي الرينجات
+            // التحقق لو كل السلوتس محجوزة
+            $allSlotsBooked = true;
+            foreach ($availableSlots as $slot) {
+                $isSlotBooked = isset($bookedSessions[$dateString]) && $bookedSessions[$dateString]->filter(function ($session) use ($slot) {
+                    $sessionStart = Carbon::parse($session->date_time); // UTC
+                    $sessionEnd = $sessionStart->copy()->addMinutes($session->duration);
+                    return $slot['start']->lt($sessionEnd) && $slot['end']->gt($sessionStart);
+                })->isNotEmpty();
+
+                if (!$isSlotBooked) {
+                    $allSlotsBooked = false;
+                    break;
                 }
             }
+
+            $status = $allSlotsBooked ? 'booked' : 'available';
 
             $dates[] = [
                 'date' => $dateString,
                 'day_of_week' => $dayOfWeek,
-                'status' => $hasAvailableSlots ? 'available' : 'booked',
+                'status' => $status,
             ];
         }
 
@@ -206,7 +212,7 @@ class BookingController extends Controller
             $isBooked = $bookedSessions->filter(function ($session) use ($slotStartUTC, $slotEndUTC) {
                 $sessionStart = Carbon::parse($session->date_time); // UTC
                 $sessionEnd = $sessionStart->copy()->addMinutes($session->duration);
-                return $slotStartUTC->lt($sessionEnd) && $slotEndUTC->gt($sessionStart);
+                return $slotStartUTC->equalTo($sessionStart) && $slotEndUTC->equalTo($sessionEnd);
             })->isNotEmpty();
 
             // التحقق لو السلوت جوا رينج أفايلبيليتي
