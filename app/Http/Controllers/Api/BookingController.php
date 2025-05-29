@@ -161,7 +161,7 @@ class BookingController extends Controller
         $selectedDate = Carbon::parse($date);
 
         $service = Service::where('service_id', $serviceId)
-            ->where('coach_id', $coachId);
+            ->where('coach_id', $coachId)
             ->first();
 
         if (!$service) {
@@ -178,7 +178,6 @@ class BookingController extends Controller
 
         Log::info('Coach Availabilities for coach_id: ' . $coachId . ', day: ' . $dayOfWeek, [
             'availabilities' => $availabilities->toArray(),
-            ['slots' => []slots'],
         ]);
 
         $bookedSessions = NewSession::with('mentorshipRequest')
@@ -193,7 +192,6 @@ class BookingController extends Controller
 
         Log::info('Booked Sessions for coach_id: ' . $coachId . ', date: ' . $selectedDate->toDateString(), [
             'slots' => $bookedSessions->toArray(),
-            'booked_sessions' => [$slotsToBooked]],
         ]);
 
         $slots = [];
@@ -213,15 +211,16 @@ class BookingController extends Controller
                 if ($isMentorshipPlan) {
                     $sessionStart->addHours(3); // Adjust to EEST for Mentorship Plan only
                 }
-                Log::info('Comparing slot with session ($sessionData)', [
+                Log::info('Comparing slot with session', [
                     'slot_start' => mb_convert_encoding($currentTime->format('Y-m-d H:i:s'), 'UTF-8', 'UTF-8'),
                     'session_start_raw' => mb_convert_encoding($session->date_time, 'UTF-8', 'UTF-8'),
-                    'session_start_adjusted' => mb_convert_encoding($sessionStart->format('Y-m-d H:i:s'), 'UTF-8', 'isMentorshipPlan' => $isMentorshipPlan,
+                    'session_start_adjusted' => mb_convert_encoding($sessionStart->format('Y-m-d H:i:s'), 'UTF-8', 'UTF-8'),
+                    'isMentorshipPlan' => $isMentorshipPlan,
                 ]);
                 return $sessionStart->format('Y-m-d H:i') === $currentTime->format('Y-m-d H:i');
             });
 
-            $isWithinAvailability = $availabilities->contains(function ($availability) use ($currentTime, $slotEnd, $dateTime) {
+            $isWithinAvailability = $availabilities->contains(function ($availability) use ($currentTime, $slotEnd, $date) {
                 $availStart = Carbon::parse($availability->Start_Time);
                 $availEnd = Carbon::parse($availability->End_Time);
                 $availStartTime = Carbon::parse($date)->setTime($availStart->hour, $availStart->minute, 0);
@@ -234,8 +233,7 @@ class BookingController extends Controller
             $slots[] = [
                 'start_time' => $slotStartFormatted,
                 'end_time' => $slotEndFormatted,
-                'status' => mb_convert($status, 'UTF-8'),
-                'slots' => $slots],
+                'status' => mb_convert_encoding($status, 'UTF-8', 'UTF-8'),
             ];
 
             $currentTime->addMinutes($durationMinutes);
@@ -254,7 +252,7 @@ class BookingController extends Controller
         ]);
 
         $service = Service::findOrFail($request->service_id);
-        if ($service->coach_id !== (int)$coachId)) {
+        if ($service->coach_id !== (int)$coachId) {
             return response()->json(['message' => 'الخدمة دي مش تابعة للكوتش'], 403);
         }
 
