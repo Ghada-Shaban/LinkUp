@@ -423,10 +423,10 @@ class BookingController extends Controller
 
                 return response()->json([
                     'message' => 'تم حجز كل الجلسات بنجاح. تابع الدفع باستخدام /api/payment/initiate/mentorship_request/' . $mentorshipRequestId,
-                    'sessions' => $createdSessions
+                    'sessions' => $createdSessions,
                 ]);
             } else {
-                $tempSessionId = Uuid::generate()->toString();
+                $tempSessionId = Uuid::uuid4()->toString();
 
                 $sessionData = [
                     'temp_session_id' => $tempSessionId,
@@ -435,10 +435,10 @@ class BookingController extends Controller
                     'service_id' => $service->service_id,
                     'date_time' => $sessionDateTime->toDateTimeString(),
                     'duration' => $durationMinutes,
-                ]);
+                ];
 
                 DB::commit();
-                Log::info('تم بدء حجز خدمة بخير، في انتظار الدفع', [
+                Log::info('تم بدء حجز خدمة عادية، في انتظار الدفع', [
                     'temp_session_id' => $tempSessionId,
                     'service_id' => $service->service_id,
                     'trainee_id' => Auth::user()->User_ID,
