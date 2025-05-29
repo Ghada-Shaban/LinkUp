@@ -116,7 +116,7 @@ class NewSessionController extends Controller
                             }
                         } else {
                             Log::warning('No mentorship found for service', [
-                                'service_id' => $service->service_id
+                                'service_id' => $session->service_id
                             ]);
                         }
                     } elseif ($service->service_type === 'Mock_Interview') {
@@ -159,18 +159,23 @@ class NewSessionController extends Controller
                     ]);
                 }
 
-                // تحويل التوقيت إلى EEST (UTC+3) only if not a Mentorship Plan
+                // تحويل التوقيت إلى EEST (Africa/Cairo)
                 $isMentorshipPlan = $session->mentorshipRequest && $session->mentorshipRequest->requestable_type === \App\Models\MentorshipPlan::class;
-                $dateTime = Carbon::parse($session->date_time);
-                if (!$isMentorshipPlan) {
-                    $dateTime->addHours(3);
+                $dateTime = Carbon::parse($session->date_time, 'UTC');
+
+                if ($isMentorshipPlan) {
+                    // تصحيح وقت Mentorship Plan لو مخزّن غلط (12:00:00)
+                    $dateTime = $dateTime->subHours(6); // طرح 6 ساعات عشان يبقى 06:00:00 UTC
+                } else {
+                    // الجلسات العادية: تحويل من UTC إلى EEST
+                    $dateTime = $dateTime->setTimezone('Africa/Cairo'); // يضيف 3 ساعات
                 }
 
                 Log::info('Session time processing', [
                     'session_id' => $session->new_session_id,
                     'is_mentorship_plan' => $isMentorshipPlan,
                     'original_time' => $session->date_time,
-                    'displayed_time' => $dateTime->toDateTimeString(),
+                    'corrected_time' => $dateTime->toDateTimeString(),
                 ]);
 
                 $endTime = $dateTime->copy()->addMinutes($session->duration);
@@ -343,18 +348,23 @@ class NewSessionController extends Controller
                     ]);
                 }
 
-                // تحويل التوقيت إلى EEST (UTC+3) only if not a Mentorship Plan
+                // تحويل التوقيت إلى EEST (Africa/Cairo)
                 $isMentorshipPlan = $session->mentorshipRequest && $session->mentorshipRequest->requestable_type === \App\Models\MentorshipPlan::class;
-                $dateTime = Carbon::parse($session->date_time);
-                if (!$isMentorshipPlan) {
-                    $dateTime->addHours(3);
+                $dateTime = Carbon::parse($session->date_time, 'UTC');
+
+                if ($isMentorshipPlan) {
+                    // تصحيح وقت Mentorship Plan لو مخزّن غلط (12:00:00)
+                    $dateTime = $dateTime->subHours(6); // طرح 6 ساعات عشان يبقى 06:00:00 UTC
+                } else {
+                    // الجلسات العادية: تحويل من UTC إلى EEST
+                    $dateTime = $dateTime->setTimezone('Africa/Cairo'); // يضيف 3 ساعات
                 }
 
                 Log::info('Session time processing', [
                     'session_id' => $session->new_session_id,
                     'is_mentorship_plan' => $isMentorshipPlan,
                     'original_time' => $session->date_time,
-                    'displayed_time' => $dateTime->toDateTimeString(),
+                    'corrected_time' => $dateTime->toDateTimeString(),
                 ]);
 
                 $endTime = $dateTime->copy()->addMinutes($session->duration);
