@@ -18,7 +18,6 @@ class MentorshipPlanController extends Controller
 {
     public function getAvailableDates(Request $request, $coachId)
     {
-        // نفس الكود اللي بعتيه، شغال مظبوط
         $request->validate([
             'service_id' => 'required|exists:services,service_id',
             'month' => 'required|date_format:Y-m',
@@ -49,7 +48,7 @@ class MentorshipPlanController extends Controller
             })
             ->get()
             ->groupBy(function ($session) {
-                return Carbon::parse($session->date_time)->toDateString();
+                return Carbon::parse($session->date_time)->format('Y-m-d');
             });
 
         $durationMinutes = 60;
@@ -57,11 +56,11 @@ class MentorshipPlanController extends Controller
 
         for ($date = $startOfMonth->copy(); $date->lte($endOfMonth); $date->addDay()) {
             $dayOfWeek = $date->format('l');
-            $dateString = $date->toDateString();
+            $dateString = $date->format('Y-m-d');
 
             if ($date->lt($currentDate)) {
                 $dates[] = [
-                    'date' => $dateString,
+                    'start_time' => $dateString,
                     'day_of_week' => $dayOfWeek,
                     'status' => 'unavailable',
                 ];
@@ -71,7 +70,7 @@ class MentorshipPlanController extends Controller
             $dayAvailabilities = $availabilities->where('Day_Of_Week', $dayOfWeek);
             if ($dayAvailabilities->isEmpty()) {
                 $dates[] = [
-                    'date' => $dateString,
+                    'start_time' => $dateString,
                     'day_of_week' => $dayOfWeek,
                     'status' => 'unavailable',
                 ];
@@ -93,7 +92,7 @@ class MentorshipPlanController extends Controller
 
                     $availableSlots[] = [
                         'start' => $currentTime->copy(),
-                        'end' => $slotEnd->copy(),
+                        'end_time' => $slotEnd->copy(),
                     ];
 
                     $currentTime->addMinutes($durationMinutes);
@@ -103,13 +102,13 @@ class MentorshipPlanController extends Controller
             $allSlotsBooked = !empty($availableSlots);
             foreach ($availableSlots as $slot) {
                 $isSlotBooked = isset($bookedSessions[$dateString]) && $bookedSessions[$dateString]->contains(function ($session) use ($slot, $dateString) {
-                    $sessionStart = Carbon::parse($session->date_time);
-                    $slotStartAdjusted = $slot['start']->copy();
+                    $sessionStart = Carbon::parse($session->date_time)->addHours(3); // Adjust to EEST
+                    $slotStartAdjusted = $slot['start'];
                     $isMatch = $slotStartAdjusted->format('Y-m-d H:i') === $sessionStart->format('Y-m-d H:i');
                     Log::info('Checking slot booking status', [
                         'date' => $dateString,
-                        'slot_start' => $slot['start']->toDateTimeString(),
-                        'slot_start_adjusted' => $slotStartAdjusted->toDateTimeString(),
+                        'slotStart' => $slot['start']->toDateTimeString(),
+                        'slotStartAdjusted' => $slotStartAdjusted->toDateTimeString(),
                         'session_start' => $sessionStart->toDateTimeString(),
                         'is_booked' => $isMatch,
                     ]);
@@ -124,14 +123,14 @@ class MentorshipPlanController extends Controller
 
             $status = $allSlotsBooked && !empty($availableSlots) ? 'booked' : 'available';
             Log::info('Day status determined', [
-                'date' => $dateString,
+                'date_time' => $dateString,
                 'status' => $status,
                 'available_slots_count' => count($availableSlots),
                 'booked_slots_count' => isset($bookedSessions[$dateString]) ? $bookedSessions[$dateString]->count() : 0,
             ]);
 
             $dates[] = [
-                'date' => $dateString,
+                'start_time' => $dateString,
                 'day_of_week' => $dayOfWeek,
                 'status' => $status,
             ];
@@ -142,7 +141,6 @@ class MentorshipPlanController extends Controller
 
     public function getAvailableSlots(Request $request, $coachId)
     {
-        // نفس الكود اللي بعتيه، شغال مظبوط
         $request->validate([
             'date' => 'required|date',
             'service_id' => 'required|exists:services,service_id',
@@ -195,12 +193,13 @@ class MentorshipPlanController extends Controller
         while ($currentTime->lt($endOfDay)) {
             $slotEnd = $currentTime->copy()->addMinutes($durationMinutes);
 
+            // Display time as EEST
             $slotStartFormatted = mb_convert_encoding($currentTime->format('H:i'), 'UTF-8', 'UTF-8');
             $slotEndFormatted = mb_convert_encoding($slotEnd->format('H:i'), 'UTF-8', 'UTF-8');
 
             $isBooked = $bookedSessions->contains(function ($session) use ($currentTime) {
                 $isMentorshipPlan = $session->mentorshipRequest && $session->mentorshipRequest->requestable_type === \App\Models\MentorshipPlan::class;
-                $sessionStart = Carbon::parse($session->date_time);
+                $sessionStart = Carbon::parse($session->date_time)->addHours(3); // Adjust to EEST
                 Log::info('Comparing slot with session', [
                     'slot_start' => mb_convert_encoding($currentTime->format('Y-m-d H:i:s'), 'UTF-8', 'UTF-8'),
                     'session_start_raw' => mb_convert_encoding($session->date_time, 'UTF-8', 'UTF-8'),
@@ -268,8 +267,8 @@ class MentorshipPlanController extends Controller
         $startDate = Carbon::parse($request->start_date);
         $startTime = Carbon::parse($request->start_time);
         $dayOfWeek = $startDate->format('l');
-        // Subtract 3 hours to store as 09:00:00 in database
-        $sessionDateTime = $startDate->setTime($startTime->hour, $startTime->minute, $startTime->second)->subHours(3);
+        // Store time as-is (EEST)
+        $sessionDateTime = $startDate->setTime($startTime->hour, $startTime->minute, $startTime->second);
         $slotEnd = $sessionDateTime->copy()->addMinutes($durationMinutes);
 
         Log::info('Initial session date time for Mentorship Plan', [
@@ -296,8 +295,8 @@ class MentorshipPlanController extends Controller
             $sessionsToBook = [];
             for ($i = 0; $i < $sessionCount; $i++) {
                 $sessionDate = $startDate->copy()->addWeeks($i);
-                // Subtract 3 hours to store as 09:00:00 in database
-                $sessionDateTime = $sessionDate->setTime($startTime->hour, $startTime->minute, $startTime->second)->subHours(3);
+                // Store time as-is (EEST)
+                $sessionDateTime = $sessionDate->setTime($startTime->hour, $startTime->minute, $startTime->second);
                 $slotEnd = $sessionDateTime->copy()->addMinutes($durationMinutes);
 
                 Log::info('Preparing Mentorship Plan session', [
@@ -309,8 +308,8 @@ class MentorshipPlanController extends Controller
 
                 $availability = CoachAvailability::where('coach_id', (int)$coachId)
                     ->where('Day_Of_Week', $sessionDate->format('l'))
-                    ->where('Start_Time', '<=', $sessionDateTime->addHours(3)->format('H:i:s'))
-                    ->where('End_Time', '>=', $slotEnd->addHours(3)->format('H:i:s'))
+                    ->where('Start_Time', '<=', $sessionDateTime->format('H:i:s'))
+                    ->where('End_Time', '>=', $slotEnd->format('H:i:s'))
                     ->first();
 
                 if (!$availability) {
