@@ -126,6 +126,8 @@ class NewSessionController extends Controller
                             Log::warning('No mentorship found for service', [
                                 'service_id' => $service->service_id
                             ]);
+                            $sessionType = 'mentorship';
+                            $serviceTitle = 'Mentorship';
                         }
                     } elseif ($service->service_type === 'Mock_Interview') {
                         $sessionType = 'mock interview';
@@ -303,7 +305,7 @@ class NewSessionController extends Controller
                                 }
                             } elseif ($mentorship->mentorship_type === 'Mentorship Plan') {
                                 $sessionType = 'mentorship plan';
-                                $mentorshipPlan = $mentorship->mentorshipPlan;
+                                $mentorshipPlan = $session->mentorshipRequest ? $session->mentorshipRequest->requestable : null;
                                 if ($mentorshipPlan) {
                                     Log::info('Mentorship plan found for service', [
                                         'service_id' => $service->service_id,
@@ -321,6 +323,8 @@ class NewSessionController extends Controller
                             Log::warning('No mentorship found for service', [
                                 'service_id' => $service->service_id
                             ]);
+                            $sessionType = 'mentorship';
+                            $serviceTitle = 'Mentorship';
                         }
                     } elseif ($service->service_type === 'Mock_Interview') {
                         $sessionType = 'mock interview';
