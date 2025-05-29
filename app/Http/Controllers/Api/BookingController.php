@@ -103,17 +103,15 @@ class BookingController extends Controller
             $allSlotsBooked = !empty($availableSlots); // Initialize as true only if there are slots
             foreach ($availableSlots as $slot) {
                 $isSlotBooked = isset($bookedSessions[$dateString]) && $bookedSessions[$dateString]->contains(function ($session) use ($slot, $dateString) {
-                    $sessionStart = Carbon::parse($session->date_time)->addHours(3); // Adjust for EEST
-                    $sessionEnd = $sessionStart->copy()->addMinutes($session->duration);
-                    // Compare only hours and minutes to avoid millisecond issues
-                    $isMatch = $slot['start']->format('Y-m-d H:i') === $sessionStart->format('Y-m-d H:i')
-                        && $slot['end']->format('Y-m-d H:i') === $sessionEnd->format('Y-m-d H:i');
+                    $sessionStart = Carbon::parse($session->date_time); // Use UTC time from DB
+                    // Adjust slot start to match the EEST comparison logic in getAvailableSlots
+                    $slotStartAdjusted = $slot['start']->copy()->subHours(3); // Convert slot to UTC for comparison
+                    $isMatch = $slotStartAdjusted->format('Y-m-d H:i') === $sessionStart->format('Y-m-d H:i');
                     Log::info('Checking slot booking status', [
                         'date' => $dateString,
                         'slot_start' => $slot['start']->toDateTimeString(),
+                        'slot_start_adjusted' => $slotStartAdjusted->toDateTimeString(),
                         'session_start' => $sessionStart->toDateTimeString(),
-                        'slot_end' => $slot['end']->toDateTimeString(),
-                        'session_end' => $sessionEnd->toDateTimeString(),
                         'is_booked' => $isMatch,
                     ]);
                     return $isMatch;
