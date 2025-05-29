@@ -156,9 +156,9 @@ class PaymentController extends Controller
                     $currentParticipantsCount = count($traineeIds);
                     if (!in_array($mentorshipRequest->trainee_id, $traineeIds)) {
                         $traineeIds[] = $mentorshipRequest->trainee_id;
-                        $groupMentorship->current_participants = json_encode($traineeIds);
+                        $groupMentorship->current_participants = json_encode($traineeIds); // Ensure JSON encoding
                         $currentParticipantsCount = count($traineeIds);
-                        $groupMentorship->is_active = $currentParticipantsCount >= $groupMentorship->minimum_participants ? 1 : 0;
+                        $groupMentorship->is_active = ($currentParticipantsCount >= $groupMentorship->minimum_participants) ? 1 : 0;
                         $groupMentorship->save();
                     }
 
