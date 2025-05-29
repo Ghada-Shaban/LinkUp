@@ -17,6 +17,7 @@ use Ramsey\Uuid\Uuid;
 
 class BookingController extends Controller
 {
+    // دالة getAvailableDates بدون تغيير
     public function getAvailableDates(Request $request, $coachId)
     {
         $request->validate([
@@ -142,6 +143,7 @@ class BookingController extends Controller
         return response()->json($dates);
     }
 
+    // دالة getAvailableSlots بدون تغيير
     public function getAvailableSlots(Request $request, $coachId)
     {
         $request->validate([
@@ -174,7 +176,6 @@ class BookingController extends Controller
             'availabilities' => $availabilities->toArray(),
         ]);
 
-        // جلب الجلسات المحجوزة للتاريخ المحدد مع تحميل mentorshipRequest
         $bookedSessions = NewSession::with('mentorshipRequest')
             ->where('coach_id', $coachId)
             ->whereIn('status', ['Pending', 'Scheduled'])
@@ -200,7 +201,6 @@ class BookingController extends Controller
             $slotStartFormatted = $currentTime->format('H:i');
             $slotEndFormatted = $slotEnd->format('H:i');
 
-            // Check if the slot is booked, adjust for EEST only if not Mentorship Plan
             $isBooked = $bookedSessions->contains(function ($session) use ($currentTime) {
                 $isMentorshipPlan = $session->mentorshipRequest && $session->mentorshipRequest->requestable_type === \App\Models\MentorshipPlan::class;
                 $sessionStart = Carbon::parse($session->date_time);
@@ -238,6 +238,7 @@ class BookingController extends Controller
         return response()->json($slots);
     }
 
+    // دالة bookService مع التعديل
     public function bookService(Request $request, $coachId)
     {
         $request->validate([
@@ -346,14 +347,10 @@ class BookingController extends Controller
                     $sessionDateTime = $sessionDate->setTime($startTime->hour, $startTime->minute, $startTime->second);
                     $slotEnd = $sessionDateTime->copy()->addMinutes($durationMinutes);
 
-                    // Adjust time for Mentorship Plan to store as EEST without UTC conversion
-                    $adjustedDateTime = $sessionDateTime->copy()->subHours(3); // Compensate for UTC conversion
-
                     Log::info('Preparing Mentorship Plan session', [
                         'mentorship_request_id' => $mentorshipRequestId,
                         'session_index' => $i,
-                        'original_date_time' => $sessionDateTime->toDateTimeString(),
-                        'adjusted_date_time' => $adjustedDateTime->toDateTimeString(),
+                        'date_time' => $sessionDateTime->toDateTimeString(),
                         'timezone' => $sessionDateTime->getTimezone()->getName(),
                     ]);
 
@@ -385,7 +382,7 @@ class BookingController extends Controller
                     }
 
                     $sessionsToBook[] = [
-                        'date_time' => $adjustedDateTime->toDateTimeString(),
+                        'date_time' => $sessionDateTime->toDateTimeString(),
                         'duration' => $durationMinutes,
                     ];
                 }
