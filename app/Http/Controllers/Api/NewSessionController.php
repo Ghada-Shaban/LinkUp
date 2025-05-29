@@ -44,25 +44,27 @@ class NewSessionController extends Controller
         $sessions = collect();
 
         if ($user->role_profile === 'Coach') {
-            $query = NewSession::with(['service.mentorship.mentorshipPlan', 'service.mentorship.mentorshipSession', 'trainees', 'mentorshipRequest'])
-                ->where('coach_id', $user->User_ID)
-                ->whereIn('status', $statuses);
+            $query = NewSession::with([
+                'service.mentorship.mentorshipPlan',
+                'service.mentorship.mentorshipSession',
+                'trainees',
+                'mentorshipRequest.requestable'
+            ])->where('coach_id', $user->User_ID)
+              ->whereIn('status', $statuses);
 
             if ($timeCondition) {
                 $query->where($timeCondition[0], $timeCondition[1], $timeCondition[2]);
             }
 
             $sessions = $query->get()->map(function ($session) {
-                // جلب الـ trainee من العلاقة
+                // جلب الـ trainee
                 $trainee = $session->trainees;
-                $traineeName = 'N/A';
+                $traineeName = $trainee ? ($trainee->full_name ?? 'N/A') : 'N/A';
                 if ($trainee) {
-                    $traineeName = $trainee->full_name ?? 'N/A';
                     Log::info('Trainee found for session', [
                         'session_id' => $session->new_session_id,
                         'trainee_id' => $session->trainee_id,
-                        'trainee_name' => $traineeName,
-                        'trainee_data' => $trainee->toArray()
+                        'trainee_name' => $traineeName
                     ]);
                 } else {
                     Log::warning('Trainee not found for session', [
@@ -71,7 +73,7 @@ class NewSessionController extends Controller
                     ]);
                 }
 
-                // جلب الـ service من العلاقة
+                // جلب الـ service
                 $service = $session->service;
                 $sessionType = 'N/A';
                 $serviceTitle = 'N/A';
@@ -81,27 +83,31 @@ class NewSessionController extends Controller
                     Log::info('Service found for session', [
                         'session_id' => $session->new_session_id,
                         'service_id' => $session->service_id,
-                        'service' => $service->toArray()
+                        'service_type' => $service->service_type
                     ]);
 
                     if ($service->service_type === 'Mentorship') {
                         $mentorship = $service->mentorship;
                         if ($mentorship) {
                             Log::info('Mentorship found for service', [
+                                'session_id' => $session->new_session_id,
                                 'service_id' => $service->service_id,
-                                'mentorship' => $mentorship->toArray()
+                                'mentorship_type' => $mentorship->mentorship_type
                             ]);
+
                             if ($mentorship->mentorship_type === 'Mentorship session') {
                                 $sessionType = 'mentorship sessions';
                                 $mentorshipSession = $mentorship->mentorshipSession;
                                 if ($mentorshipSession) {
-                                    Log::info('Mentorship session found for service', [
+                                    Log::info('Mentorship session found', [
+                                        'session_id' => $session->new_session_id,
                                         'service_id' => $service->service_id,
-                                        'mentorship_session' => $mentorshipSession->toArray()
+                                        'session_type' => $mentorshipSession->session_type
                                     ]);
                                     $serviceTitle = $mentorshipSession->session_type;
                                 } else {
-                                    Log::warning('Mentorship session not found for service', [
+                                    Log::warning('Mentorship session not found', [
+                                        'session_id' => $session->new_session_id,
                                         'service_id' => $service->service_id
                                     ]);
                                     $serviceTitle = 'Mentorship Session';
@@ -110,13 +116,15 @@ class NewSessionController extends Controller
                                 $sessionType = 'mentorship plan';
                                 $mentorshipPlan = $mentorship->mentorshipPlan;
                                 if ($mentorshipPlan) {
-                                    Log::info('Mentorship plan found for service', [
+                                    Log::info('Mentorship plan found', [
+                                        'session_id' => $session->new_session_id,
                                         'service_id' => $service->service_id,
-                                        'mentorship_plan' => $mentorshipPlan->toArray()
+                                        'plan_title' => $mentorshipPlan->title
                                     ]);
                                     $serviceTitle = $mentorshipPlan->title;
                                 } else {
-                                    Log::warning('Mentorship plan not found for service', [
+                                    Log::warning('Mentorship plan not found', [
+                                        'session_id' => $session->new_session_id,
                                         'service_id' => $service->service_id
                                     ]);
                                     $serviceTitle = 'Mentorship Plan';
@@ -134,13 +142,14 @@ class NewSessionController extends Controller
                         $sessionType = 'mock interview';
                         $mockInterview = $service->mockInterview;
                         if ($mockInterview) {
-                            Log::info('Mock Interview found for service', [
-                                'service_id' => $service->service_id,
-                                'mock_interview' => $mockInterview->toArray()
+                            Log::info('Mock Interview found', [
+                                'session_id' => $session->new_session_id,
+                                'service_id' => $service->service_id
                             ]);
                             $serviceTitle = $mockInterview->interview_type . ' (' . $mockInterview->interview_level . ')';
                         } else {
-                            Log::warning('Mock Interview not found for service', [
+                            Log::warning('Mock Interview not found', [
+                                'session_id' => $session->new_session_id,
                                 'service_id' => $service->service_id
                             ]);
                             $serviceTitle = 'Mock Interview';
@@ -149,14 +158,15 @@ class NewSessionController extends Controller
                         $sessionType = 'group mentorship';
                         $groupMentorship = $service->groupMentorship;
                         if ($groupMentorship) {
-                            Log::info('Group Mentorship found for service', [
-                                'service_id' => $service->service_id,
-                                'group_mentorship' => $groupMentorship->toArray()
+                            Log::info('Group Mentorship found', [
+                                'session_id' => $session->new_session_id,
+                                'service_id' => $service->service_id
                             ]);
                             $serviceTitle = $groupMentorship->title;
                             $currentParticipants = $groupMentorship->current_participants;
                         } else {
-                            Log::warning('Group Mentorship not found for service', [
+                            Log::warning('Group Mentorship not found', [
+                                'session_id' => $session->new_session_id,
                                 'service_id' => $service->service_id
                             ]);
                             $serviceTitle = 'Group Mentorship';
@@ -173,7 +183,7 @@ class NewSessionController extends Controller
                     ]);
                 }
 
-                // تحويل التوقيت إلى EEST (UTC+3) only if not a Mentorship Plan
+                // تحويل التوقيت إلى EEST (UTC+3) إلا لو Mentorship Plan
                 $isMentorshipPlan = $session->mentorshipRequest && $session->mentorshipRequest->requestable_type === \App\Models\MentorshipPlan::class;
                 $dateTime = Carbon::parse($session->date_time);
                 if (!$isMentorshipPlan) {
@@ -188,18 +198,12 @@ class NewSessionController extends Controller
                 ]);
 
                 $endTime = $dateTime->copy()->addMinutes($session->duration);
-
-                // تنسيق التاريخ والوقت بالشكل المطلوب
                 $date = $dateTime->format('d M Y');
-                $startTimeFormatted = $dateTime->format('h:i A');
-                $endTimeFormatted = $endTime->format('h:i A');
-                $timeRange = "$startTimeFormatted - $endTimeFormatted";
+                $timeRange = $dateTime->format('h:i A') . ' - ' . $endTime->format('h:i A');
 
                 // تنسيق created_at و updated_at
                 $createdAt = Carbon::parse($session->created_at);
                 $updatedAt = Carbon::parse($session->updated_at);
-
-                // تصحيح التاريخ لو في يوم زيادة
                 if ($createdAt->format('Y-m-d') === '2025-05-29') {
                     $createdAt->subDay();
                 }
@@ -220,7 +224,6 @@ class NewSessionController extends Controller
                     'updated_at' => $updatedAt->toDateTimeString(),
                 ];
 
-                // إضافة current_participants إذا كان الـ session من نوع GroupMentorship
                 if ($service && $service->service_type === 'Group_Mentorship') {
                     $sessionData['current_participants'] = $currentParticipants;
                 }
@@ -234,42 +237,37 @@ class NewSessionController extends Controller
                 'sessions' => $sessions->toArray()
             ]);
         } elseif ($user->role_profile === 'Trainee') {
-            $query = NewSession::with(['service.mentorship.mentorshipPlan', 'service.mentorship.mentorshipSession', 'coach.user', 'mentorshipRequest.requestable'])
-                ->where('trainee_id', $user->User_ID)
-                ->whereIn('status', $statuses);
+            $query = NewSession::with([
+                'service.mentorship.mentorshipPlan',
+                'service.mentorship.mentorshipSession',
+                'coach.user',
+                'mentorshipRequest.requestable'
+            ])->where('trainee_id', $user->User_ID)
+              ->whereIn('status', $statuses);
 
             if ($timeCondition) {
                 $query->where($timeCondition[0], $timeCondition[1], $timeCondition[2]);
             }
 
             $sessions = $query->get()->map(function ($session) {
-                // جلب الـ coach من العلاقة
+                // جلب الـ coach
                 $coach = $session->coach;
                 $coachName = 'N/A';
-                if ($coach) {
-                    $coachUser = $coach->user;
-                    if ($coachUser) {
-                        $coachName = $coachUser->full_name ?? 'N/A';
-                        Log::info('Coach found for session', [
-                            'session_id' => $session->new_session_id,
-                            'coach_id' => $session->coach_id,
-                            'coach_name' => $coachName,
-                            'user_data' => $coachUser->toArray()
-                        ]);
-                    } else {
-                        Log::warning('Coach user not found in users table for session', [
-                            'session_id' => $session->new_session_id,
-                            'coach_id' => $session->coach_id
-                        ]);
-                    }
+                if ($coach && $coach->user) {
+                    $coachName = $coach->user->full_name ?? 'N/A';
+                    Log::info('Coach found for session', [
+                        'session_id' => $session->new_session_id,
+                        'coach_id' => $session->coach_id,
+                        'coach_name' => $coachName
+                    ]);
                 } else {
-                    Log::warning('Coach not found in coaches table for session', [
+                    Log::warning('Coach not found for session', [
                         'session_id' => $session->new_session_id,
                         'coach_id' => $session->coach_id
                     ]);
                 }
 
-                // جلب الـ service من العلاقة
+                // جلب الـ service
                 $service = $session->service;
                 $sessionType = 'N/A';
                 $serviceTitle = 'N/A';
@@ -279,43 +277,49 @@ class NewSessionController extends Controller
                     Log::info('Service found for session', [
                         'session_id' => $session->new_session_id,
                         'service_id' => $session->service_id,
-                        'service' => $service->toArray()
+                        'service_type' => $service->service_type
                     ]);
 
                     if ($service->service_type === 'Mentorship') {
                         $mentorship = $service->mentorship;
                         if ($mentorship) {
                             Log::info('Mentorship found for service', [
+                                'session_id' => $session->new_session_id,
                                 'service_id' => $service->service_id,
-                                'mentorship' => $mentorship->toArray()
+                                'mentorship_type' => $mentorship->mentorship_type
                             ]);
+
                             if ($mentorship->mentorship_type === 'Mentorship session') {
                                 $sessionType = 'mentorship sessions';
                                 $mentorshipSession = $mentorship->mentorshipSession;
                                 if ($mentorshipSession) {
-                                    Log::info('Mentorship session found for service', [
+                                    Log::info('Mentorship session found', [
+                                        'session_id' => $session->new_session_id,
                                         'service_id' => $service->service_id,
-                                        'mentorship_session' => $mentorshipSession->toArray()
+                                        'session_type' => $mentorshipSession->session_type
                                     ]);
                                     $serviceTitle = $mentorshipSession->session_type;
                                 } else {
-                                    Log::warning('Mentorship session not found for service', [
+                                    Log::warning('Mentorship session not found', [
+                                        'session_id' => $session->new_session_id,
                                         'service_id' => $service->service_id
                                     ]);
                                     $serviceTitle = 'Mentorship Session';
                                 }
                             } elseif ($mentorship->mentorship_type === 'Mentorship Plan') {
                                 $sessionType = 'mentorship plan';
-                                $mentorshipPlan = $session->mentorshipRequest ? $session->mentorshipRequest->requestable : $mentorship->mentorshipPlan;
+                                $mentorshipPlan = $session->mentorshipRequest && $session->mentorshipRequest->requestable
+                                    ? $session->mentorshipRequest->requestable
+                                    : $mentorship->mentorshipPlan;
                                 if ($mentorshipPlan) {
-                                    Log::info('Mentorship plan found for service', [
+                                    Log::info('Mentorship plan found', [
                                         'session_id' => $session->new_session_id,
                                         'service_id' => $service->service_id,
-                                        'mentorship_plan' => $mentorshipPlan->toArray()
+                                        'plan_title' => $mentorshipPlan->title
                                     ]);
                                     $serviceTitle = $mentorshipPlan->title;
                                 } else {
-                                    Log::warning('Mentorship plan not found for service', [
+                                    Log::warning('Mentorship plan not found', [
                                         'session_id' => $session->new_session_id,
                                         'service_id' => $service->service_id
                                     ]);
@@ -334,13 +338,14 @@ class NewSessionController extends Controller
                         $sessionType = 'mock interview';
                         $mockInterview = $service->mockInterview;
                         if ($mockInterview) {
-                            Log::info('Mock Interview found for service', [
-                                'service_id' => $service->service_id,
-                                'mock_interview' => $mockInterview->toArray()
+                            Log::info('Mock Interview found', [
+                                'session_id' => $session->new_session_id,
+                                'service_id' => $service->service_id
                             ]);
                             $serviceTitle = $mockInterview->interview_type . ' (' . $mockInterview->interview_level . ')';
                         } else {
-                            Log::warning('Mock Interview not found for service', [
+                            Log::warning('Mock Interview not found', [
+                                'session_id' => $session->new_session_id,
                                 'service_id' => $service->service_id
                             ]);
                             $serviceTitle = 'Mock Interview';
@@ -349,15 +354,16 @@ class NewSessionController extends Controller
                         $sessionType = 'group mentorship';
                         $groupMentorship = $service->groupMentorship;
                         if ($groupMentorship) {
-                            Log::info('Group Mentorship found for service', [
-                                'service_id' => $service->service_id,
-                                'group_mentorship' => $groupMentorship->toArray()
+                            Log::info('Group Mentorship found', [
+                                'session_id' => $session->new_session_id,
+                                'service_id' => $service->service_id
                             ]);
                             $serviceTitle = $groupMentorship->title;
                             $currentParticipants = $groupMentorship->current_participants;
                         } else {
-                            Log::warning('Group Mentorship not found for service', [
-                                'service_id' => $service->service_id
+                            Log::warning('Group Mentorship not found', [
+                                'session_id' => $session->new_session_id,
+                                'service_id' => $session->service_id
                             ]);
                             $serviceTitle = 'Group Mentorship';
                             $currentParticipants = 0;
@@ -373,7 +379,7 @@ class NewSessionController extends Controller
                     ]);
                 }
 
-                // تحويل التوقيت إلى EEST (UTC+3) only if not a Mentorship Plan
+                // تحويل التوقيت إلى EEST (UTC+3) إلا لو Mentorship Plan
                 $isMentorshipPlan = $session->mentorshipRequest && $session->mentorshipRequest->requestable_type === \App\Models\MentorshipPlan::class;
                 $dateTime = Carbon::parse($session->date_time);
                 if (!$isMentorshipPlan) {
@@ -388,18 +394,12 @@ class NewSessionController extends Controller
                 ]);
 
                 $endTime = $dateTime->copy()->addMinutes($session->duration);
-
-                // تنسيق التاريخ والوقت بالشكل المطلوب
                 $date = $dateTime->format('d M Y');
-                $startTimeFormatted = $dateTime->format('h:i A');
-                $endTimeFormatted = $endTime->format('h:i A');
-                $timeRange = "$startTimeFormatted - $endTimeFormatted";
+                $timeRange = $dateTime->format('h:i A') . ' - ' . $endTime->format('h:i A');
 
                 // تنسيق created_at و updated_at
                 $createdAt = Carbon::parse($session->created_at);
                 $updatedAt = Carbon::parse($session->updated_at);
-
-                // تصحيح التاريخ لو في يوم زيادة
                 if ($createdAt->format('Y-m-d') === '2025-05-29') {
                     $createdAt->subDay();
                 }
@@ -420,7 +420,6 @@ class NewSessionController extends Controller
                     'updated_at' => $updatedAt->toDateTimeString(),
                 ];
 
-                // إضافة current_participants إذا كان الـ session من نوع GroupMentorship
                 if ($service && $service->service_type === 'Group_Mentorship') {
                     $sessionData['current_participants'] = $currentParticipants;
                 }
@@ -454,13 +453,8 @@ class NewSessionController extends Controller
         $user = Auth::user();
         $session = NewSession::findOrFail($sessionId);
 
-        // التأكد أن المستخدم هو الكوتش أو الترايني لهذه الجلسة
-        $isAuthorized = false;
-        if ($user->role_profile === 'Coach') {
-            $isAuthorized = $session->coach_id == $user->User_ID;
-        } elseif ($user->role_profile === 'Trainee') {
-            $isAuthorized = $session->trainee_id == $user->User_ID;
-        }
+        $isAuthorized = $user->role_profile === 'Coach' && $session->coach_id == $user->User_ID ||
+                        $user->role_profile === 'Trainee' && $session->trainee_id == $user->User_ID;
 
         if (!$isAuthorized) {
             Log::warning('Unauthorized attempt to complete session', [
@@ -484,15 +478,13 @@ class NewSessionController extends Controller
                 'session_id' => $sessionId,
                 'end_time' => $sessionEndTime
             ]);
-            return response()->json(['message' => 'Session cannot be completed yet. It has not ended.'], 400);
+            return response()->json(['message' => 'Session cannot be completed yet.'], 400);
         }
 
         $session->status = 'completed';
         $session->save();
 
-        Log::info('Session marked as completed', [
-            'session_id' => $sessionId
-        ]);
+        Log::info('Session marked as completed', ['session_id' => $sessionId]);
 
         return response()->json([
             'message' => 'Session marked as completed successfully!',
@@ -508,12 +500,8 @@ class NewSessionController extends Controller
         $user = Auth::user();
         $session = NewSession::findOrFail($sessionId);
 
-        $isAuthorized = false;
-        if ($user->role_profile === 'Coach') {
-            $isAuthorized = $session->coach_id == $user->User_ID;
-        } elseif ($user->role_profile === 'Trainee') {
-            $isAuthorized = $session->trainee_id == $user->User_ID;
-        }
+        $isAuthorized = $user->role_profile === 'Coach' && $session->coach_id == $user->User_ID ||
+                        $user->role_profile === 'Trainee' && $session->trainee_id == $user->User_ID;
 
         if (!$isAuthorized) {
             Log::warning('Unauthorized attempt to cancel session', [
@@ -523,7 +511,7 @@ class NewSessionController extends Controller
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        if ($session->status !== 'Scheduled' && $session->status !== 'pending') {
+        if (!in_array($session->status, ['Scheduled', 'pending'])) {
             Log::warning('Session cannot be cancelled', [
                 'session_id' => $sessionId,
                 'status' => $session->status
@@ -534,9 +522,7 @@ class NewSessionController extends Controller
         $session->status = 'cancelled';
         $session->save();
 
-        Log::info('Session cancelled', [
-            'session_id' => $sessionId
-        ]);
+        Log::info('Session cancelled', ['session_id' => $sessionId]);
 
         return response()->json([
             'message' => 'Session cancelled successfully!',
@@ -549,9 +535,7 @@ class NewSessionController extends Controller
      */
     public function updateMeetingLink(Request $request, $sessionId)
     {
-        $request->validate([
-            'meeting_link' => 'required|url'
-        ]);
+        $request->validate(['meeting_link' => 'required|url']);
 
         $user = Auth::user();
         $session = NewSession::findOrFail($sessionId);
