@@ -105,6 +105,7 @@ class BookingController extends Controller
                 $isSlotBooked = isset($bookedSessions[$dateString]) && $bookedSessions[$dateString]->contains(function ($session) use ($slot, $dateString) {
                     $sessionStart = Carbon::parse($session->date_time); // No EEST adjustment
                     $sessionEnd = $sessionStart->copy()->addMinutes($session->duration);
+                    // Compare only hours and minutes to avoid millisecond issues
                     $isMatch = $slot['start']->format('Y-m-d H:i') === $sessionStart->format('Y-m-d H:i')
                         && $slot['end']->format('Y-m-d H:i') === $sessionEnd->format('Y-m-d H:i');
                     Log::info('Checking slot booking status', [
