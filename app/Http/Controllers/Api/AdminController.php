@@ -266,7 +266,7 @@ public function getSessionCompletionTrends(Request $request)
         $trends = NewSession::select(
             DB::raw("DATE_FORMAT(created_at, '%b %Y') as month"),
             DB::raw("SUM(CASE WHEN status = 'Completed' THEN 1 ELSE 0 END) as completed"),
-            DB::raw("SUM(CASE WHEN status = 'Canceled' THEN 1 ELSE 0 END) as canceled")
+            DB::raw("SUM(CASE WHEN status = 'Cancelled' THEN 1 ELSE 0 END) as cancelled")
         )
         ->groupBy(DB::raw("DATE_FORMAT(created_at, '%b %Y')"))
         ->orderBy(DB::raw("DATE_FORMAT(created_at, '%b %Y')"))
@@ -275,7 +275,7 @@ public function getSessionCompletionTrends(Request $request)
             return [
                 'month' => $trend->month,
                 'completed' => (int)$trend->completed,
-                'canceled' => (int)$trend->canceled,
+                'cancelled' => (int)$trend->cancelled,
             ];
         });
 
