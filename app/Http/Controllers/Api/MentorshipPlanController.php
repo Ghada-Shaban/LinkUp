@@ -103,7 +103,7 @@ class MentorshipPlanController extends Controller
             foreach ($availableSlots as $slot) {
                 $isSlotBooked = isset($bookedSessions[$dateString]) && $bookedSessions[$dateString]->contains(function ($session) use ($slot, $dateString) {
                     $sessionStart = Carbon::parse($session->date_time);
-                    $slotStartAdjusted = $slot['start']->copy(); // No adjustment needed since both are in UTC
+                    $slotStartAdjusted = $slot['start']->copy();
                     $isMatch = $slotStartAdjusted->format('Y-m-d H:i') === $sessionStart->format('Y-m-d H:i');
                     Log::info('Checking slot booking status', [
                         'date' => $dateString,
@@ -193,14 +193,13 @@ class MentorshipPlanController extends Controller
         while ($currentTime->lt($endOfDay)) {
             $slotEnd = $currentTime->copy()->addMinutes($durationMinutes);
 
-            // Adjust to EEST (UTC+3) for response
-            $slotStartFormatted = mb_convert_encoding($currentTime->copy()->addHours(3)->format('H:i'), 'UTF-8', 'UTF-8');
-            $slotEndFormatted = mb_convert_encoding($slotEnd->copy()->addHours(3)->format('H:i'), 'UTF-8', 'UTF-8');
+            // إزالة timezone adjustment - الوقت كما هو
+            $slotStartFormatted = mb_convert_encoding($currentTime->format('H:i'), 'UTF-8', 'UTF-8');
+            $slotEndFormatted = mb_convert_encoding($slotEnd->format('H:i'), 'UTF-8', 'UTF-8');
 
             $isBooked = $bookedSessions->contains(function ($session) use ($currentTime) {
                 $isMentorshipPlan = $session->mentorshipRequest && $session->mentorshipRequest->requestable_type === \App\Models\MentorshipPlan::class;
                 $sessionStart = Carbon::parse($session->date_time);
-                // No adjustment needed here since comparison is in UTC
                 Log::info('Comparing slot with session', [
                     'slot_start' => mb_convert_encoding($currentTime->format('Y-m-d H:i:s'), 'UTF-8', 'UTF-8'),
                     'session_start_raw' => mb_convert_encoding($session->date_time, 'UTF-8', 'UTF-8'),
@@ -268,8 +267,8 @@ class MentorshipPlanController extends Controller
         $startDate = Carbon::parse($request->start_date);
         $startTime = Carbon::parse($request->start_time);
         $dayOfWeek = $startDate->format('l');
-        // Convert EEST to UTC by subtracting 3 hours
-        $sessionDateTime = $startDate->setTime($startTime->hour, $startTime->minute, $startTime->second)->subHours(3);
+        // إزالة timezone adjustment - حفظ الوقت كما هو
+        $sessionDateTime = $startDate->setTime($startTime->hour, $startTime->minute, $startTime->second);
         $slotEnd = $sessionDateTime->copy()->addMinutes($durationMinutes);
 
         Log::info('Initial session date time for Mentorship Plan', [
@@ -296,7 +295,8 @@ class MentorshipPlanController extends Controller
             $sessionsToBook = [];
             for ($i = 0; $i < $sessionCount; $i++) {
                 $sessionDate = $startDate->copy()->addWeeks($i);
-                $sessionDateTime = $sessionDate->setTime($startTime->hour, $startTime->minute, $startTime->second)->subHours(3);
+                // إزالة timezone adjustment - حفظ الوقت كما هو
+                $sessionDateTime = $sessionDate->setTime($startTime->hour, $startTime->minute, $startTime->second);
                 $slotEnd = $sessionDateTime->copy()->addMinutes($durationMinutes);
 
                 Log::info('Preparing Mentorship Plan session', [
