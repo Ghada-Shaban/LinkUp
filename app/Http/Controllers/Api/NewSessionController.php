@@ -1,550 +1,423 @@
-<?php
-
-namespace App\Http\Controllers\Api;
-
-use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
-use App\Models\NewSession;
-use App\Models\Service;
-use App\Models\User;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Log;
-use Carbon\Carbon;
-
-class NewSessionController extends Controller
+public function index(Request $request)
 {
-    /**
-     * عرض الجلسات بناءً على دور المستخدم ونوع الطلب (upcoming, pending, history)
-     */
-    public function index(Request $request)
-    {
-        $user = Auth::user();
-        $type = $request->query('type', 'upcoming');
+    $user = Auth::user();
+    $type = $request->query('type', 'upcoming');
 
-        $statuses = [];
+    $statuses = [];
+    $timeCondition = null;
+
+    if ($type === 'upcoming') {
+        $statuses = ['Scheduled'];
+        $timeCondition = ['date_time', '>=', now()];
+    } elseif ($type === 'pending') {
+        $statuses = ['pending'];
+        $timeCondition = ['date_time', '>=', now()];
+    } elseif ($type === 'history') {
+        $statuses = ['completed', 'cancelled'];
         $timeCondition = null;
+    } else {
+        Log::warning('Invalid type parameter', [
+            'user_id' => $user->User_ID,
+            'type' => $type
+        ]);
+        return response()->json(['message' => 'Invalid type'], 400);
+    }
 
-        if ($type === 'upcoming') {
-            $statuses = ['Scheduled'];
-            $timeCondition = ['date_time', '>=', now()];
-        } elseif ($type === 'pending') {
-            $statuses = ['pending'];
-            $timeCondition = ['date_time', '>=', now()];
-        } elseif ($type === 'history') {
-            $statuses = ['completed', 'cancelled'];
-            $timeCondition = null;
-        } else {
-            Log::warning('Invalid type parameter', [
-                'user_id' => $user->User_ID,
-                'type' => $type
-            ]);
-            return response()->json(['message' => 'Invalid type'], 400);
+    $sessions = collect();
+
+    if ($user->role_profile === 'Coach') {
+        $query = NewSession::with(['service', 'trainees', 'mentorshipRequest'])
+            ->where('coach_id', $user->User_ID)
+            ->whereIn('status', $statuses);
+
+        if ($timeCondition) {
+            $query->where($timeCondition[0], $timeCondition[1], $timeCondition[2]);
         }
 
-        $sessions = collect();
-
-        if ($user->role_profile === 'Coach') {
-            $query = NewSession::with(['service', 'trainees', 'mentorshipRequest'])
-                ->where('coach_id', $user->User_ID)
-                ->whereIn('status', $statuses);
-
-            if ($timeCondition) {
-                $query->where($timeCondition[0], $timeCondition[1], $timeCondition[2]);
+        $sessions = $query->get()->map(function ($session) {
+            // جلب الـ trainee من العلاقة
+            $trainee = $session->trainees;
+            $traineeName = 'N/A';
+            if ($trainee) {
+                $traineeName = $trainee->full_name ?? 'N/A';
+                Log::info('Trainee found for session', [
+                    'session_id' => $session->new_session_id,
+                    'trainee_id' => $session->trainee_id,
+                    'trainee_name' => $traineeName,
+                    'trainee_data' => $trainee->toArray()
+                ]);
+            } else {
+                Log::warning('Trainee not found for session', [
+                    'session_id' => $session->new_session_id,
+                    'trainee_id' => $session->trainee_id
+                ]);
             }
 
-            $sessions = $query->get()->map(function ($session) {
-                // جلب الـ trainee من العلاقة
-                $trainee = $session->trainees;
-                $traineeName = 'N/A';
-                if ($trainee) {
-                    $traineeName = $trainee->full_name ?? 'N/A';
-                    Log::info('Trainee found for session', [
-                        'session_id' => $session->new_session_id,
-                        'trainee_id' => $session->trainee_id,
-                        'trainee_name' => $traineeName,
-                        'trainee_data' => $trainee->toArray()
-                    ]);
-                } else {
-                    Log::warning('Trainee not found for session', [
-                        'session_id' => $session->new_session_id,
-                        'trainee_id' => $session->trainee_id
-                    ]);
-                }
+            // جلب الـ service من العلاقة
+            $service = $session->service;
+            $sessionType = 'N/A';
+            $serviceTitle = 'N/A';
+            $currentParticipants = null;
 
-                // جلب الـ service من العلاقة
-                $service = $session->service;
-                $sessionType = 'N/A';
-                $serviceTitle = 'N/A';
-                $currentParticipants = null;
-
-                if ($service) {
-                    Log::info('Service found for session', [
-                        'session_id' => $session->new_session_id,
-                        'service_id' => $session->service_id,
-                        'service' => $service->toArray()
-                    ]);
-
-                    if ($service->service_type === 'Mentorship') {
-                        $sessionType = 'mentorship sessions';
-                    } else {
-                        $sessionType = strtolower(str_replace('_', ' ', $service->service_type));
-                    }
-
-                    if ($service->service_type === 'Mentorship') {
-                        $mentorship = $service->mentorship;
-                        if ($mentorship) {
-                            Log::info('Mentorship found for service', [
-                                'service_id' => $service->service_id,
-                                'mentorship' => $mentorship->toArray()
-                            ]);
-                            if ($mentorship->mentorship_type === 'Mentorship session') {
-                                $mentorshipSession = $service->mentorshipSession;
-                                if ($mentorshipSession) {
-                                    Log::info('Mentorship session found for service', [
-                                        'service_id' => $service->service_id,
-                                        'mentorship_session' => $mentorshipSession->toArray()
-                                    ]);
-                                    $serviceTitle = $mentorshipSession->session_type;
-                                } else {
-                                    Log::warning('Mentorship session not found for service', [
-                                        'service_id' => $service->service_id
-                                    ]);
-                                    $serviceTitle = 'Mentorship Session';
-                                }
-                            } elseif ($mentorship->mentorship_type === 'Mentorship Plan') {
-                                $serviceTitle = 'Mentorship Plan';
-                            }
-                        } else {
-                            Log::warning('No mentorship found for service', [
-                                'service_id' => $service->service_id
-                            ]);
-                        }
-                    } elseif ($service->service_type === 'Mock_Interview') {
-                        $mockInterview = $service->mockInterview;
-                        if ($mockInterview) {
-                            Log::info('Mock Interview found for service', [
-                                'service_id' => $service->service_id,
-                                'mock_interview' => $mockInterview->toArray()
-                            ]);
-                            $serviceTitle = $mockInterview->interview_type . ' (' . $mockInterview->interview_level . ')';
-                        } else {
-                            Log::warning('Mock Interview not found for service', [
-                                'service_id' => $service->service_id
-                            ]);
-                            $serviceTitle = 'Mock Interview';
-                        }
-                    } elseif ($service->service_type === 'Group_Mentorship') {
-                        $groupMentorship = $service->groupMentorship;
-                        if ($groupMentorship) {
-                            Log::info('Group Mentorship found for service', [
-                                'service_id' => $service->service_id,
-                                'group_mentorship' => $groupMentorship->toArray()
-                            ]);
-                            $serviceTitle = $groupMentorship->title;
-                            $currentParticipants = $groupMentorship->current_participants;
-                        } else {
-                            Log::warning('Group Mentorship not found for service', [
-                                'service_id' => $service->service_id
-                            ]);
-                            $serviceTitle = 'Group Mentorship';
-                            $currentParticipants = 0;
-                        }
-                    } else {
-                        $serviceTitle = $service->title ?? 'N/A';
-                    }
-                } else {
-                    Log::warning('Service not found for session', [
-                        'session_id' => $session->new_session_id,
-                        'service_id' => $session->service_id
-                    ]);
-                }
-
-                // تحويل التوقيت إلى EEST (UTC+3) only if not a Mentorship Plan
-                $isMentorshipPlan = $session->mentorshipRequest && $session->mentorshipRequest->requestable_type === \App\Models\MentorshipPlan::class;
-                $dateTime = Carbon::parse($session->date_time);
-                if (!$isMentorshipPlan) {
-                    $dateTime->addHours(3);
-                }
-
-                Log::info('Session time processing', [
+            if ($service) {
+                Log::info('Service found for session', [
                     'session_id' => $session->new_session_id,
-                    'is_mentorship_plan' => $isMentorshipPlan,
-                    'original_time' => $session->date_time,
-                    'displayed_time' => $dateTime->toDateTimeString(),
+                    'service_id' => $session->service_id,
+                    'service' => $service->toArray()
                 ]);
 
-                $endTime = $dateTime->copy()->addMinutes($session->duration);
-
-                // تنسيق التاريخ والوقت بالشكل المطلوب
-                $date = $dateTime->format('d M Y');
-                $startTimeFormatted = $dateTime->format('h:i A');
-                $endTimeFormatted = $endTime->format('h:i A');
-                $timeRange = "$startTimeFormatted - $endTimeFormatted";
-
-                // تنسيق created_at و updated_at
-                $createdAt = Carbon::parse($session->created_at);
-                $updatedAt = Carbon::parse($session->updated_at);
-
-                // تصحيح التاريخ لو في يوم زيادة
-                if ($createdAt->format('Y-m-d') === '2025-05-29') {
-                    $createdAt->subDay();
-                }
-                if ($updatedAt->format('Y-m-d') === '2025-05-29') {
-                    $updatedAt->subDay();
+                if ($service->service_type === 'Mentorship') {
+                    $sessionType = 'mentorship sessions';
+                } else {
+                    $sessionType = strtolower(str_replace('_', ' ', $service->service_type));
                 }
 
-                $sessionData = [
-                    'new_session_id' => $session->new_session_id,
-                    'session_type' => $sessionType,
-                    'title' => $serviceTitle,
-                    'date' => $date,
-                    'time_range' => $timeRange,
-                    'status' => $session->status,
-                    'meeting_link' => $session->meeting_link,
-                    'trainee_name' => $traineeName,
-                    'created_at' => $createdAt->toDateTimeString(),
-                    'updated_at' => $updatedAt->toDateTimeString(),
-                ];
-
-                // إضافة current_participants إذا كان الـ session من نوع GroupMentorship
-                if ($service && $service->service_type === 'Group_Mentorship') {
-                    $sessionData['current_participants'] = $currentParticipants;
-                }
-
-                return $sessionData;
-            });
-
-            Log::info("Fetching $type sessions for Coach", [
-                'user_id' => $user->User_ID,
-                'sessions_count' => $sessions->count(),
-                'sessions' => $sessions->toArray()
-            ]);
-        } elseif ($user->role_profile === 'Trainee') {
-            $query = NewSession::with(['service', 'coach.user', 'mentorshipRequest'])
-                ->where('trainee_id', $user->User_ID)
-                ->whereIn('status', $statuses);
-
-            if ($timeCondition) {
-                $query->where($timeCondition[0], $timeCondition[1], $timeCondition[2]);
-            }
-
-            $sessions = $query->get()->map(function ($session) {
-                // جلب الـ coach من العلاقة
-                $coach = $session->coach;
-                $coachName = 'N/A';
-                if ($coach) {
-                    $coachUser = $coach->user;
-                    if ($coachUser) {
-                        $coachName = $coachUser->full_name ?? 'N/A';
-                        Log::info('Coach found for session', [
-                            'session_id' => $session->new_session_id,
-                            'coach_id' => $session->coach_id,
-                            'coach_name' => $coachName,
-                            'user_data' => $coachUser->toArray()
+                if ($service->service_type === 'Mentorship') {
+                    $mentorship = $service->mentorship;
+                    if ($mentorship) {
+                        Log::info('Mentorship found for service', [
+                            'service_id' => $service->service_id,
+                            'mentorship' => $mentorship->toArray()
                         ]);
+                        if ($mentorship->mentorship_type === 'Mentorship session') {
+                            $mentorshipSession = $service->mentorshipSession;
+                            if ($mentorshipSession) {
+                                Log::info('Mentorship session found for service', [
+                                    'service_id' => $service->service_id,
+                                    'mentorship_session' => $mentorshipSession->toArray()
+                                ]);
+                                $serviceTitle = $mentorshipSession->session_type;
+                            } else {
+                                Log::warning('Mentorship session not found for service', [
+                                    'service_id' => $service->service_id
+                                ]);
+                                $serviceTitle = 'Mentorship Session';
+                            }
+                        } elseif ($mentorship->mentorship_type === 'Mentorship Plan') {
+                            $mentorshipPlan = $mentorship->mentorshipPlan;
+                            if ($mentorshipPlan) {
+                                Log::info('Mentorship plan found for service', [
+                                    'service_id' => $service->service_id,
+                                    'mentorship_plan' => $mentorshipPlan->toArray()
+                                ]);
+                                $serviceTitle = $mentorshipPlan->title;
+                            } else {
+                                Log::warning('Mentorship plan not found for service', [
+                                    'service_id' => $service->service_id
+                                ]);
+                                $serviceTitle = 'Mentorship Plan';
+                            }
+                        }
                     } else {
-                        Log::warning('Coach user not found in users table for session', [
-                            'session_id' => $session->new_session_id,
-                            'coach_id' => $session->coach_id
+                        Log::warning('No mentorship found for service', [
+                            'service_id' => $service->service_id
                         ]);
                     }
+                } elseif ($service->service_type === 'Mock_Interview') {
+                    $mockInterview = $service->mockInterview;
+                    if ($mockInterview) {
+                        Log::info('Mock Interview found for service', [
+                            'service_id' => $service->service_id,
+                            'mock_interview' => $mockInterview->toArray()
+                        ]);
+                        $serviceTitle = $mockInterview->interview_type . ' (' . $mockInterview->interview_level . ')';
+                    } else {
+                        Log::warning('Mock Interview not found for service', [
+                            'service_id' => $service->service_id
+                        ]);
+                        $serviceTitle = 'Mock Interview';
+                    }
+                } elseif ($service->service_type === 'Group_Mentorship') {
+                    $groupMentorship = $service->groupMentorship;
+                    if ($groupMentorship) {
+                        Log::info('Group Mentorship found for service', [
+                            'service_id' => $service->service_id,
+                            'group_mentorship' => $groupMentorship->toArray()
+                        ]);
+                        $serviceTitle = $groupMentorship->title;
+                        $currentParticipants = $groupMentorship->current_participants;
+                    } else {
+                        Log::warning('Group Mentorship not found for service', [
+                            'service_id' => $service->service_id
+                        ]);
+                        $serviceTitle = 'Group Mentorship';
+                        $currentParticipants = 0;
+                    }
                 } else {
-                    Log::warning('Coach not found in coaches table for session', [
+                    $serviceTitle = $service->title ?? 'N/A';
+                }
+            } else {
+                Log::warning('Service not found for session', [
+                    'session_id' => $session->new_session_id,
+                    'service_id' => $session->service_id
+                ]);
+            }
+
+            // تحويل التوقيت إلى EEST (UTC+3) only if not a Mentorship Plan
+            $isMentorshipPlan = $session->mentorshipRequest && $session->mentorshipRequest->requestable_type === \App\Models\MentorshipPlan::class;
+            $dateTime = Carbon::parse($session->date_time);
+            if (!$isMentorshipPlan) {
+                $dateTime->addHours(3);
+            }
+
+            Log::info('Session time processing', [
+                'session_id' => $session->new_session_id,
+                'is_mentorship_plan' => $isMentorshipPlan,
+                'original_time' => $session->date_time,
+                'displayed_time' => $dateTime->toDateTimeString(),
+            ]);
+
+            $endTime = $dateTime->copy()->addMinutes($session->duration);
+
+            // تنسيق التاريخ والوقت بالشكل المطلوب
+            $date = $dateTime->format('d M Y');
+            $startTimeFormatted = $dateTime->format('h:i A');
+            $endTimeFormatted = $endTime->format('h:i A');
+            $timeRange = "$startTimeFormatted - $endTimeFormatted";
+
+            // تنسيق created_at و updated_at
+            $createdAt = Carbon::parse($session->created_at);
+            $updatedAt = Carbon::parse($session->updated_at);
+
+            // تصحيح التاريخ لو في يوم زيادة
+            if ($createdAt->format('Y-m-d') === '2025-05-29') {
+                $createdAt->subDay();
+            }
+            if ($updatedAt->format('Y-m-d') === '2025-05-29') {
+                $updatedAt->subDay();
+            }
+
+            $sessionData = [
+                'new_session_id' => $session->new_session_id,
+                'session_type' => $sessionType,
+                'title' => $serviceTitle,
+                'date' => $date,
+                'time_range' => $timeRange,
+                'status' => $session->status,
+                'meeting_link' => $session->meeting_link,
+                'trainee_name' => $traineeName,
+                'created_at' => $createdAt->toDateTimeString(),
+                'updated_at' => $updatedAt->toDateTimeString(),
+            ];
+
+            // إضافة current_participants إذا كان الـ session من نوع GroupMentorship
+            if ($service && $service->service_type === 'Group_Mentorship') {
+                $sessionData['current_participants'] = $currentParticipants;
+            }
+
+            return $sessionData;
+        });
+
+        Log::info("Fetching $type sessions for Coach", [
+            'user_id' => $user->User_ID,
+            'sessions_count' => $sessions->count(),
+            'sessions' => $sessions->toArray()
+        ]);
+    } elseif ($user->role_profile === 'Trainee') {
+        $query = NewSession::with(['service', 'coach.user', 'mentorshipRequest'])
+            ->where('trainee_id', $user->User_ID)
+            ->whereIn('status', $statuses);
+
+        if ($timeCondition) {
+            $query->where($timeCondition[0], $timeCondition[1], $timeCondition[2]);
+        }
+
+        $sessions = $query->get()->map(function ($session) {
+            // جلب الـ coach من العلاقة
+            $coach = $session->coach;
+            $coachName = 'N/A';
+            if ($coach) {
+                $coachUser = $coach->user;
+                if ($coachUser) {
+                    $coachName = $coachUser->full_name ?? 'N/A';
+                    Log::info('Coach found for session', [
+                        'session_id' => $session->new_session_id,
+                        'coach_id' => $session->coach_id,
+                        'coach_name' => $coachName,
+                        'user_data' => $coachUser->toArray()
+                    ]);
+                } else {
+                    Log::warning('Coach user not found in users table for session', [
                         'session_id' => $session->new_session_id,
                         'coach_id' => $session->coach_id
                     ]);
                 }
-
-                // جلب الـ service من العلاقة
-                $service = $session->service;
-                $sessionType = 'N/A';
-                $serviceTitle = 'N/A';
-                $currentParticipants = null;
-
-                if ($service) {
-                    Log::info('Service found for session', [
-                        'session_id' => $session->new_session_id,
-                        'service_id' => $session->service_id,
-                        'service' => $service->toArray()
-                    ]);
-
-                    if ($service->service_type === 'Mentorship') {
-                        $sessionType = 'mentorship sessions';
-                    } else {
-                        $sessionType = strtolower(str_replace('_', ' ', $service->service_type));
-                    }
-
-                    if ($service->service_type === 'Mentorship') {
-                        $mentorship = $service->mentorship;
-                        if ($mentorship) {
-                            Log::info('Mentorship found for service', [
-                                'service_id' => $service->service_id,
-                                'mentorship' => $mentorship->toArray()
-                            ]);
-                            if ($mentorship->mentorship_type === 'Mentorship session') {
-                                $mentorshipSession = $service->mentorshipSession;
-                                if ($mentorshipSession) {
-                                    Log::info('Mentorship session found for service', [
-                                        'service_id' => $service->service_id,
-                                        'mentorship_session' => $mentorshipSession->toArray()
-                                    ]);
-                                    $serviceTitle = $mentorshipSession->session_type;
-                                } else {
-                                    Log::warning('Mentorship session not found for service', [
-                                        'service_id' => $service->service_id
-                                    ]);
-                                    $serviceTitle = 'Mentorship Session';
-                                }
-                            } elseif ($mentorship->mentorship_type === 'Mentorship Plan') {
-                                $serviceTitle = 'Mentorship Plan';
-                            }
-                        } else {
-                            Log::warning('No mentorship found for service', [
-                                'service_id' => $service->service_id
-                            ]);
-                        }
-                    } elseif ($service->service_type === 'Mock_Interview') {
-                        $mockInterview = $service->mockInterview;
-                        if ($mockInterview) {
-                            Log::info('Mock Interview found for service', [
-                                'service_id' => $service->service_id,
-                                'mock_interview' => $mockInterview->toArray()
-                            ]);
-                            $serviceTitle = $mockInterview->interview_type . ' (' . $mockInterview->interview_level . ')';
-                        } else {
-                            Log::warning('Mock Interview not found for service', [
-                                'service_id' => $service->service_id
-                            ]);
-                            $serviceTitle = 'Mock Interview';
-                        }
-                    } elseif ($service->service_type === 'Group_Mentorship') {
-                        $groupMentorship = $service->groupMentorship;
-                        if ($groupMentorship) {
-                            Log::info('Group Mentorship found for service', [
-                                'service_id' => $service->service_id,
-                                'group_mentorship' => $groupMentorship->toArray()
-                            ]);
-                            $serviceTitle = $groupMentorship->title;
-                            $currentParticipants = $groupMentorship->current_participants;
-                        } else {
-                            Log::warning('Group Mentorship not found for service', [
-                                'service_id' => $service->service_id
-                            ]);
-                            $serviceTitle = 'Group Mentorship';
-                            $currentParticipants = 0;
-                        }
-                    } else {
-                        $serviceTitle = $service->title ?? 'N/A';
-                    }
-                } else {
-                    Log::warning('Service not found for session', [
-                        'session_id' => $session->new_session_id,
-                        'service_id' => $session->service_id
-                    ]);
-                }
-
-                // تحويل التوقيت إلى EEST (UTC+3) only if not a Mentorship Plan
-                $isMentorshipPlan = $session->mentorshipRequest && $session->mentorshipRequest->requestable_type === \App\Models\MentorshipPlan::class;
-                $dateTime = Carbon::parse($session->date_time);
-                if (!$isMentorshipPlan) {
-                    $dateTime->addHours(3);
-                }
-
-                Log::info('Session time processing', [
+            } else {
+                Log::warning('Coach not found in coaches table for session', [
                     'session_id' => $session->new_session_id,
-                    'is_mentorship_plan' => $isMentorshipPlan,
-                    'original_time' => $session->date_time,
-                    'displayed_time' => $dateTime->toDateTimeString(),
+                    'coach_id' => $session->coach_id
+                ]);
+            }
+
+            // جلب الـ service من العلاقة
+            $service = $session->service;
+            $sessionType = 'N/A';
+            $serviceTitle = 'N/A';
+            $currentParticipants = null;
+
+            if ($service) {
+                Log::info('Service found for session', [
+                    'session_id' => $session->new_session_id,
+                    'service_id' => $session->service_id,
+                    'service' => $service->toArray()
                 ]);
 
-                $endTime = $dateTime->copy()->addMinutes($session->duration);
-
-                // تنسيق التاريخ والوقت بالشكل المطلوب
-                $date = $dateTime->format('d M Y');
-                $startTimeFormatted = $dateTime->format('h:i A');
-                $endTimeFormatted = $endTime->format('h:i A');
-                $timeRange = "$startTimeFormatted - $endTimeFormatted";
-
-                // تنسيق created_at و updated_at
-                $createdAt = Carbon::parse($session->created_at);
-                $updatedAt = Carbon::parse($session->updated_at);
-
-                // تصحيح التاريخ لو في يوم زيادة
-                if ($createdAt->format('Y-m-d') === '2025-05-29') {
-                    $createdAt->subDay();
-                }
-                if ($updatedAt->format('Y-m-d') === '2025-05-29') {
-                    $updatedAt->subDay();
+                if ($service->service_type === 'Mentorship') {
+                    $sessionType = 'mentorship sessions';
+                } else {
+                    $sessionType = strtolower(str_replace('_', ' ', $service->service_type));
                 }
 
-                $sessionData = [
-                    'new_session_id' => $session->new_session_id,
-                    'session_type' => $sessionType,
-                    'title' => $serviceTitle,
-                    'date' => $date,
-                    'time_range' => $timeRange,
-                    'status' => $session->status,
-                    'meeting_link' => $session->meeting_link,
-                    'coach_name' => $coachName,
-                    'created_at' => $createdAt->toDateTimeString(),
-                    'updated_at' => $updatedAt->toDateTimeString(),
-                ];
-
-                // إضافة current_participants إذا كان الـ session من نوع GroupMentorship
-                if ($service && $service->service_type === 'Group_Mentorship') {
-                    $sessionData['current_participants'] = $currentParticipants;
+                if ($service->service_type === 'Mentorship') {
+                    $mentorship = $service->mentorship;
+                    if ($mentorship) {
+                        Log::info('Mentorship found for service', [
+                            'service_id' => $service->service_id,
+                            'mentorship' => $mentorship->toArray()
+                        ]);
+                        if ($mentorship->mentorship_type === 'Mentorship session') {
+                            $mentorshipSession = $service->mentorshipSession;
+                            if ($mentorshipSession) {
+                                Log::info('Mentorship session found for service', [
+                                    'service_id' => $service->service_id,
+                                    'mentorship_session' => $mentorshipSession->toArray()
+                                ]);
+                                $serviceTitle = $mentorshipSession->session_type;
+                            } else {
+                                Log::warning('Mentorship session not found for service', [
+                                    'service_id' => $service->service_id
+                                ]);
+                                $serviceTitle = 'Mentorship Session';
+                            }
+                        } elseif ($mentorship->mentorship_type === 'Mentorship Plan') {
+                            $mentorshipPlan = $mentorship->mentorshipPlan;
+                            if ($mentorshipPlan) {
+                                Log::info('Mentorship plan found for service', [
+                                    'service_id' => $service->service_id,
+                                    'mentorship_plan' => $mentorshipPlan->toArray()
+                                ]);
+                                $serviceTitle = $mentorshipPlan->title;
+                            } else {
+                                Log::warning('Mentorship plan not found for service', [
+                                    'service_id' => $service->service_id
+                                ]);
+                                $serviceTitle = 'Mentorship Plan';
+                            }
+                        }
+                    } else {
+                        Log::warning('No mentorship found for service', [
+                            'service_id' => $service->service_id
+                        ]);
+                    }
+                } elseif ($service->service_type === 'Mock_Interview') {
+                    $mockInterview = $service->mockInterview;
+                    if ($mockInterview) {
+                        Log::info('Mock Interview found for service', [
+                            'service_id' => $service->service_id,
+                            'mock_interview' => $mockInterview->toArray()
+                        ]);
+                        $serviceTitle = $mockInterview->interview_type . ' (' . $mockInterview->interview_level . ')';
+                    } else {
+                        Log::warning('Mock Interview not found for service', [
+                            'service_id' => $service->service_id
+                        ]);
+                        $serviceTitle = 'Mock Interview';
+                    }
+                } elseif ($service->service_type === 'Group_Mentorship') {
+                    $groupMentorship = $service->groupMentorship;
+                    if ($groupMentorship) {
+                        Log::info('Group Mentorship found for service', [
+                            'service_id' => $service->service_id,
+                            'group_mentorship' => $groupMentorship->toArray()
+                        ]);
+                        $serviceTitle = $groupMentorship->title;
+                        $currentParticipants = $groupMentorship->current_participants;
+                    } else {
+                        Log::warning('Group Mentorship not found for service', [
+                            'service_id' => $service->service_id
+                        ]);
+                        $serviceTitle = 'Group Mentorship';
+                        $currentParticipants = 0;
+                    }
+                } else {
+                    $serviceTitle = $service->title ?? 'N/A';
                 }
+            } else {
+                Log::warning('Service not found for session', [
+                    'session_id' => $session->new_session_id,
+                    'service_id' => $session->service_id
+                ]);
+            }
 
-                return $sessionData;
-            });
+            // تحويل التوقيت إلى EEST (UTC+3) only if not a Mentorship Plan
+            $isMentorshipPlan = $session->mentorshipRequest && $session->mentorshipRequest->requestable_type === \App\Models\MentorshipPlan::class;
+            $dateTime = Carbon::parse($session->date_time);
+            if (!$isMentorshipPlan) {
+                $dateTime->addHours(3);
+            }
 
-            Log::info("Fetching $type sessions for Trainee", [
-                'user_id' => $user->User_ID,
-                'sessions_count' => $sessions->count(),
-                'sessions' => $sessions->toArray()
+            Log::info('Session time processing', [
+                'session_id' => $session->new_session_id,
+                'is_mentorship_plan' => $isMentorshipPlan,
+                'original_time' => $session->date_time,
+                'displayed_time' => $dateTime->toDateTimeString(),
             ]);
-        } else {
-            Log::warning('Unauthorized access to sessions', [
-                'user_id' => $user->User_ID,
-                'role' => $user->role_profile
-            ]);
-            return response()->json(['error' => 'Unauthorized'], 403);
-        }
 
-        return response()->json([
-            'sessions' => $sessions
+            $endTime = $dateTime->copy()->addMinutes($session->duration);
+
+            // تنسيق التاريخ والوقت بالشكل المطلوب
+            $date = $dateTime->format('d M Y');
+            $startTimeFormatted = $dateTime->format('h:i A');
+            $endTimeFormatted = $endTime->format('h:i A');
+            $timeRange = "$startTimeFormatted - $endTimeFormatted";
+
+            // تنسيق created_at و updated_at
+            $createdAt = Carbon::parse($session->created_at);
+            $updatedAt = Carbon::parse($session->updated_at);
+
+            // تصحيح التاريخ لو في يوم زيادة
+            if ($createdAt->format('Y-m-d') === '2025-05-29') {
+                $createdAt->subDay();
+            }
+            if ($updatedAt->format('Y-m-d') === '2025-05-29') {
+                $updatedAt->subDay();
+            }
+
+            $sessionData = [
+                'new_session_id' => $session->new_session_id,
+                'session_type' => $sessionType,
+                'title' => $serviceTitle,
+                'date' => $date,
+                'time_range' => $timeRange,
+                'status' => $session->status,
+                'meeting_link' => $session->meeting_link,
+                'coach_name' => $coachName,
+                'created_at' => $createdAt->toDateTimeString(),
+                'updated_at' => $updatedAt->toDateTimeString(),
+            ];
+
+            // إضافة current_participants إذا كان الـ session من نوع GroupMentorship
+            if ($service && $service->service_type === 'Group_Mentorship') {
+                $sessionData['current_participants'] = $currentParticipants;
+            }
+
+            return $sessionData;
+        });
+
+        Log::info("Fetching $type sessions for Trainee", [
+            'user_id' => $user->User_ID,
+            'sessions_count' => $sessions->count(),
+            'sessions' => $sessions->toArray()
         ]);
+    } else {
+        Log::warning('Unauthorized access to sessions', [
+            'user_id' => $user->User_ID,
+            'role' => $user->role_profile
+        ]);
+        return response()->json(['error' => 'Unauthorized'], 403);
     }
 
-    /**
-     * إتمام جلسة من الكوتش أو الترايني
-     */
-    public function completeSession($sessionId)
-    {
-        $user = Auth::user();
-        $session = NewSession::findOrFail($sessionId);
-
-        // التأكد أن المستخدم هو الكوتش أو الترايني لهذه الجلسة
-        $isAuthorized = false;
-        if ($user->role_profile === 'Coach') {
-            $isAuthorized = $session->coach_id == $user->User_ID;
-        } elseif ($user->role_profile === 'Trainee') {
-            $isAuthorized = $session->trainee_id == $user->User_ID;
-        }
-
-        if (!$isAuthorized) {
-            Log::warning('Unauthorized attempt to complete session', [
-                'user_id' => $user->User_ID,
-                'session_id' => $sessionId
-            ]);
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
-
-        if ($session->status !== 'Scheduled') {
-            Log::warning('Session cannot be completed', [
-                'session_id' => $sessionId,
-                'status' => $session->status
-            ]);
-            return response()->json(['message' => 'Session cannot be completed'], 400);
-        }
-
-        $sessionEndTime = Carbon::parse($session->date_time)->addMinutes($session->duration);
-        if (Carbon::now()->lt($sessionEndTime)) {
-            Log::warning('Session cannot be completed yet', [
-                'session_id' => $sessionId,
-                'end_time' => $sessionEndTime
-            ]);
-            return response()->json(['message' => 'Session cannot be completed yet. It has not ended.'], 400);
-        }
-
-        $session->status = 'completed';
-        $session->save();
-
-        Log::info('Session marked as completed', [
-            'session_id' => $sessionId
-        ]);
-
-        return response()->json([
-            'message' => 'Session marked as completed successfully!',
-            'session' => $session
-        ]);
-    }
-
-    /**
-     * إلغاء جلسة من الكوتش أو الترايني
-     */
-    public function cancelSession($sessionId)
-    {
-        $user = Auth::user();
-        $session = NewSession::findOrFail($sessionId);
-
-        $isAuthorized = false;
-        if ($user->role_profile === 'Coach') {
-            $isAuthorized = $session->coach_id == $user->User_ID;
-        } elseif ($user->role_profile === 'Trainee') {
-            $isAuthorized = $session->trainee_id == $user->User_ID;
-        }
-
-        if (!$isAuthorized) {
-            Log::warning('Unauthorized attempt to cancel session', [
-                'user_id' => $user->User_ID,
-                'session_id' => $sessionId
-            ]);
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
-
-        if ($session->status !== 'Scheduled' && $session->status !== 'pending') {
-            Log::warning('Session cannot be cancelled', [
-                'session_id' => $sessionId,
-                'status' => $session->status
-            ]);
-            return response()->json(['message' => 'Session cannot be cancelled'], 400);
-        }
-
-        $session->status = 'cancelled';
-        $session->save();
-
-        Log::info('Session cancelled', [
-            'session_id' => $sessionId
-        ]);
-
-        return response()->json([
-            'message' => 'Session cancelled successfully!',
-            'session' => $session
-        ]);
-    }
-
-    /**
-     * تحديث رابط الاجتماع لجلسة معينة (خاص بالكوتش فقط)
-     */
-    public function updateMeetingLink(Request $request, $sessionId)
-    {
-        $request->validate([
-            'meeting_link' => 'required|url'
-        ]);
-
-        $user = Auth::user();
-        $session = NewSession::findOrFail($sessionId);
-
-        if ($session->coach_id != $user->User_ID) {
-            Log::warning('Unauthorized attempt to update meeting link', [
-                'user_id' => $user->User_ID,
-                'session_id' => $sessionId
-            ]);
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
-
-        $session->meeting_link = $request->meeting_link;
-        $session->save();
-
-        Log::info('Meeting link updated', [
-            'session_id' => $sessionId,
-            'meeting_link' => $session->meeting_link
-        ]);
-
-        return response()->json([
-            'message' => 'Meeting link updated successfully!',
-            'meeting_link' => $session->meeting_link
-        ]);
-    }
+    return response()->json([
+        'sessions' => $sessions
+    ]);
 }
