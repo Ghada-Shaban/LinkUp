@@ -193,15 +193,14 @@ class MentorshipPlanController extends Controller
         while ($currentTime->lt($endOfDay)) {
             $slotEnd = $currentTime->copy()->addMinutes($durationMinutes);
 
-            $slotStartFormatted = mb_convert_encoding($currentTime->format('H:i'), 'UTF-8', 'UTF-8');
-            $slotEndFormatted = mb_convert_encoding($slotEnd->format('H:i'), 'UTF-8', 'UTF-8');
+            // Adjust to EEST (UTC+3) for response
+            $slotStartFormatted = mb_convert_encoding($currentTime->copy()->addHours(3)->format('H:i'), 'UTF-8', 'UTF-8');
+            $slotEndFormatted = mb_convert_encoding($slotEnd->copy()->addHours(3)->format('H:i'), 'UTF-8', 'UTF-8');
 
             $isBooked = $bookedSessions->contains(function ($session) use ($currentTime) {
                 $isMentorshipPlan = $session->mentorshipRequest && $session->mentorshipRequest->requestable_type === \App\Models\MentorshipPlan::class;
                 $sessionStart = Carbon::parse($session->date_time);
-                if ($isMentorshipPlan) {
-                    $sessionStart->addHours(3); // Adjust to EEST for Mentorship Plan
-                }
+                // No adjustment needed here since comparison is in UTC
                 Log::info('Comparing slot with session', [
                     'slot_start' => mb_convert_encoding($currentTime->format('Y-m-d H:i:s'), 'UTF-8', 'UTF-8'),
                     'session_start_raw' => mb_convert_encoding($session->date_time, 'UTF-8', 'UTF-8'),
