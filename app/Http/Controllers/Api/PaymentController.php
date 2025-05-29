@@ -155,7 +155,12 @@ class PaymentController extends Controller
                     
                     $currentParticipants = count($traineeIds);
                     if (!in_array($mentorshipRequest->trainee_id, $traineeIds)) {
-                        $currentParticipants++; 
+                        $traineeIds[] = $mentorshipRequest->trainee_id;
+                        $groupMentorship->trainee_ids = json_encode($traineeIds);
+                        $groupMentorship->current_participants = count($traineeIds);
+                        // Update is_active based on minimum participants
+                        $groupMentorship->is_active = $groupMentorship->current_participants >= $groupMentorship->minimum_participants ? 1 : 0;
+                        $groupMentorship->save();
                     }
 
                     if ($currentParticipants > $groupMentorship->max_participants) {
@@ -187,13 +192,6 @@ class PaymentController extends Controller
                         }
 
                         $sessions[] = $newSession;
-                    }
-
-                    if (!in_array($mentorshipRequest->trainee_id, $traineeIds)) {
-                        $traineeIds[] = $mentorshipRequest->trainee_id;
-                        $groupMentorship->trainee_ids = json_encode($traineeIds);
-                        $groupMentorship->current_participants = count($traineeIds);
-                        $groupMentorship->save();
                     }
                 } elseif ($mentorshipRequest->requestable_type === 'App\\Models\\MentorshipPlan') {
                     $sessions = NewSession::where('mentorship_request_id', $mentorshipRequest->id)
