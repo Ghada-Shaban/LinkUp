@@ -141,7 +141,7 @@ class BookingController extends Controller
             $dates[] = [
                 'date' => $dateString,
                 'day_of_week' => $dayOfWeek,
-                'status' => $status
+                'status' => $status,
             ];
         }
 
@@ -245,7 +245,7 @@ class BookingController extends Controller
     public function bookService(Request $request, $coachId)
     {
         $request->validate([
-            'service_id' => 'required|exists:services,id',
+            'service_id' => 'required|exists:services,service_id',
             'start_time' => 'required|date_format:H:i:s',
             'start_date' => 'required|date|after:now',
             'mentorship_request_id' => 'nullable|exists:mentorship_requests,id',
@@ -349,6 +349,12 @@ class BookingController extends Controller
                     $sessionDate = $startDate->copy()->addWeeks($i);
                     $sessionDateTime = $sessionDate->setTime($startTime->hour, $startTime->minute, $startTime->second);
                     $slotEnd = $sessionDateTime->copy()->addMinutes($durationMinutes);
+
+                    Log::info('Preparing Mentorship Plan session', [
+                        'mentorship_request_id' => $mentorshipRequestId,
+                        'session_index' => $i,
+                        'date_time' => $sessionDateTime->toDateTimeString(),
+                    ]);
 
                     $availability = CoachAvailability::where('coach_id', (int)$coachId)
                         ->where('Day_Of_Week', $sessionDate->format('l'))
