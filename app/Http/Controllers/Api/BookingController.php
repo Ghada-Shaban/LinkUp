@@ -141,7 +141,7 @@ class BookingController extends Controller
             $dates[] = [
                 'date' => $dateString,
                 'day_of_week' => $dayOfWeek,
-                'status' => $status;
+                'status' => $status
             ];
         }
 
