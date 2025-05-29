@@ -45,8 +45,15 @@ class NewSessionController extends Controller
 
         if ($user->role_profile === 'Coach') {
             $query = NewSession::with([
-                'service.mentorship.mentorshipPlan',
-                'service.mentorship.mentorshipSession',
+                'service' => function ($query) {
+                    $query->with([
+                        'mentorship' => function ($query) {
+                            $query->with(['mentorshipPlan', 'mentorshipSession']);
+                        },
+                        'mockInterview',
+                        'groupMentorship'
+                    ]);
+                },
                 'trainees',
                 'mentorshipRequest.requestable'
             ])->where('coach_id', $user->User_ID)
@@ -83,7 +90,7 @@ class NewSessionController extends Controller
                         if ($mentorship) {
                             Log::info('Mentorship found', [
                                 'session_id' => $session->new_session_id,
-                                'service_id' => $service->service_id,
+                                'service_id' => $session->service_id,
                                 'mentorship_type' => $mentorship->mentorship_type
                             ]);
 
@@ -93,7 +100,7 @@ class NewSessionController extends Controller
                                 $serviceTitle = $mentorshipSession ? $mentorshipSession->session_type : 'Mentorship Session';
                                 Log::info('Mentorship session', [
                                     'session_id' => $session->new_session_id,
-                                    'service_id' => $service->service_id,
+                                    'service_id' => $session->service_id,
                                     'title' => $serviceTitle
                                 ]);
                             } elseif ($mentorship->mentorship_type === 'Mentorship Plan') {
@@ -102,7 +109,7 @@ class NewSessionController extends Controller
                                 $serviceTitle = $mentorshipPlan ? $mentorshipPlan->title : 'Mentorship Plan';
                                 Log::info('Mentorship plan', [
                                     'session_id' => $session->new_session_id,
-                                    'service_id' => $service->service_id,
+                                    'service_id' => $session->service_id,
                                     'title' => $serviceTitle
                                 ]);
                             }
@@ -199,8 +206,15 @@ class NewSessionController extends Controller
             ]);
         } elseif ($user->role_profile === 'Trainee') {
             $query = NewSession::with([
-                'service.mentorship.mentorshipPlan',
-                'service.mentorship.mentorshipSession',
+                'service' => function ($query) {
+                    $query->with([
+                        'mentorship' => function ($query) {
+                            $query->with(['mentorshipPlan', 'mentorshipSession']);
+                        },
+                        'mockInterview',
+                        'groupMentorship'
+                    ]);
+                },
                 'coach.user',
                 'mentorshipRequest.requestable'
             ])->where('trainee_id', $user->User_ID)
