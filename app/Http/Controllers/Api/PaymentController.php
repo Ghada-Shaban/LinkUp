@@ -153,12 +153,20 @@ class PaymentController extends Controller
                         $traineeIds = [];
                     }
                     
-                    $currentParticipants = count($traineeIds);
+                    // Update is_active before adding the new trainee
+                    $groupMentorship->current_participants = count($traineeIds);
+                    $groupMentorship->is_active = ($groupMentorship->current_participants >= $groupMentorship->minimum_participants) ? 1 : 0;
+                    $groupMentorship->save();
+
                     if (!in_array($mentorshipRequest->trainee_id, $traineeIds)) {
-                        $currentParticipants++; 
+                        $traineeIds[] = $mentorshipRequest->trainee_id;
+                        $groupMentorship->trainee_ids = json_encode($traineeIds);
+                        $groupMentorship->current_participants = count($traineeIds);
+                        $groupMentorship->is_active = ($groupMentorship->current_participants >= $groupMentorship->minimum_participants) ? 1 : 0;
+                        $groupMentorship->save();
                     }
 
-                    if ($currentParticipants > $groupMentorship->max_participants) {
+                    if ($groupMentorship->current_participants > $groupMentorship->max_participants) {
                         return response()->json(['message' => 'Group Mentorship is full'], 400);
                     }
 
@@ -188,14 +196,6 @@ class PaymentController extends Controller
 
                         $sessions[] = $newSession;
                     }
-
-                    if (!in_array($mentorshipRequest->trainee_id, $traineeIds)) {
-                        $traineeIds[] = $mentorshipRequest->trainee_id;
-                        $groupMentorship->trainee_ids = json_encode($traineeIds);
-                        $groupMentorship->current_participants = count($traineeIds);
-                        $groupMentorship->is_active = ($groupMentorship->current_participants >= $groupMentorship->minimum_participants) ? 1 : 0;
-                        $groupMentorship->save();
-                    }
                 } elseif ($mentorshipRequest->requestable_type === 'App\\Models\\MentorshipPlan') {
                     $sessions = NewSession::where('mentorship_request_id', $mentorshipRequest->id)
                         ->where('status', 'Pending')
@@ -221,7 +221,6 @@ class PaymentController extends Controller
                 try {
                     if ($mentorshipRequest->trainee && $mentorshipRequest->trainee->email) {
                         Mail::to($mentorshipRequest->trainee->email)->send(new PaymentConfirmation($mentorshipRequest, $sessions, $payment));
-                       
                     } 
                 } catch (\Exception $e) {
                 }
