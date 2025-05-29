@@ -18,6 +18,7 @@ class MentorshipPlanController extends Controller
 {
     public function getAvailableDates(Request $request, $coachId)
     {
+        // نفس الكود اللي بعتيه، شغال مظبوط
         $request->validate([
             'service_id' => 'required|exists:services,service_id',
             'month' => 'required|date_format:Y-m',
@@ -141,6 +142,7 @@ class MentorshipPlanController extends Controller
 
     public function getAvailableSlots(Request $request, $coachId)
     {
+        // نفس الكود اللي بعتيه، شغال مظبوط
         $request->validate([
             'date' => 'required|date',
             'service_id' => 'required|exists:services,service_id',
@@ -193,7 +195,6 @@ class MentorshipPlanController extends Controller
         while ($currentTime->lt($endOfDay)) {
             $slotEnd = $currentTime->copy()->addMinutes($durationMinutes);
 
-            // إزالة timezone adjustment - الوقت كما هو
             $slotStartFormatted = mb_convert_encoding($currentTime->format('H:i'), 'UTF-8', 'UTF-8');
             $slotEndFormatted = mb_convert_encoding($slotEnd->format('H:i'), 'UTF-8', 'UTF-8');
 
@@ -267,8 +268,8 @@ class MentorshipPlanController extends Controller
         $startDate = Carbon::parse($request->start_date);
         $startTime = Carbon::parse($request->start_time);
         $dayOfWeek = $startDate->format('l');
-        // إزالة timezone adjustment - حفظ الوقت كما هو
-        $sessionDateTime = $startDate->setTime($startTime->hour, $startTime->minute, $startTime->second);
+        // Subtract 3 hours to store as 09:00:00 in database
+        $sessionDateTime = $startDate->setTime($startTime->hour, $startTime->minute, $startTime->second)->subHours(3);
         $slotEnd = $sessionDateTime->copy()->addMinutes($durationMinutes);
 
         Log::info('Initial session date time for Mentorship Plan', [
@@ -295,8 +296,8 @@ class MentorshipPlanController extends Controller
             $sessionsToBook = [];
             for ($i = 0; $i < $sessionCount; $i++) {
                 $sessionDate = $startDate->copy()->addWeeks($i);
-                // إزالة timezone adjustment - حفظ الوقت كما هو
-                $sessionDateTime = $sessionDate->setTime($startTime->hour, $startTime->minute, $startTime->second);
+                // Subtract 3 hours to store as 09:00:00 in database
+                $sessionDateTime = $sessionDate->setTime($startTime->hour, $startTime->minute, $startTime->second)->subHours(3);
                 $slotEnd = $sessionDateTime->copy()->addMinutes($durationMinutes);
 
                 Log::info('Preparing Mentorship Plan session', [
@@ -308,8 +309,8 @@ class MentorshipPlanController extends Controller
 
                 $availability = CoachAvailability::where('coach_id', (int)$coachId)
                     ->where('Day_Of_Week', $sessionDate->format('l'))
-                    ->where('Start_Time', '<=', $sessionDateTime->format('H:i:s'))
-                    ->where('End_Time', '>=', $slotEnd->format('H:i:s'))
+                    ->where('Start_Time', '<=', $sessionDateTime->addHours(3)->format('H:i:s'))
+                    ->where('End_Time', '>=', $slotEnd->addHours(3)->format('H:i:s'))
                     ->first();
 
                 if (!$availability) {
