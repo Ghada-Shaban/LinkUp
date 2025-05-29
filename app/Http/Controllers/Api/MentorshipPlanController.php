@@ -103,7 +103,7 @@ class MentorshipPlanController extends Controller
             foreach ($availableSlots as $slot) {
                 $isSlotBooked = isset($bookedSessions[$dateString]) && $bookedSessions[$dateString]->contains(function ($session) use ($slot, $dateString) {
                     $sessionStart = Carbon::parse($session->date_time);
-                    $slotStartAdjusted = $slot['start']->copy()->subHours(3); // Convert slot to UTC for comparison
+                    $slotStartAdjusted = $slot['start']->copy(); // No adjustment needed since both are in UTC
                     $isMatch = $slotStartAdjusted->format('Y-m-d H:i') === $sessionStart->format('Y-m-d H:i');
                     Log::info('Checking slot booking status', [
                         'date' => $dateString,
@@ -268,7 +268,8 @@ class MentorshipPlanController extends Controller
         $startDate = Carbon::parse($request->start_date);
         $startTime = Carbon::parse($request->start_time);
         $dayOfWeek = $startDate->format('l');
-        $sessionDateTime = $startDate->setTime($startTime->hour, $startTime->minute, $startTime->second);
+        // Convert EEST to UTC by subtracting 3 hours
+        $sessionDateTime = $startDate->setTime($startTime->hour, $startTime->minute, $startTime->second)->subHours(3);
         $slotEnd = $sessionDateTime->copy()->addMinutes($durationMinutes);
 
         Log::info('Initial session date time for Mentorship Plan', [
@@ -295,7 +296,7 @@ class MentorshipPlanController extends Controller
             $sessionsToBook = [];
             for ($i = 0; $i < $sessionCount; $i++) {
                 $sessionDate = $startDate->copy()->addWeeks($i);
-                $sessionDateTime = $sessionDate->setTime($startTime->hour, $startTime->minute, $startTime->second);
+                $sessionDateTime = $sessionDate->setTime($startTime->hour, $startTime->minute, $startTime->second)->subHours(3);
                 $slotEnd = $sessionDateTime->copy()->addMinutes($durationMinutes);
 
                 Log::info('Preparing Mentorship Plan session', [
