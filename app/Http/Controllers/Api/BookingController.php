@@ -32,7 +32,7 @@ class BookingController extends Controller
             ->first();
 
         if (!$service) {
-            return response()->json(['message' => 'الخدمة غير متاحة لهذا المدرب'], 403);
+            return response()->json(['message' => 'الخدمة دي مش تابعة للكوتش'], 403);
         }
 
         $startOfMonth = Carbon::parse($month)->startOfMonth();
@@ -100,11 +100,12 @@ class BookingController extends Controller
                 }
             }
 
-            $allSlotsBooked = !empty($availableSlots);
+            $allSlotsBooked = !empty($availableSlots); // Initialize as true only if there are slots
             foreach ($availableSlots as $slot) {
                 $isSlotBooked = isset($bookedSessions[$dateString]) && $bookedSessions[$dateString]->contains(function ($session) use ($slot, $dateString) {
-                    $sessionStart = Carbon::parse($session->date_time);
+                    $sessionStart = Carbon::parse($session->date_time)->addHours(3); // Adjust for EEST
                     $sessionEnd = $sessionStart->copy()->addMinutes($session->duration);
+                    // Compare only hours and minutes to avoid millisecond issues
                     $isMatch = $slot['start']->format('Y-m-d H:i') === $sessionStart->format('Y-m-d H:i')
                         && $slot['end']->format('Y-m-d H:i') === $sessionEnd->format('Y-m-d H:i');
                     Log::info('Checking slot booking status', [
@@ -159,7 +160,7 @@ class BookingController extends Controller
             ->first();
 
         if (!$service) {
-            return response()->json(['message' => 'الخدمة غير متاحة لهذا المدرب'], 403);
+            return response()->json(['message' => 'الخدمة دي مش تابعة للكوتش'], 403);
         }
 
         if ($selectedDate->lt(Carbon::today())) {
@@ -174,8 +175,8 @@ class BookingController extends Controller
             'availabilities' => $availabilities->toArray(),
         ]);
 
-        $bookedSessions = NewSession::with('mentorshipRequest')
-            ->where('coach_id', $coachId)
+        // جلب الجلسات المحجوزة للتاريخ المحدد
+        $bookedSessions = NewSession::where('coach_id', $coachId)
             ->whereIn('status', ['Pending', 'Scheduled'])
             ->where('date_time', '>=', $selectedDate->startOfDay()->toDateTimeString())
             ->where('date_time', '<', $selectedDate->endOfDay()->toDateTimeString())
@@ -196,20 +197,16 @@ class BookingController extends Controller
         while ($currentTime->lt($endOfDay)) {
             $slotEnd = $currentTime->copy()->addMinutes($durationMinutes);
 
-            $slotStartFormatted = mb_convert_encoding($currentTime->format('H:i'), 'UTF-8', 'UTF-8');
-            $slotEndFormatted = mb_convert_encoding($slotEnd->format('H:i'), 'UTF-8', 'UTF-8');
+            $slotStartFormatted = $currentTime->format('H:i');
+            $slotEndFormatted = $slotEnd->format('H:i');
 
+            // Adjust session time for display purposes (EEST = UTC+3)
             $isBooked = $bookedSessions->contains(function ($session) use ($currentTime) {
-                $isMentorshipPlan = $session->mentorshipRequest && $session->mentorshipRequest->requestable_type === \App\Models\MentorshipPlan::class;
-                $sessionStart = Carbon::parse($session->date_time);
-                if ($isMentorshipPlan) {
-                    $sessionStart->addHours(3); // Adjust to EEST for Mentorship Plan
-                }
+                $sessionStart = Carbon::parse($session->date_time)->addHours(3);
                 Log::info('Comparing slot with session', [
-                    'slot_start' => mb_convert_encoding($currentTime->format('Y-m-d H:i:s'), 'UTF-8', 'UTF-8'),
-                    'session_start_raw' => mb_convert_encoding($session->date_time, 'UTF-8', 'UTF-8'),
-                    'session_start_adjusted' => mb_convert_encoding($sessionStart->format('Y-m-d H:i:s'), 'UTF-8', 'UTF-8'),
-                    'is_mentorship_plan' => $isMentorshipPlan,
+                    'slot_start' => $currentTime->format('Y-m-d H:i:s'),
+                    'session_start_raw' => $session->date_time,
+                    'session_start_adjusted' => $sessionStart->format('Y-m-d H:i:s'),
                 ]);
                 return $sessionStart->format('Y-m-d H:i') === $currentTime->format('Y-m-d H:i');
             });
@@ -227,7 +224,7 @@ class BookingController extends Controller
             $slots[] = [
                 'start_time' => $slotStartFormatted,
                 'end_time' => $slotEndFormatted,
-                'status' => mb_convert_encoding($status, 'UTF-8', 'UTF-8'),
+                'status' => $status,
             ];
 
             $currentTime->addMinutes($durationMinutes);
@@ -247,7 +244,7 @@ class BookingController extends Controller
 
         $service = Service::findOrFail($request->service_id);
         if ($service->coach_id !== (int)$coachId) {
-            return response()->json(['message' => 'الخدمة غير متاحة لهذا المدرب'], 403);
+            return response()->json(['message' => 'الخدمة دي مش تابعة للكوتش'], 403);
         }
 
         $mentorshipRequestId = $request->mentorship_request_id;
@@ -448,9 +445,9 @@ class BookingController extends Controller
             DB::rollBack();
             Log::error('فشل بدء الحجز', [
                 'coach_id' => $coachId,
-                'error' => mb_convert_encoding($e->getMessage(), 'UTF-8', 'UTF-8'),
+                'error' => $e->getMessage(),
             ]);
-            return response()->json(['message' => 'حدث خطأ أثناء الحجز: ' . mb_convert_encoding($e->getMessage(), 'UTF-8', 'UTF-8')], 500);
+            return response()->json(['error' => $e->getMessage()], 500);
         }
     }
 }
