@@ -100,12 +100,11 @@ class BookingController extends Controller
                 }
             }
 
-            $allSlotsBooked = !empty($availableSlots); // Initialize as true only if there are slots
+            $allSlotsBooked = !empty($availableSlots);
             foreach ($availableSlots as $slot) {
                 $isSlotBooked = isset($bookedSessions[$dateString]) && $bookedSessions[$dateString]->contains(function ($session) use ($slot, $dateString) {
-                    $sessionStart = Carbon::parse($session->date_time)->addHours(3); // Adjust for EEST
+                    $sessionStart = Carbon::parse($session->date_time)->addHours(3);
                     $sessionEnd = $sessionStart->copy()->addMinutes($session->duration);
-                    // Compare only hours and minutes to avoid millisecond issues
                     $isMatch = $slot['start']->format('Y-m-d H:i') === $sessionStart->format('Y-m-d H:i')
                         && $slot['end']->format('Y-m-d H:i') === $sessionEnd->format('Y-m-d H:i');
                     Log::info('Checking slot booking status', [
@@ -175,8 +174,9 @@ class BookingController extends Controller
             'availabilities' => $availabilities->toArray(),
         ]);
 
-        // جلب الجلسات المحجوزة للتاريخ المحدد
-        $bookedSessions = NewSession::where('coach_id', $coachId)
+        // جلب الجلسات المحجوزة للتاريخ المحدد مع تحميل mentorshipRequest
+        $bookedSessions = NewSession::with('mentorshipRequest')
+            ->where('coach_id', $coachId)
             ->whereIn('status', ['Pending', 'Scheduled'])
             ->where('date_time', '>=', $selectedDate->startOfDay()->toDateTimeString())
             ->where('date_time', '<', $selectedDate->endOfDay()->toDateTimeString())
@@ -200,13 +200,18 @@ class BookingController extends Controller
             $slotStartFormatted = $currentTime->format('H:i');
             $slotEndFormatted = $slotEnd->format('H:i');
 
-            // Adjust session time for display purposes (EEST = UTC+3)
+            // Check if the slot is booked, adjust for EEST only if not Mentorship Plan
             $isBooked = $bookedSessions->contains(function ($session) use ($currentTime) {
-                $sessionStart = Carbon::parse($session->date_time)->addHours(3);
+                $isMentorshipPlan = $session->mentorshipRequest && $session->mentorshipRequest->requestable_type === \App\Models\MentorshipPlan::class;
+                $sessionStart = Carbon::parse($session->date_time);
+                if (!$isMentorshipPlan) {
+                    $sessionStart->addHours(3); // Adjust to EEST for non-Mentorship Plan
+                }
                 Log::info('Comparing slot with session', [
                     'slot_start' => $currentTime->format('Y-m-d H:i:s'),
                     'session_start_raw' => $session->date_time,
                     'session_start_adjusted' => $sessionStart->format('Y-m-d H:i:s'),
+                    'is_mentorship_plan' => $isMentorshipPlan,
                 ]);
                 return $sessionStart->format('Y-m-d H:i') === $currentTime->format('Y-m-d H:i');
             });
@@ -334,7 +339,6 @@ class BookingController extends Controller
                     $sessionDateTime = $sessionDate->setTime($startTime->hour, $startTime->minute, $startTime->second);
                     $slotEnd = $sessionDateTime->copy()->addMinutes($durationMinutes);
 
-                    // Log the sessionDateTime to ensure it's correct
                     Log::info('Preparing Mentorship Plan session', [
                         'mentorship_request_id' => $mentorshipRequestId,
                         'session_index' => $i,
@@ -388,7 +392,6 @@ class BookingController extends Controller
                     ]);
                     $createdSessions[] = $session;
 
-                    // Log the created session to verify storage
                     Log::info('Mentorship Plan session created', [
                         'new_session_id' => $session->new_session_id,
                         'date_time' => $session->date_time,
