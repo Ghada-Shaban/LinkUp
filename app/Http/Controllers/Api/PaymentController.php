@@ -148,26 +148,25 @@ class PaymentController extends Controller
                 $sessions = [];
                 if ($mentorshipRequest->requestable_type === 'App\\Models\\GroupMentorship') {
                     $groupMentorship = $requestable;
-                    $traineeIds = json_decode($groupMentorship->trainee_ids, true) ?? [];
+                    $traineeIds = json_decode($groupMentorship->current_participants, true) ?? [];
                     if (!is_array($traineeIds)) {
                         $traineeIds = [];
                     }
                     
-                    $currentParticipants = count($traineeIds);
+                    $currentParticipantsCount = count($traineeIds);
                     if (!in_array($mentorshipRequest->trainee_id, $traineeIds)) {
                         $traineeIds[] = $mentorshipRequest->trainee_id;
-                        $groupMentorship->trainee_ids = json_encode($traineeIds);
-                        $groupMentorship->current_participants = count($traineeIds);
-                        // Update is_active based on minimum participants
-                        $groupMentorship->is_active = $groupMentorship->current_participants >= $groupMentorship->minimum_participants ? 1 : 0;
+                        $groupMentorship->current_participants = json_encode($traineeIds);
+                        $currentParticipantsCount = count($traineeIds);
+                        $groupMentorship->is_active = $currentParticipantsCount >= $groupMentorship->minimum_participants ? 1 : 0;
                         $groupMentorship->save();
                     }
 
-                    if ($currentParticipants > $groupMentorship->max_participants) {
+                    if ($currentParticipantsCount > $groupMentorship->maximum_participants) {
                         return response()->json(['message' => 'Group Mentorship is full'], 400);
                     }
 
-                    $startDateTime = Carbon::parse($groupMentorship->day . ' ' . $groupMentorship->start_time, 'Africa/Cairo');
+                    $startDateTime = Carbon::parse($groupMentorship->day_of_week . ' ' . $groupMentorship->start_time, 'Africa/Cairo');
                     if ($startDateTime->lt(Carbon::now())) {
                         $startDateTime->addWeek();
                     }
@@ -179,7 +178,7 @@ class PaymentController extends Controller
                             'coach_id' => $mentorshipRequest->coach_id,
                             'trainee_id' => $mentorshipRequest->trainee_id,
                             'date_time' => $sessionDateTime,
-                            'duration' => $groupMentorship->duration_minutes,
+                            'duration' => $groupMentorship->duration,
                             'status' => NewSession::STATUS_SCHEDULED,
                             'payment_status' => 'Completed',
                             'meeting_link' => null,
@@ -218,7 +217,6 @@ class PaymentController extends Controller
                 try {
                     if ($mentorshipRequest->trainee && $mentorshipRequest->trainee->email) {
                         Mail::to($mentorshipRequest->trainee->email)->send(new PaymentConfirmation($mentorshipRequest, $sessions, $payment));
-                       
                     } 
                 } catch (\Exception $e) {
                 }
@@ -339,7 +337,6 @@ class PaymentController extends Controller
                         ]);
                     }
                 } catch (\Exception $e) {
-                  
                 }
 
                 return response()->json([
