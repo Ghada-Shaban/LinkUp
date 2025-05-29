@@ -267,8 +267,9 @@ class MentorshipPlanController extends Controller
         $startDate = Carbon::parse($request->start_date);
         $startTime = Carbon::parse($request->start_time);
         $dayOfWeek = $startDate->format('l');
-        // إنشاء التاريخ والوقت بـ UTC عشان ميتحولش تلقائياً
-        $sessionDateTime = Carbon::createFromFormat('Y-m-d H:i:s', $startDate->format('Y-m-d') . ' ' . $startTime->format('H:i:s'), 'UTC');
+        // تكوين datetime string مباشرة بدون timezone conversion
+        $sessionDateTimeString = $startDate->format('Y-m-d') . ' ' . $startTime->format('H:i:s');
+        $sessionDateTime = Carbon::parse($sessionDateTimeString);
         $slotEnd = $sessionDateTime->copy()->addMinutes($durationMinutes);
 
         Log::info('Initial session date time for Mentorship Plan', [
@@ -295,8 +296,9 @@ class MentorshipPlanController extends Controller
             $sessionsToBook = [];
             for ($i = 0; $i < $sessionCount; $i++) {
                 $sessionDate = $startDate->copy()->addWeeks($i);
-                // إنشاء التاريخ والوقت بـ UTC عشان ميتحولش تلقائياً
-                $sessionDateTime = Carbon::createFromFormat('Y-m-d H:i:s', $sessionDate->format('Y-m-d') . ' ' . $startTime->format('H:i:s'), 'UTC');
+                // تكوين datetime string مباشرة بدون timezone conversion
+                $sessionDateTimeString = $sessionDate->format('Y-m-d') . ' ' . $startTime->format('H:i:s');
+                $sessionDateTime = Carbon::parse($sessionDateTimeString);
                 $slotEnd = $sessionDateTime->copy()->addMinutes($durationMinutes);
 
                 Log::info('Preparing Mentorship Plan session', [
@@ -334,7 +336,7 @@ class MentorshipPlanController extends Controller
                 }
 
                 $sessionsToBook[] = [
-                    'date_time' => $sessionDateTime->toDateTimeString(),
+                    'date_time' => $sessionDateTimeString,
                     'duration' => $durationMinutes,
                 ];
             }
