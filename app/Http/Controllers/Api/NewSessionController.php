@@ -44,7 +44,7 @@ class NewSessionController extends Controller
         $sessions = collect();
 
         if ($user->role_profile === 'Coach') {
-            $query = NewSession::with(['service', 'trainees', 'mentorshipRequest'])
+            $query = NewSession::with(['service.mentorship.mentorshipPlan', 'service.mentorship.mentorshipSession', 'trainees', 'mentorshipRequest'])
                 ->where('coach_id', $user->User_ID)
                 ->whereIn('status', $statuses);
 
@@ -93,7 +93,7 @@ class NewSessionController extends Controller
                             ]);
                             if ($mentorship->mentorship_type === 'Mentorship session') {
                                 $sessionType = 'mentorship sessions';
-                                $mentorshipSession = $service->mentorshipSession;
+                                $mentorshipSession = $mentorship->mentorshipSession;
                                 if ($mentorshipSession) {
                                     Log::info('Mentorship session found for service', [
                                         'service_id' => $service->service_id,
@@ -124,6 +124,7 @@ class NewSessionController extends Controller
                             }
                         } else {
                             Log::warning('No mentorship found for service', [
+                                'session_id' => $session->new_session_id,
                                 'service_id' => $service->service_id
                             ]);
                             $sessionType = 'mentorship';
@@ -233,7 +234,7 @@ class NewSessionController extends Controller
                 'sessions' => $sessions->toArray()
             ]);
         } elseif ($user->role_profile === 'Trainee') {
-            $query = NewSession::with(['service', 'coach.user', 'mentorshipRequest'])
+            $query = NewSession::with(['service.mentorship.mentorshipPlan', 'service.mentorship.mentorshipSession', 'coach.user', 'mentorshipRequest.requestable'])
                 ->where('trainee_id', $user->User_ID)
                 ->whereIn('status', $statuses);
 
@@ -290,7 +291,7 @@ class NewSessionController extends Controller
                             ]);
                             if ($mentorship->mentorship_type === 'Mentorship session') {
                                 $sessionType = 'mentorship sessions';
-                                $mentorshipSession = $service->mentorshipSession;
+                                $mentorshipSession = $mentorship->mentorshipSession;
                                 if ($mentorshipSession) {
                                     Log::info('Mentorship session found for service', [
                                         'service_id' => $service->service_id,
@@ -305,15 +306,17 @@ class NewSessionController extends Controller
                                 }
                             } elseif ($mentorship->mentorship_type === 'Mentorship Plan') {
                                 $sessionType = 'mentorship plan';
-                                $mentorshipPlan = $session->mentorshipRequest ? $session->mentorshipRequest->requestable : null;
+                                $mentorshipPlan = $session->mentorshipRequest ? $session->mentorshipRequest->requestable : $mentorship->mentorshipPlan;
                                 if ($mentorshipPlan) {
                                     Log::info('Mentorship plan found for service', [
+                                        'session_id' => $session->new_session_id,
                                         'service_id' => $service->service_id,
                                         'mentorship_plan' => $mentorshipPlan->toArray()
                                     ]);
                                     $serviceTitle = $mentorshipPlan->title;
                                 } else {
                                     Log::warning('Mentorship plan not found for service', [
+                                        'session_id' => $session->new_session_id,
                                         'service_id' => $service->service_id
                                     ]);
                                     $serviceTitle = 'Mentorship Plan';
@@ -321,6 +324,7 @@ class NewSessionController extends Controller
                             }
                         } else {
                             Log::warning('No mentorship found for service', [
+                                'session_id' => $session->new_session_id,
                                 'service_id' => $service->service_id
                             ]);
                             $sessionType = 'mentorship';
