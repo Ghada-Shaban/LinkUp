@@ -85,12 +85,6 @@ class NewSessionController extends Controller
                     ]);
 
                     if ($service->service_type === 'Mentorship') {
-                        $sessionType = 'mentorship sessions';
-                    } else {
-                        $sessionType = strtolower(str_replace('_', ' ', $service->service_type));
-                    }
-
-                    if ($service->service_type === 'Mentorship') {
                         $mentorship = $service->mentorship;
                         if ($mentorship) {
                             Log::info('Mentorship found for service', [
@@ -98,6 +92,7 @@ class NewSessionController extends Controller
                                 'mentorship' => $mentorship->toArray()
                             ]);
                             if ($mentorship->mentorship_type === 'Mentorship session') {
+                                $sessionType = 'mentorship sessions';
                                 $mentorshipSession = $service->mentorshipSession;
                                 if ($mentorshipSession) {
                                     Log::info('Mentorship session found for service', [
@@ -112,6 +107,7 @@ class NewSessionController extends Controller
                                     $serviceTitle = 'Mentorship Session';
                                 }
                             } elseif ($mentorship->mentorship_type === 'Mentorship Plan') {
+                                $sessionType = 'mentorship plan';
                                 $mentorshipPlan = $mentorship->mentorshipPlan;
                                 if ($mentorshipPlan) {
                                     Log::info('Mentorship plan found for service', [
@@ -132,6 +128,7 @@ class NewSessionController extends Controller
                             ]);
                         }
                     } elseif ($service->service_type === 'Mock_Interview') {
+                        $sessionType = 'mock interview';
                         $mockInterview = $service->mockInterview;
                         if ($mockInterview) {
                             Log::info('Mock Interview found for service', [
@@ -146,6 +143,7 @@ class NewSessionController extends Controller
                             $serviceTitle = 'Mock Interview';
                         }
                     } elseif ($service->service_type === 'Group_Mentorship') {
+                        $sessionType = 'group mentorship';
                         $groupMentorship = $service->groupMentorship;
                         if ($groupMentorship) {
                             Log::info('Group Mentorship found for service', [
@@ -162,6 +160,7 @@ class NewSessionController extends Controller
                             $currentParticipants = 0;
                         }
                     } else {
+                        $sessionType = strtolower(str_replace('_', ' ', $service->service_type));
                         $serviceTitle = $service->title ?? 'N/A';
                     }
                 } else {
@@ -281,12 +280,6 @@ class NewSessionController extends Controller
                     ]);
 
                     if ($service->service_type === 'Mentorship') {
-                        $sessionType = 'mentorship sessions';
-                    } else {
-                        $sessionType = strtolower(str_replace('_', ' ', $service->service_type));
-                    }
-
-                    if ($service->service_type === 'Mentorship') {
                         $mentorship = $service->mentorship;
                         if ($mentorship) {
                             Log::info('Mentorship found for service', [
@@ -294,6 +287,7 @@ class NewSessionController extends Controller
                                 'mentorship' => $mentorship->toArray()
                             ]);
                             if ($mentorship->mentorship_type === 'Mentorship session') {
+                                $sessionType = 'mentorship sessions';
                                 $mentorshipSession = $service->mentorshipSession;
                                 if ($mentorshipSession) {
                                     Log::info('Mentorship session found for service', [
@@ -308,6 +302,7 @@ class NewSessionController extends Controller
                                     $serviceTitle = 'Mentorship Session';
                                 }
                             } elseif ($mentorship->mentorship_type === 'Mentorship Plan') {
+                                $sessionType = 'mentorship plan';
                                 $mentorshipPlan = $mentorship->mentorshipPlan;
                                 if ($mentorshipPlan) {
                                     Log::info('Mentorship plan found for service', [
@@ -328,6 +323,7 @@ class NewSessionController extends Controller
                             ]);
                         }
                     } elseif ($service->service_type === 'Mock_Interview') {
+                        $sessionType = 'mock interview';
                         $mockInterview = $service->mockInterview;
                         if ($mockInterview) {
                             Log::info('Mock Interview found for service', [
@@ -342,6 +338,7 @@ class NewSessionController extends Controller
                             $serviceTitle = 'Mock Interview';
                         }
                     } elseif ($service->service_type === 'Group_Mentorship') {
+                        $sessionType = 'group mentorship';
                         $groupMentorship = $service->groupMentorship;
                         if ($groupMentorship) {
                             Log::info('Group Mentorship found for service', [
@@ -358,6 +355,7 @@ class NewSessionController extends Controller
                             $currentParticipants = 0;
                         }
                     } else {
+                        $sessionType = strtolower(str_replace('_', ' ', $service->service_type));
                         $serviceTitle = $service->title ?? 'N/A';
                     }
                 } else {
