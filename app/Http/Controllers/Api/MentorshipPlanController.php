@@ -103,7 +103,8 @@ class MentorshipPlanController extends Controller
             foreach ($availableSlots as $slot) {
                 $isSlotBooked = isset($bookedSessions[$dateString]) && $bookedSessions[$dateString]->contains(function ($session) use ($slot, $dateString) {
                     $sessionStart = Carbon::parse($session->date_time);
-                    $slotStartAdjusted = $slot['start']->copy()->addHours(3); // Adjust to EEST for display
+                    // تطبيق نفس منطق BookingController - تعديل slot للمقارنة
+                    $slotStartAdjusted = $slot['start']->copy()->subHours(3);
                     $isMatch = $slotStartAdjusted->format('Y-m-d H:i') === $sessionStart->format('Y-m-d H:i');
                     Log::info('Checking slot booking status', [
                         'date' => $dateString,
@@ -196,9 +197,10 @@ class MentorshipPlanController extends Controller
             $slotStartFormatted = mb_convert_encoding($currentTime->format('H:i'), 'UTF-8', 'UTF-8');
             $slotEndFormatted = mb_convert_encoding($slotEnd->format('H:i'), 'UTF-8', 'UTF-8');
 
+            // تطبيق نفس منطق BookingController - إضافة 3 ساعات للمقارنة
             $isBooked = $bookedSessions->contains(function ($session) use ($currentTime) {
                 $isMentorshipPlan = $session->mentorshipRequest && $session->mentorshipRequest->requestable_type === \App\Models\MentorshipPlan::class;
-                $sessionStart = Carbon::parse($session->date_time)->addHours(3); // Adjust to EEST for display
+                $sessionStart = Carbon::parse($session->date_time)->addHours(3); // التعديل المطلوب هنا
                 Log::info('Comparing slot with session', [
                     'slot_start' => mb_convert_encoding($currentTime->format('Y-m-d H:i:s'), 'UTF-8', 'UTF-8'),
                     'session_start_raw' => mb_convert_encoding($session->date_time, 'UTF-8', 'UTF-8'),
@@ -263,20 +265,17 @@ class MentorshipPlanController extends Controller
         }
 
         $durationMinutes = 60;
-        $startDate = Carbon::parse($request->start_date)->setTimezone('Africa/Cairo'); // Ensure EEST
-        $startTime = Carbon::parse($request->start_time, 'Africa/Cairo'); // Parse time in EEST
+        $startDate = Carbon::parse($request->start_date);
+        $startTime = Carbon::parse($request->start_time);
         $dayOfWeek = $startDate->format('l');
-        $sessionDateTime = $startDate->copy()->setTime($startTime->hour, $startTime->minute, $startTime->second);
+        // تطبيق نفس منطق BookingController - حفظ الوقت كما هو
+        $sessionDateTime = $startDate->setTime($startTime->hour, $startTime->minute, $startTime->second);
         $slotEnd = $sessionDateTime->copy()->addMinutes($durationMinutes);
-
-        // Convert to UTC for database storage (EEST is UTC+3)
-        $sessionDateTimeUtc = $sessionDateTime->copy()->subHours(3);
 
         Log::info('Initial session date time for Mentorship Plan', [
             'start_date' => $request->start_date,
             'start_time' => $request->start_time,
-            'session_date_time_eest' => $sessionDateTime->toDateTimeString(),
-            'session_date_time_utc' => $sessionDateTimeUtc->toDateTimeString(),
+            'session_date_time' => $sessionDateTime->toDateTimeString(),
             'timezone' => $sessionDateTime->getTimezone()->getName(),
         ]);
 
@@ -297,15 +296,14 @@ class MentorshipPlanController extends Controller
             $sessionsToBook = [];
             for ($i = 0; $i < $sessionCount; $i++) {
                 $sessionDate = $startDate->copy()->addWeeks($i);
-                $sessionDateTime = $sessionDate->copy()->setTime($startTime->hour, $startTime->minute, $startTime->second);
-                $sessionDateTimeUtc = $sessionDateTime->copy()->subHours(3); // Convert to UTC
+                // تطبيق نفس منطق BookingController - حفظ الوقت كما هو
+                $sessionDateTime = $sessionDate->setTime($startTime->hour, $startTime->minute, $startTime->second);
                 $slotEnd = $sessionDateTime->copy()->addMinutes($durationMinutes);
 
                 Log::info('Preparing Mentorship Plan session', [
                     'mentorship_request_id' => $mentorshipRequest->id,
                     'session_index' => $i,
-                    'date_time_eest' => $sessionDateTime->toDateTimeString(),
-                    'date_time_utc' => $sessionDateTimeUtc->toDateTimeString(),
+                    'date_time' => $sessionDateTime->toDateTimeString(),
                     'timezone' => $sessionDateTime->getTimezone()->getName(),
                 ]);
 
@@ -321,15 +319,15 @@ class MentorshipPlanController extends Controller
 
                 $conflictingSessions = NewSession::where('coach_id', (int)$coachId)
                     ->whereIn('status', ['Pending', 'Scheduled'])
-                    ->whereDate('date_time', $sessionDateTimeUtc->toDateString())
+                    ->whereDate('date_time', $sessionDateTime->toDateString())
                     ->whereDoesntHave('mentorshipRequest', function ($query) {
                         $query->where('requestable_type', GroupMentorship::class);
                     })
                     ->get()
-                    ->filter(function ($existingSession) use ($sessionDateTimeUtc, $slotEnd) {
+                    ->filter(function ($existingSession) use ($sessionDateTime, $slotEnd) {
                         $reqStart = Carbon::parse($existingSession->date_time);
                         $reqEnd = $reqStart->copy()->addMinutes($existingSession->duration);
-                        return $sessionDateTimeUtc->equalTo($reqStart) && $slotEnd->equalTo($reqEnd);
+                        return $sessionDateTime->equalTo($reqStart) && $slotEnd->equalTo($reqEnd);
                     });
 
                 if ($conflictingSessions->isNotEmpty()) {
@@ -337,7 +335,7 @@ class MentorshipPlanController extends Controller
                 }
 
                 $sessionsToBook[] = [
-                    'date_time' => $sessionDateTimeUtc->toDateTimeString(), // Store in UTC
+                    'date_time' => $sessionDateTime->toDateTimeString(),
                     'duration' => $durationMinutes,
                 ];
             }
@@ -356,7 +354,7 @@ class MentorshipPlanController extends Controller
                 $createdSessions[] = $session;
 
                 Log::info('Mentorship Plan session created', [
-                    'new_session_id' => $session->id,
+                    'new_session_id' => $session->new_session_id,
                     'date_time' => $session->date_time,
                     'mentorship_request_id' => $mentorshipRequest->id,
                 ]);
@@ -364,7 +362,7 @@ class MentorshipPlanController extends Controller
 
             \App\Models\PendingPayment::create([
                 'mentorship_request_id' => $mentorshipRequest->id,
-                'payment_due_at' => Carbon::now()->addHours(24),
+                'payment_due_at' => now()->addHours(24),
             ]);
 
             DB::commit();
