@@ -262,6 +262,13 @@ class BookingController extends Controller
         $sessionDateTime = $startDate->setTime($startTime->hour, $startTime->minute, $startTime->second);
         $slotEnd = $sessionDateTime->copy()->addMinutes($durationMinutes);
 
+        Log::info('Initial session date time', [
+            'start_date' => $request->start_date,
+            'start_time' => $request->start_time,
+            'session_date_time' => $sessionDateTime->toDateTimeString(),
+            'timezone' => $sessionDateTime->getTimezone()->getName(),
+        ]);
+
         $availability = CoachAvailability::where('coach_id', (int)$coachId)
             ->where('Day_Of_Week', $dayOfWeek)
             ->where('Start_Time', '<=', $sessionDateTime->format('H:i:s'))
@@ -339,10 +346,14 @@ class BookingController extends Controller
                     $sessionDateTime = $sessionDate->setTime($startTime->hour, $startTime->minute, $startTime->second);
                     $slotEnd = $sessionDateTime->copy()->addMinutes($durationMinutes);
 
+                    // Adjust time for Mentorship Plan to store as EEST without UTC conversion
+                    $adjustedDateTime = $sessionDateTime->copy()->subHours(3); // Compensate for UTC conversion
+
                     Log::info('Preparing Mentorship Plan session', [
                         'mentorship_request_id' => $mentorshipRequestId,
                         'session_index' => $i,
-                        'date_time' => $sessionDateTime->toDateTimeString(),
+                        'original_date_time' => $sessionDateTime->toDateTimeString(),
+                        'adjusted_date_time' => $adjustedDateTime->toDateTimeString(),
                         'timezone' => $sessionDateTime->getTimezone()->getName(),
                     ]);
 
@@ -374,7 +385,7 @@ class BookingController extends Controller
                     }
 
                     $sessionsToBook[] = [
-                        'date_time' => $sessionDateTime->toDateTimeString(),
+                        'date_time' => $adjustedDateTime->toDateTimeString(),
                         'duration' => $durationMinutes,
                     ];
                 }
@@ -412,10 +423,10 @@ class BookingController extends Controller
 
                 return response()->json([
                     'message' => 'تم حجز كل الجلسات بنجاح. تابع الدفع باستخدام /api/payment/initiate/mentorship_request/' . $mentorshipRequestId,
-                    'sessions' => $createdSessions,
+                    'sessions' => $createdSessions
                 ]);
             } else {
-                $tempSessionId = Uuid::uuid4()->toString();
+                $tempSessionId = Uuid::generate()->toString();
 
                 $sessionData = [
                     'temp_session_id' => $tempSessionId,
@@ -424,10 +435,10 @@ class BookingController extends Controller
                     'service_id' => $service->service_id,
                     'date_time' => $sessionDateTime->toDateTimeString(),
                     'duration' => $durationMinutes,
-                ];
+                ]);
 
                 DB::commit();
-                Log::info('تم بدء حجز خدمة عادية، في انتظار الدفع', [
+                Log::info('تم بدء حجز خدمة بخير، في انتظار الدفع', [
                     'temp_session_id' => $tempSessionId,
                     'service_id' => $service->service_id,
                     'trainee_id' => Auth::user()->User_ID,
