@@ -18,7 +18,7 @@ class MentorshipPlanController extends Controller
 {
     public function getAvailableDates(Request $request, $coachId)
     {
-        // الكود زي ما هو في النسخة السابقة
+        // الكود زي ما هو، بدون تغيير
         $request->validate([
             'service_id' => 'required|exists:services,service_id',
             'month' => 'required|date_format:Y-m',
@@ -142,6 +142,7 @@ class MentorshipPlanController extends Controller
 
     public function getAvailableSlots(Request $request, $coachId)
     {
+        // الكود زي ما هو، بدون تغيير
         $request->validate([
             'date' => 'required|date',
             'service_id' => 'required|exists:services,service_id',
@@ -264,13 +265,28 @@ class MentorshipPlanController extends Controller
         }
 
         $durationMinutes = 60;
+
         // Parse date and time explicitly in EEST (Africa/Cairo)
-        $startDate = Carbon::parse($request->start_date, 'Africa/Cairo');
-        $startTime = Carbon::parse($request->start_time, 'Africa/Cairo');
-        $dayOfWeek = $startDate->format('l');
+        try {
+            $startDate = Carbon::createFromFormat('Y-m-d', $request->start_date, 'Africa/Cairo');
+            $startTime = Carbon::createFromFormat('H:i:s', $request->start_time, 'Africa/Cairo');
+            if (!$startDate || !$startTime) {
+                throw new \Exception('Invalid date or time format');
+            }
+        } catch (\Exception $e) {
+            Log::error('Failed to parse date or time', [
+                'start_date' => $request->start_date,
+                'start_time' => $request->start_time,
+                'error' => $e->getMessage(),
+            ]);
+            return response()->json(['message' => 'تنسيق التاريخ أو الوقت غير صحيح'], 400);
+        }
+
+        // Combine date and time
         $sessionDateTime = $startDate->copy()->setTime($startTime->hour, $startTime->minute, $startTime->second);
-        $sessionDateTimeUtc = $sessionDateTime->copy()->setTimezone('UTC'); // Convert to UTC for storage
+        $sessionDateTimeUtc = $sessionDateTime->copy()->setTimezone('UTC'); // Convert to UTC
         $slotEnd = $sessionDateTime->copy()->addMinutes($durationMinutes);
+        $dayOfWeek = $sessionDateTime->format('l');
 
         Log::info('Initial session date time for Mentorship Plan', [
             'start_date' => $request->start_date,
@@ -295,91 +311,92 @@ class MentorshipPlanController extends Controller
                 return response()->json(['message' => 'خطة المنتورشيب بتتطلب حجز 4 جلسات مرة واحدة'], 400);
             }
 
-        $sessionsToBook = [];
-        for ($i = 0; $i < $sessionCount; $i++) {
-            $sessionDate = $startDate->copy()->addWeeks($i);
-            $sessionDateTime = $sessionDate->copy()->setTime($startTime->hour, $startTime->minute, $startTime->second);
-            $sessionDateTimeUtc = $sessionDateTime->copy()->setTimezone('UTC'); // Convert to UTC
-            $slotEnd = $sessionDateTime->copy()->addMinutes($durationMinutes);
+            $sessionsToBook = [];
+            for ($i = 0; $i < $sessionCount; $i++) {
+                $sessionDate = $startDate->copy()->addWeeks($i);
+                $sessionDateTime = $sessionDate->copy()->setTime($startTime->hour, $startTime->minute, $startTime->second);
+                $sessionDateTimeUtc = $sessionDateTime->copy()->setTimezone('UTC');
+                $slotEnd = $sessionDateTime->copy()->addMinutes($durationMinutes);
 
-            Log::info('Preparing Mentorship Plan session', [
+                Log::info('Preparing Mentorship Plan session', [
+                    'mentorship_request_id' => $mentorshipRequest->id,
+                    'session_index' => $i,
+                    'date_time_eest' => $sessionDateTime->toDateTimeString(),
+                    'date_time_utc' => $sessionDateTimeUtc->toDateTimeString(),
+                    'timezone' => $sessionDateTime->getTimezone()->getName(),
+                ]);
+
+                $availability = CoachAvailability::where('coach_id', (int)$coachId)
+                    ->where('Day_Of_Week', $sessionDate->format('l'))
+                    ->where('Start_Time', '<=', $sessionDateTime->format('H:i:s'))
+                    ->where('End_Time', '>=', $slotEnd->format('H:i:s'))
+                    ->first();
+
+                if (!$availability) {
+                    return response()->json(['message' => "السلوت المختار مش متاح في {$sessionDateTime->toDateString()}"], 400);
+                }
+
+                $conflictingSessions = NewSession::where('coach_id', (int)$coachId)
+                    ->whereIn('status', ['Pending', 'Scheduled'])
+                    ->where('date_time', $sessionDateTimeUtc->toDateTimeString())
+                    ->whereDoesntHave('mentorshipRequest', function ($query) {
+                        $query->where('requestable_type', GroupMentorship::class);
+                    })
+                    ->get();
+
+                if ($conflictingSessions->isNotEmpty()) {
+                    return response()->json(['message' => "السلوت المختار محجوز بالفعل في {$sessionDateTime->toDateString()}"], 400);
+                }
+
+                $sessionsToBook[] = [
+                    'date_time' => $sessionDateTimeUtc->toDateTimeString(),
+                    'duration' => $durationMinutes,
+                ];
+            }
+
+            $createdSessions = [];
+            foreach ($sessionsToBook as $sessionData) {
+                $session = NewSession::create([
+                    'trainee_id' => Auth::user()->User_ID,
+                    'coach_id' => $coachId,
+                    'date_time' => $sessionData['date_time'],
+                    'duration' => $sessionData['duration'],
+                    'status' => 'Pending',
+                    'service_id' => $service->service_id,
+                    'mentorship_request_id' => $mentorshipRequest->id,
+                ]);
+                $createdSessions[] = $session;
+
+                Log::info('Mentorship Plan session created', [
+                    'new_session_id' => $session->new_session_id,
+                    'date_time' => $session->date_time,
+                    'mentorship_request_id' => $mentorshipRequest->id,
+                ]);
+            }
+
+            \App\Models\PendingPayment::create([
                 'mentorship_request_id' => $mentorshipRequest->id,
-                'session_index' => $i,
-                'date_time_eest' => $sessionDateTime->toDateTimeString(),
-                'date_time_utc' => $sessionDateTimeUtc->toDateTimeString(),
-                'timezone' => $sessionDateTime->getTimezone()->getName(),
+                'payment_due_at' => now()->addHours(24),
             ]);
 
-            $availability = CoachAvailability::where('coach_id', (int)$coachId)
-                ->where('Day_Of_Week', $sessionDate->format('l'))
-                ->where('Start_Time', '<=', $sessionDateTime->format('H:i:s'))
-                ->where('End_Time', '>=', $slotEnd->format('H:i:s'))
-                ->first();
+            DB::commit();
+            Log::info('تم حجز كل الجلسات لخطة المنتورشيب، في انتظار الدفع', [
+                'mentorship_request_id' => $mentorshipRequest->id,
+                'sessions' => $createdSessions,
+            ]);
 
-            if (!$availability) {
-                return response()->json(['message' => "السلوت المختار مش متاح في {$sessionDateTime->toDateString()}"], 400);
-            }
-
-            $conflictingSessions = NewSession::where('coach_id', (int)$coachId)
-                ->whereIn('status', ['Pending', 'Scheduled'])
-                ->where('date_time', $sessionDateTimeUtc->toDateTimeString())
-                ->whereDoesntHave('mentorshipRequest', function ($query) {
-                    $query->where('requestable_type', GroupMentorship::class);
-                })
-                ->get();
-
-            if ($conflictingSessions->isNotEmpty()) {
-                return response()->json(['message' => "السلوت المختار محجوز بالفعل في {$sessionDateTime->toDateString()}"], 400);
-            }
-
-            $sessionsToBook[] = [
-                'date_time' => $sessionDateTimeUtc->toDateTimeString(), // Store in UTC
-                'duration' => $durationMinutes,
-            ];
-        }
-
-        $createdSessions = [];
-        foreach ($sessionsToBook as $sessionData) {
-            $session = NewSession::create([
-                'trainee_id' => Auth::user()->User_ID,
+            return response()->json([
+                'message' => 'تم حجز كل الجلسات بنجاح. تابع الدفع باستخدام /api/payment/initiate/partner/' . $mentorshipRequest->id,
+                'sessions' => $createdSessions,
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('فشل بدء الحجز لخطة المنتورشيب', [
                 'coach_id' => $coachId,
-                'date_time' => $sessionData['date_time'],
-                'duration' => $sessionData['duration'],
-                'status' => 'Pending',
-                'service_id' => $service->service_id,
                 'mentorship_request_id' => $mentorshipRequest->id,
+                'error' => mb_convert_encoding($e->getMessage(), 'UTF-8', 'UTF-8'),
             ]);
-            $createdSessions[] = $session;
-
-            Log::info('Mentorship Plan session created', [
-                'new_session_id' => $session->new_session_id,
-                'date_time' => $session->date_time,
-                'mentorship_request_id' => $mentorshipRequest->id,
-            ]);
+            return response()->json(['message' => 'حدث خطأ أثناء الحجز: ' . mb_convert_encoding($e->getMessage(), 'UTF-8', 'UTF-8')], 500);
         }
-
-        \App\Models\PendingPayment::create([
-            'mentorship_request_id' => $mentorshipRequest->id,
-            'payment_due_at' => now()->addHours(24),
-        ]);
-
-        DB::commit();
-        Log::info('تم حجز كل الجلسات لخطة المنتورشيب، في انتظار الدفع', [
-            'mentorship_request_id' => $mentorshipRequest->id,
-            'sessions' => $createdSessions,
-        ]);
-
-        return response()->json([
-            'message' => 'تم حجز كل الجلسات بنجاح. تابع الدفع باستخدام /api/payment/initiate/mentorship_request/' . $mentorshipRequest->id,
-            'sessions' => $createdSessions,
-        ]);
-    } catch (\Exception $e) {
-        DB::rollBack();
-        Log::error('فشل بدء الحجز لخطة المنتورشيب', [
-            'coach_id' => $coachId,
-            'mentorship_request_id' => $mentorshipRequest->id,
-            'error' => mb_convert_encoding($e->getMessage(), 'UTF-8', 'UTF-8'),
-        ]);
-        return response()->json(['message' => 'حدث خطأ أثناء الحجز: ' . mb_convert_encoding($e->getMessage(), 'UTF-8', 'UTF-8')], 500);
     }
 }
