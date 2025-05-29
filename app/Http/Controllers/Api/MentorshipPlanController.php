@@ -18,7 +18,6 @@ class MentorshipPlanController extends Controller
 {
     public function getAvailableDates(Request $request, $coachId)
     {
-        // الكود زي ما هو، بدون تغيير
         $request->validate([
             'service_id' => 'required|exists:services,service_id',
             'month' => 'required|date_format:Y-m',
@@ -103,7 +102,7 @@ class MentorshipPlanController extends Controller
             $allSlotsBooked = !empty($availableSlots);
             foreach ($availableSlots as $slot) {
                 $isSlotBooked = isset($bookedSessions[$dateString]) && $bookedSessions[$dateString]->contains(function ($session) use ($slot, $dateString) {
-                    $sessionStart = Carbon::parse($session->date_time, 'UTC')->setTimezone('Africa/Cairo');
+                    $sessionStart = Carbon::parse($session->date_time);
                     $slotStartAdjusted = $slot['start']->copy();
                     $isMatch = $slotStartAdjusted->format('Y-m-d H:i') === $sessionStart->format('Y-m-d H:i');
                     Log::info('Checking slot booking status', [
@@ -142,7 +141,6 @@ class MentorshipPlanController extends Controller
 
     public function getAvailableSlots(Request $request, $coachId)
     {
-        // الكود زي ما هو، بدون تغيير
         $request->validate([
             'date' => 'required|date',
             'service_id' => 'required|exists:services,service_id',
@@ -151,7 +149,7 @@ class MentorshipPlanController extends Controller
         $date = $request->query('date');
         $serviceId = $request->query('service_id');
         $dayOfWeek = Carbon::parse($date)->format('l');
-        $selectedDate = Carbon::parse($date, 'Africa/Cairo');
+        $selectedDate = Carbon::parse($date);
 
         $service = Service::where('service_id', $serviceId)
             ->where('coach_id', $coachId)
@@ -176,8 +174,8 @@ class MentorshipPlanController extends Controller
         $bookedSessions = NewSession::with('mentorshipRequest')
             ->where('coach_id', $coachId)
             ->whereIn('status', ['Pending', 'Scheduled'])
-            ->where('date_time', '>=', $selectedDate->startOfDay()->setTimezone('UTC')->toDateTimeString())
-            ->where('date_time', '<', $selectedDate->endOfDay()->setTimezone('UTC')->toDateTimeString())
+            ->where('date_time', '>=', $selectedDate->startOfDay()->toDateTimeString())
+            ->where('date_time', '<', $selectedDate->endOfDay()->toDateTimeString())
             ->whereDoesntHave('mentorshipRequest', function ($query) {
                 $query->where('requestable_type', GroupMentorship::class);
             })
@@ -195,12 +193,13 @@ class MentorshipPlanController extends Controller
         while ($currentTime->lt($endOfDay)) {
             $slotEnd = $currentTime->copy()->addMinutes($durationMinutes);
 
+            // إزالة timezone adjustment - الوقت كما هو
             $slotStartFormatted = mb_convert_encoding($currentTime->format('H:i'), 'UTF-8', 'UTF-8');
             $slotEndFormatted = mb_convert_encoding($slotEnd->format('H:i'), 'UTF-8', 'UTF-8');
 
             $isBooked = $bookedSessions->contains(function ($session) use ($currentTime) {
                 $isMentorshipPlan = $session->mentorshipRequest && $session->mentorshipRequest->requestable_type === \App\Models\MentorshipPlan::class;
-                $sessionStart = Carbon::parse($session->date_time, 'UTC')->setTimezone('Africa/Cairo');
+                $sessionStart = Carbon::parse($session->date_time);
                 Log::info('Comparing slot with session', [
                     'slot_start' => mb_convert_encoding($currentTime->format('Y-m-d H:i:s'), 'UTF-8', 'UTF-8'),
                     'session_start_raw' => mb_convert_encoding($session->date_time, 'UTF-8', 'UTF-8'),
@@ -213,8 +212,8 @@ class MentorshipPlanController extends Controller
             $isWithinAvailability = $availabilities->contains(function ($availability) use ($currentTime, $slotEnd, $date) {
                 $availStart = Carbon::parse($availability->Start_Time);
                 $availEnd = Carbon::parse($availability->End_Time);
-                $availStartTime = Carbon::parse($date, 'Africa/Cairo')->setTime($availStart->hour, $availStart->minute, 0);
-                $availEndTime = Carbon::parse($date, 'Africa/Cairo')->setTime($availEnd->hour, $availEnd->minute, 0);
+                $availStartTime = Carbon::parse($date)->setTime($availStart->hour, $availStart->minute, 0);
+                $availEndTime = Carbon::parse($date)->setTime($availEnd->hour, $availEnd->minute, 0);
                 return $currentTime->gte($availStartTime) && $slotEnd->lte($availEndTime);
             });
 
@@ -265,36 +264,18 @@ class MentorshipPlanController extends Controller
         }
 
         $durationMinutes = 60;
-
-        // Parse date and time explicitly in EEST (Africa/Cairo)
-        try {
-            $startDate = Carbon::createFromFormat('Y-m-d', $request->start_date, 'Africa/Cairo');
-            $startTime = Carbon::createFromFormat('H:i:s', $request->start_time, 'Africa/Cairo');
-            if (!$startDate || !$startTime) {
-                throw new \Exception('Invalid date or time format');
-            }
-        } catch (\Exception $e) {
-            Log::error('Failed to parse date or time', [
-                'start_date' => $request->start_date,
-                'start_time' => $request->start_time,
-                'error' => $e->getMessage(),
-            ]);
-            return response()->json(['message' => 'تنسيق التاريخ أو الوقت غير صحيح'], 400);
-        }
-
-        // Combine date and time
-        $sessionDateTime = $startDate->copy()->setTime($startTime->hour, $startTime->minute, $startTime->second);
-        $sessionDateTimeUtc = $sessionDateTime->copy()->setTimezone('UTC'); // Convert to UTC
+        $startDate = Carbon::parse($request->start_date);
+        $startTime = Carbon::parse($request->start_time);
+        $dayOfWeek = $startDate->format('l');
+        // إزالة timezone adjustment - حفظ الوقت كما هو
+        $sessionDateTime = $startDate->setTime($startTime->hour, $startTime->minute, $startTime->second);
         $slotEnd = $sessionDateTime->copy()->addMinutes($durationMinutes);
-        $dayOfWeek = $sessionDateTime->format('l');
 
         Log::info('Initial session date time for Mentorship Plan', [
             'start_date' => $request->start_date,
             'start_time' => $request->start_time,
-            'session_date_time_eest' => $sessionDateTime->toDateTimeString(),
-            'session_date_time_utc' => $sessionDateTimeUtc->toDateTimeString(),
-            'timezone_eest' => $sessionDateTime->getTimezone()->getName(),
-            'timezone_utc' => $sessionDateTimeUtc->getTimezone()->getName(),
+            'session_date_time' => $sessionDateTime->toDateTimeString(),
+            'timezone' => $sessionDateTime->getTimezone()->getName(),
         ]);
 
         DB::beginTransaction();
@@ -314,15 +295,14 @@ class MentorshipPlanController extends Controller
             $sessionsToBook = [];
             for ($i = 0; $i < $sessionCount; $i++) {
                 $sessionDate = $startDate->copy()->addWeeks($i);
-                $sessionDateTime = $sessionDate->copy()->setTime($startTime->hour, $startTime->minute, $startTime->second);
-                $sessionDateTimeUtc = $sessionDateTime->copy()->setTimezone('UTC');
+                // إزالة timezone adjustment - حفظ الوقت كما هو
+                $sessionDateTime = $sessionDate->setTime($startTime->hour, $startTime->minute, $startTime->second);
                 $slotEnd = $sessionDateTime->copy()->addMinutes($durationMinutes);
 
                 Log::info('Preparing Mentorship Plan session', [
                     'mentorship_request_id' => $mentorshipRequest->id,
                     'session_index' => $i,
-                    'date_time_eest' => $sessionDateTime->toDateTimeString(),
-                    'date_time_utc' => $sessionDateTimeUtc->toDateTimeString(),
+                    'date_time' => $sessionDateTime->toDateTimeString(),
                     'timezone' => $sessionDateTime->getTimezone()->getName(),
                 ]);
 
@@ -338,18 +318,23 @@ class MentorshipPlanController extends Controller
 
                 $conflictingSessions = NewSession::where('coach_id', (int)$coachId)
                     ->whereIn('status', ['Pending', 'Scheduled'])
-                    ->where('date_time', $sessionDateTimeUtc->toDateTimeString())
+                    ->whereDate('date_time', $sessionDateTime->toDateString())
                     ->whereDoesntHave('mentorshipRequest', function ($query) {
                         $query->where('requestable_type', GroupMentorship::class);
                     })
-                    ->get();
+                    ->get()
+                    ->filter(function ($existingSession) use ($sessionDateTime, $slotEnd) {
+                        $reqStart = Carbon::parse($existingSession->date_time);
+                        $reqEnd = $reqStart->copy()->addMinutes($existingSession->duration);
+                        return $sessionDateTime->equalTo($reqStart) && $slotEnd->equalTo($reqEnd);
+                    });
 
                 if ($conflictingSessions->isNotEmpty()) {
                     return response()->json(['message' => "السلوت المختار محجوز بالفعل في {$sessionDateTime->toDateString()}"], 400);
                 }
 
                 $sessionsToBook[] = [
-                    'date_time' => $sessionDateTimeUtc->toDateTimeString(),
+                    'date_time' => $sessionDateTime->toDateTimeString(),
                     'duration' => $durationMinutes,
                 ];
             }
@@ -386,7 +371,7 @@ class MentorshipPlanController extends Controller
             ]);
 
             return response()->json([
-                'message' => 'تم حجز كل الجلسات بنجاح. تابع الدفع باستخدام /api/payment/initiate/partner/' . $mentorshipRequest->id,
+                'message' => 'تم حجز كل الجلسات بنجاح. تابع الدفع باستخدام /api/payment/initiate/mentorship_request/' . $mentorshipRequest->id,
                 'sessions' => $createdSessions,
             ]);
         } catch (\Exception $e) {
