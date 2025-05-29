@@ -16,6 +16,7 @@ use App\Http\Controllers\Api\BookingController;
 use App\Http\Controllers\Api\PerformanceReportController;
 use App\Http\Controllers\Api\CoachDashboardController;
 use App\Http\Controllers\Api\TraineeDashboardController;
+use App\Http\Controllers\Api\MentorshipPlanController;
 
 /*
 |--------------------------------------------------------------------------
@@ -81,6 +82,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/trainee/reviews', [ReviewController::class, 'store']);
 });
 
+// Routes الخاصة بـ MentorshipPlanController
+Route::prefix('mentorship-plan/{coachId}')->middleware(['auth:sanctum', 'check.trainee'])->group(function () {
+    Route::get('/available-dates', [MentorshipPlanController::class, 'getAvailableDates']);
+    Route::get('/available-slots', [MentorshipPlanController::class, 'getAvailableSlots']);
+    Route::post('/book', [MentorshipPlanController::class, 'bookMentorshipPlan']);
+});
+
 // Payment routes for all types of services
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/payment/initiate/{type}/{id}', [PaymentController::class, 'initiatePayment']);
@@ -107,19 +115,19 @@ Route::middleware('auth:sanctum')->group(function () {
 
 // Routes for Admin
 Route::prefix('admin')->group(function () {
-Route::get('/coach-requests', [AdminController::class, 'getPendingCoachRequests']);
-Route::post('/coach-requests/{coachId}/handle', [AdminController::class, 'handleCoachRequest']);
-Route::get('/top-coaches', [AdminController::class, 'getTopCoaches']);
-Route::get('/Approved-coaches', [AdminController::class, 'getApprovedCoaches']);
-Route::get('/Approved-coaches-count', [AdminController::class, 'getApprovedCoachesCount']);
-Route::get('/Pending-coaches-count', [AdminController::class, 'getPendingCoachesCount']);
-Route::get('/DashboardStats', [AdminController::class, 'getDashboardStats']);
-Route::get('/trainees', [AdminController::class, 'getAllTrainees']);
-Route::get('/trainees-count', [AdminController::class, 'getTraineesCount']);
-Route::get('/session-trends', [AdminController::class, 'getSessionCompletionTrends']);
-Route::delete('/delete-users/{userId}', [AdminController::class, 'deleteUser']);
-Route::get('/trainees/search', [AdminController::class, 'searchTrainees']);
-Route::get('/coaches/search', [AdminController::class, 'searchCoaches']);
+    Route::get('/coach-requests', [AdminController::class, 'getPendingCoachRequests']);
+    Route::post('/coach-requests/{coachId}/handle', [AdminController::class, 'handleCoachRequest']);
+    Route::get('/top-coaches', [AdminController::class, 'getTopCoaches']);
+    Route::get('/Approved-coaches', [AdminController::class, 'getApprovedCoaches']);
+    Route::get('/Approved-coaches-count', [AdminController::class, 'getApprovedCoachesCount']);
+    Route::get('/Pending-coaches-count', [AdminController::class, 'getPendingCoachesCount']);
+    Route::get('/DashboardStats', [AdminController::class, 'getDashboardStats']);
+    Route::get('/trainees', [AdminController::class, 'getAllTrainees']);
+    Route::get('/trainees-count', [AdminController::class, 'getTraineesCount']);
+    Route::get('/session-trends', [AdminController::class, 'getSessionCompletionTrends']);
+    Route::delete('/delete-users/{userId}', [AdminController::class, 'deleteUser']);
+    Route::get('/trainees/search', [AdminController::class, 'searchTrainees']);
+    Route::get('/coaches/search', [AdminController::class, 'searchCoaches']);
 });
 
 // Routes for performance reports
