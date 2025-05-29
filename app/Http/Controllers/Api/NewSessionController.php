@@ -46,13 +46,16 @@ class NewSessionController extends Controller
         if ($user->role_profile === 'Coach') {
             $query = NewSession::with([
                 'service' => function ($query) {
-                    $query->with([
-                        'mentorship' => function ($query) {
-                            $query->with(['mentorshipPlan', 'mentorshipSession']);
-                        },
-                        'mockInterview',
-                        'groupMentorship'
-                    ]);
+                    $query->whereNull('deleted_at')
+                          ->with([
+                              'mentorship' => function ($query) {
+                                  $query->where('mentorship_type', 'Mentorship Plan')
+                                        ->orWhere('mentorship_type', 'Mentorship session')
+                                        ->with(['mentorshipPlan', 'mentorshipSession']);
+                              },
+                              'mockInterview',
+                              'groupMentorship'
+                          ]);
                 },
                 'trainees',
                 'mentorshipRequest.requestable'
@@ -64,7 +67,6 @@ class NewSessionController extends Controller
             }
 
             $sessions = $query->get()->map(function ($session) {
-                // جلب الـ trainee
                 $traineeName = $session->trainees ? ($session->trainees->full_name ?? 'N/A') : 'N/A';
                 Log::info('Trainee check', [
                     'session_id' => $session->new_session_id,
@@ -72,7 +74,6 @@ class NewSessionController extends Controller
                     'trainee_name' => $traineeName
                 ]);
 
-                // جلب الـ service
                 $service = $session->service;
                 $sessionType = 'N/A';
                 $serviceTitle = 'N/A';
@@ -151,7 +152,6 @@ class NewSessionController extends Controller
                     ]);
                 }
 
-                // تحويل التوقيت إلى EEST (UTC+3) إلا لو Mentorship Plan
                 $isMentorshipPlan = $session->mentorshipRequest && $session->mentorshipRequest->requestable_type === \App\Models\MentorshipPlan::class;
                 $dateTime = Carbon::parse($session->date_time);
                 if (!$isMentorshipPlan) {
@@ -169,7 +169,6 @@ class NewSessionController extends Controller
                 $date = $dateTime->format('d M Y');
                 $timeRange = $dateTime->format('h:i A') . ' - ' . $endTime->format('h:i A');
 
-                // تنسيق created_at و updated_at
                 $createdAt = Carbon::parse($session->created_at);
                 $updatedAt = Carbon::parse($session->updated_at);
                 if ($createdAt->format('Y-m-d') === '2025-05-29') {
@@ -207,13 +206,16 @@ class NewSessionController extends Controller
         } elseif ($user->role_profile === 'Trainee') {
             $query = NewSession::with([
                 'service' => function ($query) {
-                    $query->with([
-                        'mentorship' => function ($query) {
-                            $query->with(['mentorshipPlan', 'mentorshipSession']);
-                        },
-                        'mockInterview',
-                        'groupMentorship'
-                    ]);
+                    $query->whereNull('deleted_at')
+                          ->with([
+                              'mentorship' => function ($query) {
+                                  $query->where('mentorship_type', 'Mentorship Plan')
+                                        ->orWhere('mentorship_type', 'Mentorship session')
+                                        ->with(['mentorshipPlan', 'mentorshipSession']);
+                              },
+                              'mockInterview',
+                              'groupMentorship'
+                          ]);
                 },
                 'coach.user',
                 'mentorshipRequest.requestable'
@@ -225,7 +227,6 @@ class NewSessionController extends Controller
             }
 
             $sessions = $query->get()->map(function ($session) {
-                // جلب الـ coach
                 $coachName = $session->coach && $session->coach->user ? $session->coach->user->full_name : 'N/A';
                 Log::info('Coach check', [
                     'session_id' => $session->new_session_id,
@@ -233,7 +234,6 @@ class NewSessionController extends Controller
                     'coach_name' => $coachName
                 ]);
 
-                // جلب الـ service
                 $service = $session->service;
                 $sessionType = 'N/A';
                 $serviceTitle = 'N/A';
@@ -314,7 +314,6 @@ class NewSessionController extends Controller
                     ]);
                 }
 
-                // تحويل التوقيت إلى EEST (UTC+3) إلا لو Mentorship Plan
                 $isMentorshipPlan = $session->mentorshipRequest && $session->mentorshipRequest->requestable_type === \App\Models\MentorshipPlan::class;
                 $dateTime = Carbon::parse($session->date_time);
                 if (!$isMentorshipPlan) {
@@ -332,7 +331,6 @@ class NewSessionController extends Controller
                 $date = $dateTime->format('d M Y');
                 $timeRange = $dateTime->format('h:i A') . ' - ' . $endTime->format('h:i A');
 
-                // تنسيق created_at و updated_at
                 $createdAt = Carbon::parse($session->created_at);
                 $updatedAt = Carbon::parse($session->updated_at);
                 if ($createdAt->format('Y-m-d') === '2025-05-29') {
