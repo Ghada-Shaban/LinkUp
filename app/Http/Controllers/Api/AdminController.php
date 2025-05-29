@@ -39,7 +39,7 @@ public function getPendingCoachRequests(Request $request)
 
     try {
         $pendingCoaches = Coach::with(['user', 'languages', 'skills'])
-            ->where('status', Coach::STATUS_PENDING)
+            ->where('status', Coach::STATUS_PENDING) 
             ->get()
             ->map(function ($coach) {
                 return [
