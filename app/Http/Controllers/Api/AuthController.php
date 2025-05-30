@@ -163,50 +163,64 @@ class AuthController extends Controller
 private function setAvailability($userID, array $availability)
 {
     $savedSlots = [];
-    
+
     try {
+        // Validate input structure
+        if (!isset($availability['days']) || !isset($availability['time_slots'])) {
+            throw new \Exception("Invalid availability format: 'days' or 'time_slots' missing.");
+        }
+
         foreach ($availability['days'] as $day) {
-            if (isset($availability['time_slots'][$day])) {
-                $daySlots = $availability['time_slots'][$day];
-                
-                // فحص التداخل بين الأوقات في نفس اليوم
-                for ($i = 0; $i < count($daySlots); $i++) {
-                    for ($j = $i + 1; $j < count($daySlots); $j++) {
-                        $slot1 = $daySlots[$i];
-                        $slot2 = $daySlots[$j];
-                        
-                        $start1 = $slot1['start_time'];
-                        $end1 = $slot1['end_time'];
-                        $start2 = $slot2['start_time'];
-                        $end2 = $slot2['end_time'];
-                        
-                        // فحص التداخل الفعلي (بدون المتتالية)
-                        if (($start1 < $end2 && $end1 > $start2) && 
-                            !($start1 == $end2 || $end1 == $start2)) {
-                            throw new \Exception("Time slots overlap on $day: ($start1 - $end1) and ($start2 - $end2)");
-                        }
+            if (!isset($availability['time_slots'][$day])) {
+                continue; // Skip if no time slots for this day
+            }
+
+            // Validate and sort time slots to ensure they are consecutive
+            $timeSlots = $availability['time_slots'][$day];
+            usort($timeSlots, function ($a, $b) {
+                return strcmp($a['start_time'], $b['start_time']);
+            });
+
+            // Check for consecutive slots and validate times
+            for ($i = 0; $i < count($timeSlots); $i++) {
+                $currentSlot = $timeSlots[$i];
+
+                // Validate time format
+                if (!$this->isValidTimeFormat($currentSlot['start_time']) || !$this->isValidTimeFormat($currentSlot['end_time'])) {
+                    throw new \Exception("Invalid time format for slot on $day: {$currentSlot['start_time']} - {$currentSlot['end_time']}");
+                }
+
+                // Check if end_time is after start_time
+                if (strtotime($currentSlot['end_time']) <= strtotime($currentSlot['start_time'])) {
+                    throw new \Exception("End time must be after start time for slot on $day.");
+                }
+
+                // Check for consecutive slots (if applicable)
+                if ($i > 0) {
+                    $prevSlot = $timeSlots[$i - 1];
+                    if ($prevSlot['end_time'] !== $currentSlot['start_time']) {
+                        throw new \Exception("Non-consecutive time slots detected on $day: {$prevSlot['end_time']} to {$currentSlot['start_time']}");
                     }
                 }
-                
-                // حفظ الأوقات بعد التأكد من عدم التداخل
-                foreach ($daySlots as $slot) {
-                    $availabilityRecord = CoachAvailability::create([
-                        'coach_id' => $userID,
-                        'Day_Of_Week' => $day,
-                        'Start_Time' => $slot['start_time'],
-                        'End_Time' => $slot['end_time'],
-                    ]);
-                    
-                    $savedSlots[] = $availabilityRecord;
-                }
+
+                // Save the slot to the database
+                $availabilityRecord = CoachAvailability::create([
+                    'coach_id' => $userID,
+                    'Day_Of_Week' => $day,
+                    'Start_Time' => $currentSlot['start_time'],
+                    'End_Time' => $currentSlot['end_time'],
+                ]);
+
+                $savedSlots[] = $availabilityRecord;
             }
         }
     } catch (\Exception $e) {
         throw new \Exception("Error saving availability: " . $e->getMessage());
     }
-    
+
     return $savedSlots;
 }
+
     
     protected function registerTrainee(array $validated, Request $request)
     {
