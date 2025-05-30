@@ -160,7 +160,7 @@ class AuthController extends Controller
     }
     }
     
-  private function setAvailability($userID, array $availability)
+ private function setAvailability($userID, array $availability)
 {
     $savedSlots = [];
 
@@ -176,12 +176,10 @@ class AuthController extends Controller
                     $startTime = $slot['start_time'];
                     $endTime = $slot['end_time'];
 
-                    // التحقق من التداخل، لكن نسمح بالفترات المتتالية
+                    // التحقق من التداخل بس (نسمح بالمتتالية)
                     $overlaps = false;
                     foreach ($existingSlots as $existingStart => $existingEnd) {
-                        // التداخل يحصل لو الفترة الجديدة بتبدأ قبل ما الفترة القديمة تخلّص
-                        // وبتخلّص بعد ما الفترة القديمة تبدأ، لكن بنستثني النقاط المشتركة
-                        if ($startTime < $existingEnd && $endTime > $existingStart && !($startTime == $existingEnd || $endTime == $existingStart)) {
+                        if ($startTime < $existingEnd && $endTime > $existingStart && !($startTime == $existingEnd)) {
                             $overlaps = true;
                             break;
                         }
@@ -199,7 +197,7 @@ class AuthController extends Controller
                         ->exists();
 
                     if ($duplicate) {
-                        continue; // لو الفترة مكررة، نتجاهلها
+                        continue; // تجاهل الفترة المكررة
                     }
 
                     $availabilityRecord = CoachAvailability::create([
