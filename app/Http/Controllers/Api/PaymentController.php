@@ -153,6 +153,10 @@ class PaymentController extends Controller
                         $traineeIds = [];
                     }
                     
+                    if (in_array($mentorshipRequest->trainee_id, $traineeIds)) {
+                        return response()->json(['message' => 'You have already booked this Group Mentorship'], 400);
+                    }
+
                     $currentParticipants = count($traineeIds);
                     if (!in_array($mentorshipRequest->trainee_id, $traineeIds)) {
                         $currentParticipants++; 
@@ -341,7 +345,6 @@ class PaymentController extends Controller
                         ]);
                     }
                 } catch (\Exception $e) {
-                  
                 }
 
                 return response()->json([
