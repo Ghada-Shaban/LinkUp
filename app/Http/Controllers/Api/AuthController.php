@@ -175,13 +175,12 @@ private function setAvailability($userID, array $availability)
                 continue; // Skip if no time slots for this day
             }
 
-            // Validate and sort time slots to ensure they are consecutive
+            // Validate and sort time slots
             $timeSlots = $availability['time_slots'][$day];
             usort($timeSlots, function ($a, $b) {
                 return strcmp($a['start_time'], $b['start_time']);
             });
 
-            // Check for consecutive slots and validate times
             for ($i = 0; $i < count($timeSlots); $i++) {
                 $currentSlot = $timeSlots[$i];
 
@@ -203,6 +202,19 @@ private function setAvailability($userID, array $availability)
                     }
                 }
 
+                // Check for existing slot
+                $existingSlot = CoachAvailability::where([
+                    'coach_id' => $userID,
+                    'Day_Of_Week' => $day,
+                    'Start_Time' => $currentSlot['start_time'],
+                    'End_Time' => $currentSlot['end_time'],
+                ])->first();
+
+                if ($existingSlot) {
+                    // Skip if slot already exists
+                    continue;
+                }
+
                 // Save the slot to the database
                 $availabilityRecord = CoachAvailability::create([
                     'coach_id' => $userID,
@@ -220,6 +232,8 @@ private function setAvailability($userID, array $availability)
 
     return $savedSlots;
 }
+
+
 private function isValidTimeFormat($time)
 {
     return preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $time);
