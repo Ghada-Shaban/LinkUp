@@ -162,10 +162,6 @@ class PaymentController extends Controller
                         return response()->json(['message' => 'Group Mentorship is full'], 400);
                     }
 
-                    if ($currentParticipants < $groupMentorship->min_participants) {
-                        return response()->json(['message' => 'Group Mentorship requires at least ' . $groupMentorship->min_participants . ' participants to proceed'], 400);
-                    }
-
                     $startDateTime = Carbon::parse($groupMentorship->day . ' ' . $groupMentorship->start_time, 'Africa/Cairo');
                     if ($startDateTime->lt(Carbon::now())) {
                         $startDateTime->addWeek();
@@ -217,9 +213,7 @@ class PaymentController extends Controller
                         ]);
 
                     if ($updated === 0) {
-                        return response()->json(['message' => 'Payment /
-
- succeeded but no sessions were updated'], 500);
+                        return response()->json(['message' => 'Payment succeeded but no sessions were updated'], 500);
                     }
                 }
 
@@ -347,6 +341,7 @@ class PaymentController extends Controller
                         ]);
                     }
                 } catch (\Exception $e) {
+                  
                 }
 
                 return response()->json([
