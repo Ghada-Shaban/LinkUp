@@ -48,7 +48,7 @@ class PerformanceReportController extends Controller
         ->with(['coach' => function ($query) {
             $query->select('User_ID', 'full_name', 'photo'); 
         }, 'session' => function ($query) {
-            $query->select('new_session_id', 'date_time', 'duration')
+            $query->select('new_session_id', 'date_time', 'duration','service_id')
                   ->with(['service' => function ($query) {
                       $query->select('service_id', 'service_type'); 
                   }]);
