@@ -27,7 +27,8 @@ class NewSessionController extends Controller
 
         if ($type === 'upcoming') {
             $statuses = ['Scheduled'];
-            $timeCondition = ['date_time', '>=', now()];
+            // $timeCondition = ['date_time', '>=', now()]; // تمت إزالة الشرط للسماح بالجلسات في الماضي
+            // لا حاجة لشرط الوقت، الجلسات ستظهر بناءً على الحالة "Scheduled" فقط
         } elseif ($type === 'pending') {
             $statuses = ['pending'];
             $timeCondition = ['date_time', '>=', now()];
