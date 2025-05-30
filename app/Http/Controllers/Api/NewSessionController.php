@@ -92,8 +92,13 @@ class NewSessionController extends Controller
                 }
             }
 
+            // فرز جلسات Group Mentorship حسب date_time
+            $groupMentorshipSessions = collect($groupMentorshipSessions)->sortBy(function ($item) {
+                return $item['date_time'];
+            })->values()->all();
+
             // معالجة الجلسات
-            $sessions = collect(array_merge(array_values($groupMentorshipSessions), $otherSessions))->map(function ($item) use ($user) {
+            $sessions = collect(array_merge($groupMentorshipSessions, $otherSessions))->map(function ($item) use ($user) {
                 $session = is_array($item) ? $item['session'] : $item;
                 $groupMentorship = is_array($item) ? $item['group_mentorship'] : null;
                 $dateTime = is_array($item) ? $item['date_time'] : Carbon::parse($session->date_time);
@@ -145,6 +150,8 @@ class NewSessionController extends Controller
                         if (!empty($traineeIds)) {
                             $trainees = User::whereIn('User_ID', $traineeIds)->pluck('full_name')->toArray();
                             $traineeNames = array_filter($trainees);
+                            // فرز الأسماء أبجديًا لضمان الاتساق
+                            sort($traineeNames);
                         }
                         $traineeNames = !empty($traineeNames) ? array_values($traineeNames) : ['N/A'];
                     } else {
@@ -246,8 +253,13 @@ class NewSessionController extends Controller
                 }
             }
 
+            // فرز جلسات Group Mentorship حسب date_time
+            $groupMentorshipSessions = collect($groupMentorshipSessions)->sortBy(function ($item) {
+                return $item['date_time'];
+            })->values()->all();
+
             // معالجة الجلسات
-            $sessions = collect(array_merge(array_values($groupMentorshipSessions), $otherSessions))->map(function ($item) use ($user) {
+            $sessions = collect(array_merge($groupMentorshipSessions, $otherSessions))->map(function ($item) use ($user) {
                 $session = is_array($item) ? $item['session'] : $item;
                 $groupMentorship = is_array($item) ? $item['group_mentorship'] : null;
                 $dateTime = is_array($item) ? $item['date_time'] : Carbon::parse($session->date_time);
@@ -301,6 +313,8 @@ class NewSessionController extends Controller
                         if (!empty($traineeIds)) {
                             $trainees = User::whereIn('User_ID', $traineeIds)->pluck('full_name')->toArray();
                             $traineeNames = array_filter($trainees);
+                            // فرز الأسماء أبجديًا لضمان الاتساق
+                            sort($traineeNames);
                         }
                         $traineeNames = !empty($traineeNames) ? array_values($traineeNames) : ['N/A'];
                     } else {
