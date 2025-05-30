@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\NewSession;
+use App\Models\Service;
 use App\Models\PerformanceReport;
 use Illuminate\Http\Request;
 
@@ -41,18 +42,23 @@ class PerformanceReportController extends Controller
 
    
     public function getPerformanceReports(Request $request)
-    {
-        $trainee = auth()->user();
-        $reports = PerformanceReport::where('trainee_id', $trainee->User_ID)
-            ->with(['coach' => function ($query) {
-            $query->select('User_ID', 'full_name','photo'); 
+{
+    $trainee = auth()->user();
+    $reports = PerformanceReport::where('trainee_id', $trainee->User_ID)
+        ->with(['coach' => function ($query) {
+            $query->select('User_ID', 'full_name', 'photo'); 
+        }, 'session' => function ($query) {
+            $query->select('new_session_id', 'date_time', 'duration')
+                  ->with(['service' => function ($serviceQuery) {
+                      $serviceQuery->select('service_id', 'service_type'); 
+                  }]);
         }])
-            ->orderBy('created_at', 'desc')
-            ->get()
+        ->orderBy('created_at', 'desc')
+        ->get()
         ->each(function ($report) {
             $report->coach->makeHidden(['profile_photo_url', 'photo_url']);
         });
 
-        return response()->json($reports, 200);
-    }
+    return response()->json($reports, 200);
+}
 }
