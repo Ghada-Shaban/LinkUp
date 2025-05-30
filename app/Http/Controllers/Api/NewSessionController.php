@@ -204,6 +204,7 @@ class NewSessionController extends Controller
                 if ($service && $service->service_type === 'Group_Mentorship') {
                     $sessionData['current_participants'] = $currentParticipants;
                     $sessionData['trainee_names'] = $traineeNames;
+                    $sessionData['coach_id'] = $session->coach ? $session->coach->User_ID : null;
                 } else {
                     $sessionData['coach_name'] = $session->coach && $session->coach->user ? $session->coach->user->full_name : 'N/A';
                     $sessionData['coach_id'] = $session->coach ? $session->coach->User_ID : null;
@@ -382,6 +383,7 @@ class NewSessionController extends Controller
                 if ($service && $service->service_type === 'Group_Mentorship') {
                     $sessionData['current_participants'] = $currentParticipants;
                     $sessionData['trainee_names'] = $traineeNames;
+                    $sessionData['coach_id'] = $session->coach ? $session->coach->User_ID : null;
                 } else {
                     $sessionData['coach_name'] = $session->coach && $session->coach->user ? $session->coach->user->full_name : 'N/A';
                     $sessionData['coach_id'] = $session->coach ? $session->coach->User_ID : null;
