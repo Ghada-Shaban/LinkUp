@@ -160,38 +160,57 @@ class AuthController extends Controller
     }
     }
     
-    private function setAvailability($userID, array $availability)
+  private function setAvailability($userID, array $availability)
 {
     $savedSlots = [];
 
     try {
         foreach ($availability['days'] as $day) {
             if (isset($availability['time_slots'][$day])) {
+                $existingSlots = CoachAvailability::where('coach_id', $userID)
+                    ->where('Day_Of_Week', $day)
+                    ->pluck('End_Time', 'Start_Time')
+                    ->toArray();
+
                 foreach ($availability['time_slots'][$day] as $slot) {
-                    $existingSlots = CoachAvailability::where('coach_id', $userID)
-                        ->where('Day_Of_Week', $day)
-                        ->get();
+                    $startTime = $slot['start_time'];
+                    $endTime = $slot['end_time'];
 
-                    $newStart = strtotime($slot['start_time']);
-                    $newEnd = strtotime($slot['end_time']);
-
-                    foreach ($existingSlots as $existingSlot) {
-                        $existingStart = strtotime($existingSlot->Start_Time);
-                        $existingEnd = strtotime($existingSlot->End_Time);
-
-                        if (!($newEnd <= $existingStart || $newStart >= $existingEnd)) {
-                            throw new \Exception("Time slot overlaps with an existing slot on $day");
+                    // التحقق من التداخل، لكن نسمح بالفترات المتتالية
+                    $overlaps = false;
+                    foreach ($existingSlots as $existingStart => $existingEnd) {
+                        // التداخل يحصل لو الفترة الجديدة بتبدأ قبل ما الفترة القديمة تخلّص
+                        // وبتخلّص بعد ما الفترة القديمة تبدأ، لكن بنستثني النقاط المشتركة
+                        if ($startTime < $existingEnd && $endTime > $existingStart && !($startTime == $existingEnd || $endTime == $existingStart)) {
+                            $overlaps = true;
+                            break;
                         }
+                    }
+
+                    if ($overlaps) {
+                        throw new \Exception("Time slot overlaps with an existing slot on $day");
+                    }
+
+                    // التحقق من التكرار
+                    $duplicate = CoachAvailability::where('coach_id', $userID)
+                        ->where('Day_Of_Week', $day)
+                        ->where('Start_Time', $startTime)
+                        ->where('End_Time', $endTime)
+                        ->exists();
+
+                    if ($duplicate) {
+                        continue; // لو الفترة مكررة، نتجاهلها
                     }
 
                     $availabilityRecord = CoachAvailability::create([
                         'coach_id' => $userID,
                         'Day_Of_Week' => $day,
-                        'Start_Time' => $slot['start_time'],
-                        'End_Time' => $slot['end_time'],
+                        'Start_Time' => $startTime,
+                        'End_Time' => $endTime,
                     ]);
 
                     $savedSlots[] = $availabilityRecord;
+                    $existingSlots[$startTime] = $endTime;
                 }
             }
         }
