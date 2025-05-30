@@ -205,7 +205,8 @@ class NewSessionController extends Controller
                     $sessionData['current_participants'] = $currentParticipants;
                     $sessionData['trainee_names'] = $traineeNames;
                 } else {
-                    $sessionData['trainee_name'] = $session->trainees ? ($session->trainees->full_name ?? 'N/A') : 'N/A';
+                    $sessionData['coach_name'] = $session->coach && $session->coach->user ? $session->coach->user->full_name : 'N/A';
+                    $sessionData['coach_id'] = $session->coach ? $session->coach->User_ID : null;
                 }
 
                 return $sessionData;
@@ -383,6 +384,7 @@ class NewSessionController extends Controller
                     $sessionData['trainee_names'] = $traineeNames;
                 } else {
                     $sessionData['coach_name'] = $session->coach && $session->coach->user ? $session->coach->user->full_name : 'N/A';
+                    $sessionData['coach_id'] = $session->coach ? $session->coach->User_ID : null;
                 }
 
                 return $sessionData;
