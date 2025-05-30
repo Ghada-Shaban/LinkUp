@@ -182,7 +182,7 @@ class AuthController extends Controller
 
                     $overlaps = false;
                     foreach ($existingSlots as $existingStart => $existingEnd) {
-                        if ($startTime < $existingEnd && $endTime > $existingStart && !($startTime == $existingEnd)) {
+                        if ($startTime < $existingEnd && $endTime > $existingStart && !($startTime == $existingEnd || $endTime == $existingStart)) {
                             $overlaps = true;
                             break;
                         }
