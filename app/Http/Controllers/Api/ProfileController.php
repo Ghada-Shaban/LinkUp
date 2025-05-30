@@ -284,52 +284,98 @@ public function updateTraineeProfile(Request $request)
     }
 }
 
-    private function setAvailability(int $userID, array $availability): array
-    {
-        $savedSlots = [];
+  private function setAvailability(int $userID, array $availability): array
+{
+    $savedSlots = [];
 
-        try {
-            foreach ($availability['days'] as $day) {
-                if (isset($availability['time_slots'][$day])) {
-                    foreach ($availability['time_slots'][$day] as $slot) {
-                        $existingSlots = CoachAvailability::where('coach_id', $userID)
-                            ->where('Day_Of_Week', $day)
-                            ->where(function ($query) use ($slot) {
-                                $query->whereBetween('Start_Time', [$slot['start_time'], $slot['end_time']])
-                                    ->orWhereBetween('End_Time', [$slot['start_time'], $slot['end_time']])
-                                    ->orWhere(function ($q) use ($slot) {
-                                        $q->where('Start_Time', '<', $slot['start_time'])
-                                          ->where('End_Time', '>', $slot['end_time']);
-                                    });
-                            })
-                            ->where('Start_Time', '!=', $slot['start_time'])
-                            ->exists();
-
-                        if ($existingSlots) {
-                            throw new \Exception("Time slot overlaps with an existing slot on $day");
-                        }
-
-                        $availabilityRecord = CoachAvailability::updateOrCreate(
-                            [
-                                'coach_id' => $userID,
-                                'Day_Of_Week' => $day,
-                                'Start_Time' => $slot['start_time'],
-                            ],
-                            [
-                                'End_Time' => $slot['end_time'],
-                            ]
-                        );
-
-                        $savedSlots[] = $availabilityRecord;
-                    }
-                }
-            }
-        } catch (\Exception $e) {
-            throw new \Exception("Error saving availability: " . $e->getMessage());
+    try {
+        if (!isset($availability['days']) || !isset($availability['time_slots'])) {
+            throw new \Exception("Invalid availability format: 'days' or 'time_slots' missing.");
         }
 
-        return $savedSlots;
+        foreach ($availability['days'] as $day) {
+            if (!isset($availability['time_slots'][$day])) {
+                continue; 
+            }
+
+            
+            $timeSlots = $availability['time_slots'][$day];
+            usort($timeSlots, fn($a, $b) => strcmp($a['start_time'], $b['start_time']));
+
+       
+            for ($i = 1; $i < count($timeSlots); $i++) {
+                $prevSlot = $timeSlots[$i - 1];
+                $currentSlot = $timeSlots[$i];
+
+              
+                if (!$this->isValidTimeFormat($currentSlot['start_time']) || !$this->isValidTimeFormat($currentSlot['end_time'])) {
+                    throw new \Exception("Invalid time format for slot on $day: {$currentSlot['start_time']} - {$currentSlot['end_time']}");
+                }
+
+        
+                if (strtotime($currentSlot['end_time']) <= strtotime($currentSlot['start_time'])) {
+                    throw new \Exception("End time must be after start time for slot on $day: {$currentSlot['start_time']} - {$currentSlot['end_time']}");
+                }
+
+           
+                if ($prevSlot['end_time'] !== $currentSlot['start_time']) {
+                    throw new \Exception("Non-consecutive time slots detected on $day: {$prevSlot['end_time']} to {$currentSlot['start_time']}");
+                }
+            }
+
+      
+            $mergedSlots = $this->mergeConsecutiveSlots($timeSlots);
+
+            foreach ($mergedSlots as $slot) {
+           
+                $existingSlot = CoachAvailability::where('coach_id', $userID)
+                    ->where('Day_Of_Week', $day)
+                    ->where(function ($query) use ($slot) {
+                        $query->where(function ($q) use ($slot) {
+                            $q->where('Start_Time', '>=', $slot['start_time'])
+                              ->where('Start_Time', '<', $slot['end_time']);
+                        })->orWhere(function ($q) use ($slot) {
+                            $q->where('End_Time', '>', $slot['start_time'])
+                              ->where('End_Time', '<=', $slot['end_time']);
+                        })->orWhere(function ($q) use ($slot) {
+                            $q->where('Start_Time', '<=', $slot['start_time'])
+                              ->where('End_Time', '>=', $slot['end_time']);
+                        });
+                    })
+                    ->first();
+
+                if ($existingSlot) {
+                    throw new \Exception("Time slot {$slot['start_time']}-{$slot['end_time']} on $day overlaps with existing slot {$existingSlot->Start_Time}-{$existingSlot->End_Time}");
+                }
+
+               
+                $availabilityRecord = CoachAvailability::updateOrCreate(
+                    [
+                        'coach_id' => $userID,
+                        'Day_Of_Week' => $day,
+                        'Start_Time' => $slot['start_time'],
+                        'End_Time' => $slot['end_time'],
+                    ],
+                    [
+                        'End_Time' => $slot['end_time'], 
+                    ]
+                );
+
+                $savedSlots[] = $availabilityRecord;
+            }
+        }
+    } catch (\Exception $e) {
+        throw new \Exception("Error saving availability: " . $e->getMessage());
     }
+
+    return $savedSlots;
+}
+
+
+private function isValidTimeFormat(string $time): bool
+{
+    return preg_match('/^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/', $time);
+}
    
     public function getCoachProfile(int $user_id)
     {
