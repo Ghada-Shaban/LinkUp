@@ -18,7 +18,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\Rule;
-use CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary; // إضافة Cloudinary
+use CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary; 
 
 class AuthController extends Controller
 {  
@@ -91,13 +91,12 @@ class AuthController extends Controller
         ]));
     try {
         return DB::transaction(function () use ($validated, $request) {
-            // رفع الصورة إلى Cloudinary إذا وُجدت
             $photoPath = null;
             if ($request->hasFile('Photo')) {
                 $uploadedFile = $request->file('Photo');
                 $result = Cloudinary::upload($uploadedFile->getRealPath(), [
-                    'folder' => 'coach_photos', // مجلد في Cloudinary
-                    'public_id' => 'coach_' . time(), // اسم فريد للصورة
+                    'folder' => 'coach_photos', 
+                    'public_id' => 'coach_' . time(), 
                     'transformation' => [
                         'quality' => 'auto',
                         'fetch_format' => 'auto',
@@ -106,7 +105,7 @@ class AuthController extends Controller
                         'crop' => 'fill',
                     ],
                 ]);
-                $photoPath = $result->getSecurePath(); // رابط الصورة
+                $photoPath = $result->getSecurePath();
             }
         
             $user = User::create([
@@ -214,7 +213,7 @@ class AuthController extends Controller
             if ($request->hasFile('Photo')) {
                 $uploadedFile = $request->file('Photo');
                 $result = Cloudinary::upload($uploadedFile->getRealPath(), [
-                    'folder' => 'trainee_photos', // مجلد في Cloudinary
+                    'folder' => 'trainee_photos', 
                     'public_id' => 'trainee_' . time(), 
                     'transformation' => [
                         'quality' => 'auto',
@@ -224,7 +223,7 @@ class AuthController extends Controller
                         'crop' => 'fill',
                     ],
                 ]);
-                $photoPath = $result->getSecurePath(); // رابط الصورة
+                $photoPath = $result->getSecurePath(); 
             }
             
             $user = User::create([
