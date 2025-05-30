@@ -261,14 +261,21 @@ class NewSessionController extends Controller
                             ];
                         }
 
-                        // تجميع معرفات المتدربين
+                        // تجميع معرفات المتدربين من جميع الجلسات بنفس group_mentorship_id وتاريخ
                         $gmKey = $groupMentorship->id . '-' . $dateTime->toDateString();
                         if (!isset($groupMentorshipTrainees[$gmKey])) {
                             $groupMentorshipTrainees[$gmKey] = [];
                         }
-                        if ($session->trainee_id && !in_array($session->trainee_id, $groupMentorshipTrainees[$gmKey])) {
-                            $groupMentorshipTrainees[$gmKey][] = $session->trainee_id;
-                        }
+                        // استرجاع جميع trainee_ids من الجلسات المرتبطة بنفس group_mentorship_id وتاريخ
+                        $relatedSessions = NewSession::whereHas('service', function ($query) use ($groupMentorship) {
+                            $query->where('service_type', 'Group_Mentorship')
+                                  ->where('serviceable_id', $groupMentorship->id);
+                        })
+                        ->whereDate('date_time', $dateTime->toDateString())
+                        ->whereIn('status', $statuses)
+                        ->pluck('trainee_id')
+                        ->toArray();
+                        $groupMentorshipTrainees[$gmKey] = array_unique(array_filter($relatedSessions));
                     }
                 } else {
                     $otherSessions[] = $session;
