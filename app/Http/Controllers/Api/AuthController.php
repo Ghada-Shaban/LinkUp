@@ -176,7 +176,10 @@ class AuthController extends Controller
                     $startTime = $slot['start_time'];
                     $endTime = $slot['end_time'];
 
-                    // التحقق من التداخل بس (نسمح بالمتتالية)
+                    if ($startTime >= $endTime) {
+                        throw new \Exception("Start time must be less than end time for slot on $day");
+                    }
+
                     $overlaps = false;
                     foreach ($existingSlots as $existingStart => $existingEnd) {
                         if ($startTime < $existingEnd && $endTime > $existingStart && !($startTime == $existingEnd)) {
@@ -189,7 +192,6 @@ class AuthController extends Controller
                         throw new \Exception("Time slot overlaps with an existing slot on $day");
                     }
 
-                    // التحقق من التكرار
                     $duplicate = CoachAvailability::where('coach_id', $userID)
                         ->where('Day_Of_Week', $day)
                         ->where('Start_Time', $startTime)
@@ -197,7 +199,7 @@ class AuthController extends Controller
                         ->exists();
 
                     if ($duplicate) {
-                        continue; // تجاهل الفترة المكررة
+                        continue;
                     }
 
                     $availabilityRecord = CoachAvailability::create([
