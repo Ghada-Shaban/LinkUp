@@ -165,17 +165,17 @@ private function setAvailability($userID, array $availability)
     $savedSlots = [];
 
     try {
-        // Validate input structure
+      
         if (!isset($availability['days']) || !isset($availability['time_slots'])) {
             throw new \Exception("Invalid availability format: 'days' or 'time_slots' missing.");
         }
 
         foreach ($availability['days'] as $day) {
             if (!isset($availability['time_slots'][$day])) {
-                continue; // Skip if no time slots for this day
+                continue; 
             }
 
-            // Validate and sort time slots
+           
             $timeSlots = $availability['time_slots'][$day];
             usort($timeSlots, function ($a, $b) {
                 return strcmp($a['start_time'], $b['start_time']);
@@ -184,17 +184,16 @@ private function setAvailability($userID, array $availability)
             for ($i = 0; $i < count($timeSlots); $i++) {
                 $currentSlot = $timeSlots[$i];
 
-                // Validate time format
+        
                 if (!$this->isValidTimeFormat($currentSlot['start_time']) || !$this->isValidTimeFormat($currentSlot['end_time'])) {
                     throw new \Exception("Invalid time format for slot on $day: {$currentSlot['start_time']} - {$currentSlot['end_time']}");
                 }
 
-                // Check if end_time is after start_time
+                
                 if (strtotime($currentSlot['end_time']) <= strtotime($currentSlot['start_time'])) {
                     throw new \Exception("End time must be after start time for slot on $day.");
                 }
 
-                // Check for consecutive slots (if applicable)
                 if ($i > 0) {
                     $prevSlot = $timeSlots[$i - 1];
                     if ($prevSlot['end_time'] !== $currentSlot['start_time']) {
@@ -211,11 +210,9 @@ private function setAvailability($userID, array $availability)
                 ])->first();
 
                 if ($existingSlot) {
-                    // Skip if slot already exists
                     continue;
                 }
 
-                // Save the slot to the database
                 $availabilityRecord = CoachAvailability::create([
                     'coach_id' => $userID,
                     'Day_Of_Week' => $day,
