@@ -42,6 +42,17 @@ class MentorshipRequestController extends Controller
         $service = $modelClass::findOrFail($serviceId);
         $coachId = $service->service->coach_id;
 
+        if ($serviceTypeInput === 'GroupMentorship') {
+            $existingRequest = MentorshipRequest::where('trainee_id', Auth::user()->User_ID)
+                ->where('requestable_type', $modelClass)
+                ->where('requestable_id', $serviceId)
+                ->exists();
+
+            if ($existingRequest) {
+                return response()->json(['message' => 'You have already requested this Group Mentorship'], 400);
+            }
+        }
+
         $mentorshipRequest = MentorshipRequest::create([
             'requestable_id' => $serviceId,
             'requestable_type' => $modelClass,
@@ -55,7 +66,6 @@ class MentorshipRequestController extends Controller
         try {
             $coach = User::findOrFail($coachId);
             Mail::to($coach->email)->send(new NewMentorshipRequest($mentorshipRequest));
-           
         } catch (\Exception $e) {
         }
 
@@ -137,7 +147,7 @@ class MentorshipRequestController extends Controller
             'mentorship_request_id' => $request->id,
             'trainee_id' => $request->trainee_id,
             'coach_id' => $request->coach_id,
-            'payment_due_at' => now()->addHours(24), // تاريخ الاستحقاق بعد 24 ساعة من دلوقتي
+            'payment_due_at' => now()->addHours(24),
         ]);
 
         try {
@@ -146,7 +156,6 @@ class MentorshipRequestController extends Controller
             } else {
                 Mail::to($request->trainee->email)->send(new GroupMentorshipRequestAccepted($request));
             }
-           
         } catch (\Exception $e) {
         }
 
@@ -183,8 +192,7 @@ class MentorshipRequestController extends Controller
         try {
             if ($request->trainee && $request->trainee->email) {
                 Mail::to($request->trainee->email)->send(new RequestRejected($request));
-                
-            } 
+            }
         } catch (\Exception $e) {
         }
         return response()->json(['message' => 'Request rejected successfully.']);
