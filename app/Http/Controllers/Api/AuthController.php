@@ -161,29 +161,45 @@ class AuthController extends Controller
     }
     
     private function setAvailability($userID, array $availability)
-    {
-        $savedSlots = [];
+{
+    $savedSlots = [];
 
-        try {
-            foreach ($availability['days'] as $day) {
-                if (isset($availability['time_slots'][$day])) {
-                    foreach ($availability['time_slots'][$day] as $slot) {
-                        $availabilityRecord = CoachAvailability::create([
-                            'coach_id' => $userID,
-                            'Day_Of_Week' => $day,
-                            'Start_Time' => $slot['start_time'],
-                            'End_Time' => $slot['end_time'],
-                        ]);
+    try {
+        foreach ($availability['days'] as $day) {
+            if (isset($availability['time_slots'][$day])) {
+                foreach ($availability['time_slots'][$day] as $slot) {
+                    $existingSlots = CoachAvailability::where('coach_id', $userID)
+                        ->where('Day_Of_Week', $day)
+                        ->get();
 
-                        $savedSlots[] = $availabilityRecord;
+                    $newStart = strtotime($slot['start_time']);
+                    $newEnd = strtotime($slot['end_time']);
+
+                    foreach ($existingSlots as $existingSlot) {
+                        $existingStart = strtotime($existingSlot->Start_Time);
+                        $existingEnd = strtotime($existingSlot->End_Time);
+
+                        if (!($newEnd <= $existingStart || $newStart >= $existingEnd)) {
+                            throw new \Exception("Time slot overlaps with an existing slot on $day");
+                        }
                     }
+
+                    $availabilityRecord = CoachAvailability::create([
+                        'coach_id' => $userID,
+                        'Day_Of_Week' => $day,
+                        'Start_Time' => $slot['start_time'],
+                        'End_Time' => $slot['end_time'],
+                    ]);
+
+                    $savedSlots[] = $availabilityRecord;
                 }
             }
-        } catch (\Exception $e) {
-            throw new \Exception("Error saving availability: " . $e->getMessage());
         }
-        return $savedSlots;
-    } 
+    } catch (\Exception $e) {
+        throw new \Exception("Error saving availability: " . $e->getMessage());
+    }
+    return $savedSlots;
+}
     
     protected function registerTrainee(array $validated, Request $request)
     {
