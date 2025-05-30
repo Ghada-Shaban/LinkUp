@@ -153,21 +153,17 @@ class PaymentController extends Controller
                         $traineeIds = [];
                     }
                     
-                    // Update is_active before adding the new trainee
-                    $groupMentorship->current_participants = count($traineeIds);
-                    $groupMentorship->is_active = ($groupMentorship->current_participants >= $groupMentorship->minimum_participants) ? 1 : 0;
-                    $groupMentorship->save();
-
+                    $currentParticipants = count($traineeIds);
                     if (!in_array($mentorshipRequest->trainee_id, $traineeIds)) {
-                        $traineeIds[] = $mentorshipRequest->trainee_id;
-                        $groupMentorship->trainee_ids = json_encode($traineeIds);
-                        $groupMentorship->current_participants = count($traineeIds);
-                        $groupMentorship->is_active = ($groupMentorship->current_participants >= $groupMentorship->minimum_participants) ? 1 : 0;
-                        $groupMentorship->save();
+                        $currentParticipants++; 
                     }
 
-                    if ($groupMentorship->current_participants > $groupMentorship->max_participants) {
+                    if ($currentParticipants > $groupMentorship->max_participants) {
                         return response()->json(['message' => 'Group Mentorship is full'], 400);
+                    }
+
+                    if ($currentParticipants < $groupMentorship->min_participants) {
+                        return response()->json(['message' => 'Group Mentorship requires at least ' . $groupMentorship->min_participants . ' participants to proceed'], 400);
                     }
 
                     $startDateTime = Carbon::parse($groupMentorship->day . ' ' . $groupMentorship->start_time, 'Africa/Cairo');
@@ -196,6 +192,13 @@ class PaymentController extends Controller
 
                         $sessions[] = $newSession;
                     }
+
+                    if (!in_array($mentorshipRequest->trainee_id, $traineeIds)) {
+                        $traineeIds[] = $mentorshipRequest->trainee_id;
+                        $groupMentorship->trainee_ids = json_encode($traineeIds);
+                        $groupMentorship->current_participants = count($traineeIds);
+                        $groupMentorship->save();
+                    }
                 } elseif ($mentorshipRequest->requestable_type === 'App\\Models\\MentorshipPlan') {
                     $sessions = NewSession::where('mentorship_request_id', $mentorshipRequest->id)
                         ->where('status', 'Pending')
@@ -214,13 +217,16 @@ class PaymentController extends Controller
                         ]);
 
                     if ($updated === 0) {
-                        return response()->json(['message' => 'Payment succeeded but no sessions were updated'], 500);
+                        return response()->json(['message' => 'Payment /
+
+ succeeded but no sessions were updated'], 500);
                     }
                 }
 
                 try {
                     if ($mentorshipRequest->trainee && $mentorshipRequest->trainee->email) {
                         Mail::to($mentorshipRequest->trainee->email)->send(new PaymentConfirmation($mentorshipRequest, $sessions, $payment));
+                       
                     } 
                 } catch (\Exception $e) {
                 }
