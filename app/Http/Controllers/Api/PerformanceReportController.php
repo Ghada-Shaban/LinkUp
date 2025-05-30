@@ -49,8 +49,8 @@ class PerformanceReportController extends Controller
             $query->select('User_ID', 'full_name', 'photo'); 
         }, 'session' => function ($query) {
             $query->select('new_session_id', 'date_time', 'duration')
-                  ->with(['service' => function ($serviceQuery) {
-                      $serviceQuery->select('service_id', 'service_type'); 
+                  ->with(['service' => function ($query) {
+                      $query->select('service_id', 'service_type'); 
                   }]);
         }])
         ->orderBy('created_at', 'desc')
