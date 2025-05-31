@@ -16,6 +16,8 @@ class Mentorship extends Model
     protected $fillable = [
         'service_id',
         'mentorship_type'
+        'career_phase',
+        'role',
     ];
     protected $casts = [
         'mentorship_type' => 'string', 
