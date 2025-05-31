@@ -45,18 +45,113 @@ class PerformanceReportController extends Controller
 {
     $trainee = auth()->user();
     $reports = PerformanceReport::where('trainee_id', $trainee->User_ID)
-        ->with(['coach' => function ($query) {
-            $query->select('User_ID', 'full_name', 'photo'); 
-        }, 'session' => function ($query) {
-            $query->select('new_session_id', 'date_time', 'duration','service_id')
-                  ->with(['service' => function ($query) {
-                      $query->select('service_id', 'service_type'); 
-                  }]);
-        }])
+        ->with([
+            'coach' => function ($query) {
+                $query->select('User_ID', 'full_name', 'photo');
+            },
+            'session' => function ($query) {
+                $query->select('new_session_id', 'date_time', 'duration', 'service_id')
+                    ->with([
+                        'service' => function ($query) {
+                            $query->select('service_id', 'service_type', 'title')
+                                ->with([
+                                    'mentorship' => function ($query) {
+                                        $query->select('id', 'service_id', 'mentorship_type')
+                                            ->with([
+                                                'mentorshipSession' => function ($query) {
+                                                    $query->select('id', 'session_type');
+                                                },
+                                                'mentorshipPlan' => function ($query) {
+                                                    $query->select('id', 'title');
+                                                },
+                                                'mentorshipRequest' => function ($query) {
+                                                    $query->select('id', 'requestable_id', 'requestable_type')
+                                                        ->with('requestable');
+                                                }
+                                            ]);
+                                    },
+                                    'mockInterview' => function ($query) {
+                                        $query->select('id', 'interview_type', 'interview_level');
+                                    },
+                                    'groupMentorship' => function ($query) {
+                                        $query->select('id', 'title');
+                                    }
+                                ]);
+                        }
+                    ]);
+            }
+        ])
         ->orderBy('created_at', 'desc')
         ->get()
         ->each(function ($report) {
             $report->coach->makeHidden(['profile_photo_url', 'photo_url']);
+
+            // إضافة serviceTitle و sessionType
+            $session = $report->session;
+            $service = $session->service ?? null;
+            $sessionType = 'N/A';
+            $serviceTitle = 'N/A';
+            $currentParticipants = null;
+            $traineeNames = null;
+
+            if ($service) {
+                if ($service->service_type === 'Mentorship') {
+                    $mentorship = $service->mentorship;
+                    if ($mentorship) {
+                        if (strtolower($mentorship->mentorship_type) === 'mentorship session') {
+                            $sessionType = 'mentorship sessions';
+                            $mentorshipSession = $mentorship->mentorshipSession;
+                            $serviceTitle = $mentorshipSession ? $mentorshipSession->session_type : 'Mentorship Session';
+                        } elseif (strtolower($mentorship->mentorship_type) === 'mentorship plan') {
+                            $sessionType = 'mentorship plan';
+                            $mentorshipPlan = $mentorship->mentorshipRequest && $session->mentorshipRequest->requestable
+                                ? $session->mentorshipRequest->requestable
+                                : $mentorship->mentorshipPlan;
+                            $serviceTitle = $mentorshipPlan ? $mentorshipPlan->title : 'Mentorship Plan';
+                        } else {
+                            $sessionType = 'mentorship';
+                            $serviceTitle = 'Unknown Mentorship';
+                        }
+                    } else {
+                        $mentorshipPlan = MentorshipPlan::where('service_id', $session->service_id)->first();
+                        if ($mentorshipPlan) {
+                            $sessionType = 'mentorship plan';
+                            $serviceTitle = $mentorshipPlan->title ?? 'Mentorship Plan';
+                        } else {
+                            $sessionType = 'mentorship';
+                            $serviceTitle = 'Mentorship';
+                        }
+                    }
+                } elseif ($service->service_type === 'Mock_Interview') {
+                    $sessionType = 'mock interview';
+                    $mockInterview = $service->mockInterview;
+                    $serviceTitle = $mockInterview ? $mockInterview->interview_type . ' (' . $mockInterview->interview_level . ')' : 'Mock Interview';
+                } elseif ($service->service_type === 'Group_Mentorship') {
+                    $sessionType = 'group mentorship';
+                    $groupMentorship = $service->groupMentorship;
+                    $serviceTitle = $groupMentorship ? $groupMentorship->title : 'Group Mentorship';
+
+                  
+                    $gmKey = $groupMentorship->id . '-' . $session->date_time->toDateString();
+                    $traineeIds = isset($groupMentorshipTrainees[$gmKey]) ? $groupMentorshipTrainees[$gmKey] : [];
+                    $traineeNames = [];
+                    if (!empty($traineeIds)) {
+                        $trainees = User::whereIn('User_ID', $traineeIds)->pluck('full_name')->toArray();
+                        $traineeNames = array_filter($trainees);
+                        sort($traineeNames); 
+                    }
+                    $traineeNames = !empty($traineeNames) ? array_values($traineeNames) : ['N/A'];
+                    $currentParticipants = count($traineeNames) > 1 || (count($traineeNames) === 1 && $traineeNames[0] !== 'N/A') ? count($traineeNames) : 0;
+                } else {
+                    $sessionType = strtolower(str_replace('_', ' ', $service->service_type));
+                    $serviceTitle = $service->title ?? 'N/A';
+                }
+            }
+
+    
+            $report->sessionType = $sessionType;
+            $report->serviceTitle = $serviceTitle;
+          
         });
 
     return response()->json($reports, 200);
