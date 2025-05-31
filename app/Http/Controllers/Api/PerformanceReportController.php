@@ -53,7 +53,7 @@ class PerformanceReportController extends Controller
                 $query->select('new_session_id', 'date_time', 'duration', 'service_id')
                     ->with([
                         'service' => function ($query) {
-                            $query->select('service_id', 'service_type', 'title')
+                            $query->select('service_id', 'service_type')
                                 ->with([
                                     'mentorship' => function ($query) {
                                         $query->select('service_id', 'mentorship_type')
