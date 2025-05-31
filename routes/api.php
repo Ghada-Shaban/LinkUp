@@ -17,6 +17,7 @@ use App\Http\Controllers\Api\PerformanceReportController;
 use App\Http\Controllers\Api\CoachDashboardController;
 use App\Http\Controllers\Api\TraineeDashboardController;
 use App\Http\Controllers\Api\MentorshipPlanController;
+use App\Http\Controllers\LandingPageReviewController; // إضافة الكونترولر الجديد
 
 /*
 |--------------------------------------------------------------------------
@@ -143,3 +144,6 @@ Route::middleware('auth:sanctum')->group(function () {
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/trainee-dashboard/stats', [TraineeDashboardController::class, 'getTraineeDashboardStats']);
 });
+
+// الراوت الجديد لـ Landing Page Reviews (بدون أي middleware عشان يكون متاح للجميع)
+Route::get('/landing-reviews', [LandingPageReviewController::class, 'getReviews']);
