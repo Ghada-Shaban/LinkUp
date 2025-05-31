@@ -160,116 +160,78 @@ class AuthController extends Controller
     }
     }
     
-private function setAvailability($userID, array $availability)
+ private function setAvailability($userID, array $availability)
 {
     $savedSlots = [];
 
     try {
-        // Validate input structure
-        if (!isset($availability['days']) || !isset($availability['time_slots'])) {
-            throw new \Exception("Invalid availability format: 'days' or 'time_slots' missing.");
-        }
-
         foreach ($availability['days'] as $day) {
-            if (!isset($availability['time_slots'][$day])) {
-                continue; // Skip if no time slots for this day
-            }
-
-            // Sort time slots by start_time
-            $timeSlots = $availability['time_slots'][$day];
-            usort($timeSlots, function ($a, $b) {
-                return strcmp($a['start_time'], $b['start_time']);
-            });
-
-            // Check for overlaps within the input time slots
-            for ($i = 1; $i < count($timeSlots); $i++) {
-                $prevSlot = $timeSlots[$i - 1];
-                $currentSlot = $timeSlots[$i];
-
-                // Validate time format
-                if (!$this->isValidTimeFormat($currentSlot['start_time']) || !$this->isValidTimeFormat($currentSlot['end_time'])) {
-                    throw new \Exception("Invalid time format for slot on $day: {$currentSlot['start_time']} - {$currentSlot['end_time']}");
+            if (isset($availability['time_slots'][$day])) {
+                // نتحقق من التداخل في الأوقات
+                if ($this->hasOverlappingSlots($availability['time_slots'][$day])) {
+                    throw new \Exception("في أوقات متداخلة يوم $day!");
                 }
 
-                // Check if end_time is after start_time
-                if (strtotime($currentSlot['end_time']) <= strtotime($currentSlot['start_time'])) {
-                    throw new \Exception("End time must be after start time for slot on $day: {$currentSlot['start_time']} - {$currentSlot['end_time']}");
+                foreach ($availability['time_slots'][$day] as $slot) {
+                    // نتأكد إن الوقت صح ومنطقي
+                    if (!$this->isValidTimeSlot($slot['start_time'], $slot['end_time'])) {
+                        throw new \Exception("الوقت غلط يوم $day: من {$slot['start_time']} لـ {$slot['end_time']}");
+                    }
+
+                    $availabilityRecord = CoachAvailability::create([
+                        'coach_id' => $userID,
+                        'Day_Of_Week' => $day,
+                        'Start_Time' => $slot['start_time'],
+                        'End_Time' => $slot['end_time'],
+                    ]);
+
+                    $savedSlots[] = $availabilityRecord;
                 }
-
-                // Check for overlaps between input slots
-                if (strtotime($prevSlot['end_time']) > strtotime($currentSlot['start_time'])) {
-                    throw new \Exception("Overlapping time slots detected in input on $day: {$prevSlot['start_time']}-{$prevSlot['end_time']} overlaps with {$currentSlot['start_time']}-{$currentSlot['end_time']}");
-                }
-            }
-
-            foreach ($timeSlots as $currentSlot) {
-                // Validate time format (for the first slot, since the loop above starts at i=1)
-                if (!$this->isValidTimeFormat($currentSlot['start_time']) || !$this->isValidTimeFormat($currentSlot['end_time'])) {
-                    throw new \Exception("Invalid time format for slot on $day: {$currentSlot['start_time']} - {$currentSlot['end_time']}");
-                }
-
-                // Check if end_time is after start_time
-                if (strtotime($currentSlot['end_time']) <= strtotime($currentSlot['start_time'])) {
-                    throw new \Exception("End time must be after start time for slot on $day: {$currentSlot['start_time']} - {$currentSlot['end_time']}");
-                }
-
-                // Check for overlapping slots in the database
-                $existingSlot = CoachAvailability::where('coach_id', $userID)
-                    ->where('Day_Of_Week', $day)
-                    ->where(function ($query) use ($currentSlot) {
-                        $query->where(function ($q) use ($currentSlot) {
-                            $q->where('Start_Time', '>=', $currentSlot['start_time'])
-                              ->where('Start_Time', '<', $currentSlot['end_time']);
-                        })->orWhere(function ($q) use ($currentSlot) {
-                            $q->where('End_Time', '>', $currentSlot['start_time'])
-                              ->where('End_Time', '<=', $currentSlot['end_time']);
-                        })->orWhere(function ($q) use ($currentSlot) {
-                            $q->where('Start_Time', '<=', $currentSlot['start_time'])
-                              ->where('End_Time', '>=', $currentSlot['end_time']);
-                        });
-                    })
-                    ->first();
-
-                if ($existingSlot) {
-                    throw new \Exception("Time slot {$currentSlot['start_time']}-{$currentSlot['end_time']} on $day overlaps with existing slot {$existingSlot->Start_Time}-{$existingSlot->End_Time}");
-                }
-
-                // Check for exact duplicate slot
-                $duplicateSlot = CoachAvailability::where([
-                    'coach_id' => $userID,
-                    'Day_Of_Week' => $day,
-                    'Start_Time' => $currentSlot['start_time'],
-                    'End_Time' => $currentSlot['end_time'],
-                ])->first();
-
-                if ($duplicateSlot) {
-                    continue; // Skip if slot already exists
-                }
-
-                // Save the slot
-                $availabilityRecord = CoachAvailability::create([
-                    'coach_id' => $userID,
-                    'Day_Of_Week' => $day,
-                    'Start_Time' => $currentSlot['start_time'],
-                    'End_Time' => $currentSlot['end_time'],
-                ]);
-
-                $savedSlots[] = $availabilityRecord;
             }
         }
     } catch (\Exception $e) {
-        throw new \Exception("Error saving availability: " . $e->getMessage());
+        throw new \Exception("مشكلة في حفظ الأوقات: " . $e->getMessage());
     }
 
     return $savedSlots;
 }
 
 /**
- * Validate time format (e.g., HH:MM or HH:MM:SS)
+ * بيتحقق لو في أوقات متداخلة في اليوم
  */
-private function isValidTimeFormat(string $time): bool
+private function hasOverlappingSlots(array $slots): bool
 {
-    return preg_match('/^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/', $time);
+    // نرتب الأوقات على حسب وقت البداية
+    usort($slots, function ($a, $b) {
+        return strcmp($a['start_time'], $b['start_time']);
+    });
+
+    for ($i = 0; $i < count($slots) - 1; $i++) {
+        $currentEnd = strtotime($slots[$i]['end_time']);
+        $nextStart = strtotime($slots[$i + 1]['start_time']);
+
+        // لو وقت النهاية أكبر من وقت البداية بتاع الوقت اللي بعده، يبقى في تداخل
+        if ($currentEnd > $nextStart) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/**
+ * بيتأكد إن الوقت صح ومنطقي (يعني البداية قبل النهاية)
+ */
+private function isValidTimeSlot(string $startTime, string $endTime): bool
+{
+    // التأكد إن الوقت بصيغة HH:MM
+    $timePattern = '/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/';
+    if (!preg_match($timePattern, $startTime) || !preg_match($timePattern, $endTime)) {
+        return false;
+    }
+
+    // التأكد إن وقت البداية قبل النهاية
+    return strtotime($startTime) < strtotime($endTime);
 }
     
     protected function registerTrainee(array $validated, Request $request)
