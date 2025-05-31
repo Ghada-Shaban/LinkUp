@@ -13,7 +13,8 @@ class LandingPageCoachController extends Controller
     {
         try {
             $search = $request->query('search', '');
-            $perPage = $request->query('per_page', 4); // 4 لأن الصورة بتعرض 4 Coaches في الصفحة
+            $perPage = $request->query('per_page', 4); // 4 Coaches لكل صفحة زي الصورة
+            $page = $request->query('page', 1); // الصفحة الافتراضية 1
             $serviceType = $request->query('service_type', '');
 
             $coachesQuery = User::with(['coach', 'services.price', 'services.sessions', 'skills', 'reviewsAsCoach'])
@@ -22,16 +23,18 @@ class LandingPageCoachController extends Controller
                     $query->where('status', 'approved');
                 })
                 ->when($search, function ($query, $search) {
-                    $query->where(function ($q) use ($search) {
-                        $q->where('full_name', 'like', "%{$search}%")
-                          ->orWhereHas('coach', function ($q) use ($search) {
-                              $q->where('Title', 'like', "%{$search}%");
+                    $searchTerm = "%{$search}%";
+                    $query->where(function ($q) use ($searchTerm) {
+                        $q->where('full_name', 'like', $searchTerm) // Search by name
+                          ->orWhereHas('coach', function ($q) use ($searchTerm) {
+                              $q->where('Title', 'like', $searchTerm) // Search by role
+                                ->orWhere('Company_or_School', 'like', $searchTerm); // Search by company
                           })
-                          ->orWhereHas('services', function ($q) use ($search) {
-                              $q->where('service_type', 'like', "%{$search}%");
+                          ->orWhereHas('services', function ($q) use ($searchTerm) {
+                              $q->where('service_type', 'like', $searchTerm);
                           })
-                          ->orWhereHas('skills', function ($q) use ($search) {
-                              $q->where('skill', 'like', "%{$search}%");
+                          ->orWhereHas('skills', function ($q) use ($searchTerm) {
+                              $q->where('skill', 'like', $searchTerm);
                           });
                     });
                 })
@@ -68,7 +71,7 @@ class LandingPageCoachController extends Controller
                     });
                 });
 
-            $coaches = $coachesQuery->paginate($perPage);
+            $coaches = $coachesQuery->paginate($perPage, ['*'], 'page', $page);
 
             return CoachResource::collection($coaches);
         } catch (\Exception $e) {
