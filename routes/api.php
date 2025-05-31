@@ -17,7 +17,7 @@ use App\Http\Controllers\Api\PerformanceReportController;
 use App\Http\Controllers\Api\CoachDashboardController;
 use App\Http\Controllers\Api\TraineeDashboardController;
 use App\Http\Controllers\Api\MentorshipPlanController;
-use App\Http\Controllers\LandingPageReviewController; // إضافة الكونترولر الجديد
+use App\Http\Controllers\Api\LandingPageReviewController; // تعديل الـ Namespace ليكون Api
 
 /*
 |--------------------------------------------------------------------------
@@ -146,4 +146,4 @@ Route::middleware('auth:sanctum')->group(function () {
 });
 
 // الراوت الجديد لـ Landing Page Reviews (بدون أي middleware عشان يكون متاح للجميع)
-Route::get('/landing-reviews', [LandingPageReviewController::class, 'getReviews']);
+Route::get('/landing-reviews', [\App\Http\Controllers\Api\LandingPageReviewController::class, 'getReviews']); // تعديل الـ Namespace
