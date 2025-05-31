@@ -44,8 +44,7 @@ class PerformanceReportController extends Controller
         return response()->json(['message' => 'Performance report submitted successfully'], 200);
     }
 
-
-    public function getPerformanceReports(Request $request)
+public function getPerformanceReports(Request $request)
     {
         $trainee = auth()->user();
         $reports = PerformanceReport::where('trainee_id', $trainee->User_ID)
@@ -78,26 +77,35 @@ class PerformanceReportController extends Controller
                     // تحديد العلاقة المناسبة بناءً على service_type
                     $mentorshipTypes = ['Mentorship', 'Project_Evaluation', 'CV_Review', 'Linkedin_Optimization'];
                     if (in_array($service->service_type, $mentorshipTypes)) {
-                        $mentorship = Mentorship::where('service_id', $service->service_id)->with([
-                            'mentorshipSession' => fn($q) => $q->select('service_id', 'session_type'),
-                            'mentorshipPlan' => fn($q) => $q->select('service_id', 'title'),
-                        ])->first();
+                        $mentorship = Mentorship::where('service_id', $service->service_id)->first();
 
                         if ($mentorship && strtolower($mentorship->mentorship_type) === 'mentorship session') {
-                            $mentorshipSession = $mentorship->mentorshipSession;
-                            $serviceTitle = $mentorshipSession ? $mentorshipSession->session_type : str_replace('_', ' ', $service->service_type);
-                            $serviceData['mentorship'] = $mentorship ? $mentorship->toArray() : ['mentorship_type' => 'mentorship session'];
+                            $mentorshipSession = MentorshipSession::where('service_id', $service->service_id)->select('service_id', 'session_type')->first();
+                            $title = $mentorshipSession ? $mentorshipSession->session_type : str_replace('_', ' ', $service->service_type);
+                            $serviceTitle = 'Mentorship Session: ' . $title;
+                            $serviceData['mentorship'] = [
+                                'service_id' => $mentorship->service_id,
+                                'mentorship_type' => $mentorship->mentorship_type,
+                                'mentorship_session' => $mentorshipSession ? $mentorshipSession->toArray() : null
+                            ];
                         } elseif ($mentorship && strtolower($mentorship->mentorship_type) === 'mentorship plan') {
-                            $mentorshipPlan = $mentorship->mentorshipPlan;
-                            $serviceTitle = $mentorshipPlan ? $mentorshipPlan->title : 'Mentorship Plan';
-                            $serviceData['mentorship'] = $mentorship ? $mentorship->toArray() : ['mentorship_type' => 'mentorship plan'];
+                            $mentorshipPlan = MentorshipPlan::where('service_id', $service->service_id)->select('service_id', 'title')->first();
+                            $serviceTitle = 'Mentorship Plan: ' . ($mentorshipPlan ? $mentorshipPlan->title : 'Mentorship Plan');
+                            $serviceData['mentorship'] = [
+                                'service_id' => $mentorship->service_id,
+                                'mentorship_type' => $mentorship->mentorship_type,
+                                'mentorship_plan' => $mentorshipPlan ? $mentorshipPlan->toArray() : null
+                            ];
                         } else {
                             $mentorshipPlan = MentorshipPlan::where('service_id', $service->service_id)->first();
-                            $serviceTitle = $mentorshipPlan ? $mentorshipPlan->title : str_replace('_', ' ', $service->service_type);
+                            $serviceTitle = $mentorshipPlan ? 'Mentorship Plan: ' . $mentorshipPlan->title : str_replace('_', ' ', $service->service_type);
                             if ($mentorshipPlan) {
                                 $serviceData['mentorship'] = ['mentorship_plan' => $mentorshipPlan->toArray()];
                             } elseif ($mentorship) {
-                                $serviceData['mentorship'] = $mentorship->toArray();
+                                $serviceData['mentorship'] = [
+                                    'service_id' => $mentorship->service_id,
+                                    'mentorship_type' => $mentorship->mentorship_type
+                                ];
                             }
                         }
                     } elseif ($service->service_type === 'Mock_Interview') {
@@ -126,7 +134,6 @@ class PerformanceReportController extends Controller
 
         return response()->json($reports, 200);
     }
-
                  
                 
 }
