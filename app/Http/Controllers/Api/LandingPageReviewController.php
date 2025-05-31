@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Controller; // إضافة use للـ Controller الأساسي
 use App\Models\Review;
 use Illuminate\Http\Request;
 
