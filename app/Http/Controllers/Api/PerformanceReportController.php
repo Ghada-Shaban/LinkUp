@@ -50,36 +50,9 @@ public function getPerformanceReports(Request $request)
             },
             'session' => function ($query) {
                 $query->select('new_session_id', 'date_time', 'duration', 'service_id')
-                    ->with([
-                        'service' => function ($query) {
-                            $query->select('service_id', 'service_type')
-                                ->with([
-                                    'mentorship' => function ($query) {
-                                        $query->select('service_id', 'mentorship_type')
-                                            ->when(true, function ($query) {
-                                                $query->with([
-                                                    'mentorshipSession' => function ($query) {
-                                                        $query->select('service_id', 'session_type');
-                                                    },
-                                                    'mentorshipPlan' => function ($query) {
-                                                        $query->select('service_id', 'title');
-                                                    },
-                                                    'mentorshipRequest' => function ($query) {
-                                                        $query->select('id', 'requestable_id', 'requestable_type')
-                                                            ->with('requestable');
-                                                    }
-                                                ]);
-                                            });
-                                    },
-                                    'mockInterview' => function ($query) {
-                                        $query->select('service_id', 'interview_type', 'interview_level');
-                                    },
-                                    'groupMentorship' => function ($query) {
-                                        $query->select('service_id', 'title');
-                                    }
-                                ]);
-                        }
-                    ]);
+                    ->with(['service' => function ($query) {
+                        $query->select('service_id', 'service_type');
+                    }]);
             }
         ])
         ->orderBy('created_at', 'desc')
@@ -91,49 +64,55 @@ public function getPerformanceReports(Request $request)
             $session = $report->session;
             $service = $session->service ?? null;
             $serviceTitle = 'N/A';
-            $relevantRelation = null;
+            $serviceData = $service ? [
+                'service_id' => $service->service_id,
+                'service_type' => $service->service_type,
+            ] : [];
 
             if ($service) {
                 // تحديد العلاقة المناسبة بناءً على service_type
                 $mentorshipTypes = ['Mentorship', 'Project_Evaluation', 'CV_Review', 'Linkedin_Optimization'];
                 if (in_array($service->service_type, $mentorshipTypes)) {
-                    $mentorship = $service->mentorship;
+                    $mentorship = Mentorship::where('service_id', $service->service_id)->with([
+                        'mentorshipSession' => fn($q) => $q->select('service_id', 'session_type'),
+                        'mentorshipPlan' => fn($q) => $q->select('service_id', 'title'),
+                        'mentorshipRequest' => fn($q) => $q->select('id', 'requestable_id', 'requestable_type')->with('requestable')
+                    ])->first();
+
                     if ($mentorship && strtolower($mentorship->mentorship_type) === 'mentorship session') {
                         $mentorshipSession = $mentorship->mentorshipSession;
                         $serviceTitle = $mentorshipSession ? $mentorshipSession->session_type : str_replace('_', ' ', $service->service_type);
-                        $relevantRelation = $mentorship ? ['mentorship' => $mentorship->toArray()] : null;
+                        $serviceData['mentorship'] = $mentorship->toArray();
                     } elseif ($mentorship && strtolower($mentorship->mentorship_type) === 'mentorship plan') {
-                        $mentorshipPlan = $mentorship->mentorshipRequest && $session->mentorshipRequest->requestable
-                            ? $session->mentorshipRequest->requestable
+                        $mentorshipPlan = $mentorship->mentorshipRequest && $mentorship->mentorshipRequest->requestable
+                            ? $mentorship->mentorshipRequest->requestable
                             : $mentorship->mentorshipPlan;
                         $serviceTitle = $mentorshipPlan ? $mentorshipPlan->title : 'Mentorship Plan';
-                        $relevantRelation = $mentorship ? ['mentorship' => $mentorship->toArray()] : null;
+                        $serviceData['mentorship'] = $mentorship->toArray();
                     } else {
-                        $mentorshipPlan = MentorshipPlan::where('service_id', $session->service_id)->first();
+                        $mentorshipPlan = MentorshipPlan::where('service_id', $service->service_id)->first();
                         $serviceTitle = $mentorshipPlan ? $mentorshipPlan->title : str_replace('_', ' ', $service->service_type);
-                        $relevantRelation = $mentorshipPlan ? ['mentorship' => ['mentorship_plan' => $mentorshipPlan->toArray()]] : null;
+                        if ($mentorshipPlan) {
+                            $serviceData['mentorship'] = ['mentorship_plan' => $mentorshipPlan->toArray()];
+                        }
                     }
                 } elseif ($service->service_type === 'Mock_Interview') {
-                    $mockInterview = $service->mockInterview;
+                    $mockInterview = MockInterview::where('service_id', $service->service_id)->first();
                     $serviceTitle = $mockInterview ? $mockInterview->interview_type . ' (' . $mockInterview->interview_level . ')' : 'Mock Interview';
-                    $relevantRelation = $mockInterview ? ['mock_interview' => $mockInterview->toArray()] : null;
+                    if ($mockInterview) {
+                        $serviceData['mock_interview'] = $mockInterview->toArray();
+                    }
                 } elseif ($service->service_type === 'Group_Mentorship') {
-                    $groupMentorship = $service->groupMentorship;
+                    $groupMentorship = GroupMentorship::where('service_id', $service->service_id)->select('service_id', 'title')->first();
                     $serviceTitle = $groupMentorship ? $groupMentorship->title : 'Group Mentorship';
-                    $relevantRelation = $groupMentorship ? ['group_mentorship' => $groupMentorship->toArray()] : null;
+                    if ($groupMentorship) {
+                        $serviceData['group_mentorship'] = $groupMentorship->toArray();
+                    }
                 } else {
                     $serviceTitle = str_replace('_', ' ', $service->service_type);
-                    $relevantRelation = null;
                 }
 
-                // تنظيف حقل service لإظهار العلاقة المناسبة فقط
-                $serviceData = [
-                    'service_id' => $service->service_id,
-                    'service_type' => $service->service_type,
-                ];
-                if ($relevantRelation) {
-                    $serviceData = array_merge($serviceData, $relevantRelation);
-                }
+                // تحديث حقل service بالبيانات المنظفة
                 $report->session->service = $serviceData;
             }
 
