@@ -5,6 +5,10 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\NewSession;
 use App\Models\Service;
+use App\Models\Mentorship;
+use App\Models\MentorshipPlan;
+use App\Models\MockInterview;
+use App\Models\GroupMentorship;
 use App\Models\PerformanceReport;
 use Illuminate\Http\Request;
 
