@@ -93,18 +93,19 @@ public function getPerformanceReports(Request $request)
             if ($service) {
                 if ($service->service_type === 'Mentorship') {
                     $mentorship = $service->mentorship;
-                    if ($mentorship) {
-                        if (strtolower($mentorship->mentorship_type) === 'mentorship session') {
+                    if ($mentorship && strtolower($mentorship->mentorship_type) === 'mentorship session') {
+                        // التحقق من service_type لـ Project_Evaluation, CV_Review, Linkedin_Optimization
+                        if (in_array($service->service_type, ['Project_Evaluation', 'CV_Review', 'Linkedin_Optimization'])) {
+                            $serviceTitle = str_replace('_', ' ', $service->service_type);
+                        } else {
                             $mentorshipSession = $mentorship->mentorshipSession;
                             $serviceTitle = $mentorshipSession ? $mentorshipSession->session_type : 'Mentorship Session';
-                        } elseif (strtolower($mentorship->mentorship_type) === 'mentorship plan') {
-                            $mentorshipPlan = $mentorship->mentorshipRequest && $session->mentorshipRequest->requestable
-                                ? $session->mentorshipRequest->requestable
-                                : $mentorship->mentorshipPlan;
-                            $serviceTitle = $mentorshipPlan ? $mentorshipPlan->title : 'Mentorship Plan';
-                        } else {
-                            $serviceTitle = 'Unknown Mentorship';
                         }
+                    } elseif ($mentorship && strtolower($mentorship->mentorship_type) === 'mentorship plan') {
+                        $mentorshipPlan = $mentorship->mentorshipRequest && $session->mentorshipRequest->requestable
+                            ? $session->mentorshipRequest->requestable
+                            : $mentorship->mentorshipPlan;
+                        $serviceTitle = $mentorshipPlan ? $mentorshipPlan->title : 'Mentorship Plan';
                     } else {
                         $mentorshipPlan = MentorshipPlan::where('service_id', $session->service_id)->first();
                         $serviceTitle = $mentorshipPlan ? $mentorshipPlan->title : 'Mentorship';
@@ -115,12 +116,6 @@ public function getPerformanceReports(Request $request)
                 } elseif ($service->service_type === 'Group_Mentorship') {
                     $groupMentorship = $service->groupMentorship;
                     $serviceTitle = $groupMentorship ? $groupMentorship->title : 'Group Mentorship';
-                } elseif ($service->service_type === 'Project_Evaluation') {
-                    $serviceTitle = 'Project Evaluation';
-                } elseif ($service->service_type === 'CV_Review') {
-                    $serviceTitle = 'CV Review';
-                } elseif ($service->service_type === 'Linkedin_Optimization') {
-                    $serviceTitle = 'LinkedIn Optimization';
                 } else {
                     $serviceTitle = str_replace('_', ' ', $service->service_type); // تحويل service_type إلى عنوان
                 }
@@ -132,5 +127,6 @@ public function getPerformanceReports(Request $request)
 
     return response()->json($reports, 200);
 }
+           
                 
 }
