@@ -40,7 +40,7 @@ class PerformanceReportController extends Controller
         return response()->json(['message' => 'Performance report submitted successfully'], 200);
     }
 
- public function getPerformanceReports(Request $request)
+public function getPerformanceReports(Request $request)
 {
     $trainee = auth()->user();
     $reports = PerformanceReport::where('trainee_id', $trainee->User_ID)
@@ -74,15 +74,6 @@ class PerformanceReportController extends Controller
                                     },
                                     'groupMentorship' => function ($query) {
                                         $query->select('service_id', 'title');
-                                    },
-                                    'projectEvaluation' => function ($query) {
-                                        $query->select('service_id'); 
-                                    },
-                                    'cvReview' => function ($query) {
-                                        $query->select('service_id'); 
-                                    },
-                                    'linkedinOptimization' => function ($query) {
-                                        $query->select('service_id'); 
                                     }
                                 ]);
                         }
@@ -94,7 +85,7 @@ class PerformanceReportController extends Controller
         ->each(function ($report) {
             $report->coach->makeHidden(['profile_photo_url', 'photo_url']);
 
-           
+            // إضافة serviceTitle فقط
             $session = $report->session;
             $service = $session->service ?? null;
             $serviceTitle = 'N/A';
@@ -131,14 +122,15 @@ class PerformanceReportController extends Controller
                 } elseif ($service->service_type === 'Linkedin_Optimization') {
                     $serviceTitle = 'LinkedIn Optimization';
                 } else {
-                    $serviceTitle = str_replace('_', ' ', $service->service_type); 
+                    $serviceTitle = str_replace('_', ' ', $service->service_type); // تحويل service_type إلى عنوان
                 }
             }
 
-      
+            // إضافة serviceTitle إلى التقرير
             $report->serviceTitle = $serviceTitle;
         });
 
     return response()->json($reports, 200);
 }
+                
 }
