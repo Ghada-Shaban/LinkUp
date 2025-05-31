@@ -201,6 +201,11 @@ class NewSessionController extends Controller
                     'updated_at' => $updatedAt->toDateTimeString()
                 ];
 
+                if ($service) {
+                    $traineeName = $session->trainees->first() ? $session->trainees->first()->full_name : 'N/A';
+                    $sessionData['trainee_name'] = $traineeName;
+                }
+
                 if ($service && $service->service_type === 'Group_Mentorship') {
                     $sessionData['current_participants'] = $currentParticipants;
                     $sessionData['trainee_names'] = $traineeNames;
@@ -380,6 +385,11 @@ class NewSessionController extends Controller
                     'created_at' => $createdAt->toDateTimeString(),
                     'updated_at' => $updatedAt->toDateTimeString()
                 ];
+
+                if ($service) {
+                    $traineeName = $session->trainees->first() ? $session->trainees->first()->full_name : 'N/A';
+                    $sessionData['trainee_name'] = $traineeName;
+                }
 
                 if ($service && $service->service_type === 'Group_Mentorship') {
                     $sessionData['current_participants'] = $currentParticipants;
