@@ -160,7 +160,7 @@ class AuthController extends Controller
     }
     }
     
-rivate function setAvailability($userID, array $availability)
+private function setAvailability($userID, array $availability)
     {
         $savedSlots = [];
 
