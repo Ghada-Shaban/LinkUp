@@ -160,135 +160,30 @@ class AuthController extends Controller
     }
     }
     
-private function setAvailability($userID, array $availability)
-{
-    $savedSlots = [];
-    
-    // استخدام Transaction للتأكد من تنفيذ العملية بالكامل أو إلغاؤها
-    \DB::beginTransaction();
-    
-    try {
-        // حذف جميع الأوقات المتاحة السابقة للمدرب
-        CoachAvailability::where('coach_id', $userID)->delete();
-        
-        foreach ($availability['days'] as $day) {
-            if (isset($availability['time_slots'][$day])) {
-                $daySlots = $availability['time_slots'][$day];
-                
-                // التحقق من عدم وجود تداخل في الأوقات
-                $this->validateTimeSlots($daySlots, $day);
-                
-                // ترتيب الأوقات حسب وقت البداية
-                usort($daySlots, function($a, $b) {
-                    return strtotime($a['start_time']) - strtotime($b['start_time']);
-                });
-                
-                // دمج الأوقات المتصلة
-                $mergedSlots = $this->mergeConnectedSlots($daySlots);
-                
-                foreach ($mergedSlots as $slot) {
-                    $availabilityRecord = CoachAvailability::create([
-                        'coach_id' => $userID,
-                        'Day_Of_Week' => $day,
-                        'Start_Time' => $slot['start_time'],
-                        'End_Time' => $slot['end_time'],
-                    ]);
-                    
-                    $savedSlots[] = $availabilityRecord;
+rivate function setAvailability($userID, array $availability)
+    {
+        $savedSlots = [];
+
+        try {
+            foreach ($availability['days'] as $day) {
+                if (isset($availability['time_slots'][$day])) {
+                    foreach ($availability['time_slots'][$day] as $slot) {
+                        $availabilityRecord = CoachAvailability::create([
+                            'coach_id' => $userID,
+                            'Day_Of_Week' => $day,
+                            'Start_Time' => $slot['start_time'],
+                            'End_Time' => $slot['end_time'],
+                        ]);
+
+                        $savedSlots[] = $availabilityRecord;
+                    }
                 }
             }
+        } catch (\Exception $e) {
+            throw new \Exception("Error saving availability: " . $e->getMessage());
         }
-        
-        // تأكيد العملية
-        \DB::commit();
-        
-    } catch (\Exception $e) {
-        // إلغاء العملية في حالة الخطأ
-        \DB::rollback();
-        throw new \Exception("Error saving availability: " . $e->getMessage());
-    }
-    
-    return $savedSlots;
-}
-
-/**
- * التحقق من عدم وجود تداخل في الأوقات
- */
-private function validateTimeSlots(array $slots, string $day)
-{
-    $count = count($slots);
-    
-    for ($i = 0; $i < $count; $i++) {
-        $startTime1 = strtotime($slots[$i]['start_time']);
-        $endTime1 = strtotime($slots[$i]['end_time']);
-        
-        // التحقق من صحة الوقت (البداية قبل النهاية)
-        if ($startTime1 >= $endTime1) {
-            throw new \Exception("Invalid time slot on {$day}: Start time must be before end time");
-        }
-        
-        for ($j = $i + 1; $j < $count; $j++) {
-            $startTime2 = strtotime($slots[$j]['start_time']);
-            $endTime2 = strtotime($slots[$j]['end_time']);
-            
-            // التحقق من التداخل
-            if ($this->timeSlotsOverlap($startTime1, $endTime1, $startTime2, $endTime2)) {
-                throw new \Exception("Overlapping time slots found on {$day}: " . 
-                    $slots[$i]['start_time'] . "-" . $slots[$i]['end_time'] . 
-                    " overlaps with " . 
-                    $slots[$j]['start_time'] . "-" . $slots[$j]['end_time']);
-            }
-        }
-    }
-}
-
-/**
- * التحقق من تداخل فترتين زمنيتين
- */
-private function timeSlotsOverlap($start1, $end1, $start2, $end2)
-{
-    return ($start1 < $end2) && ($start2 < $end1);
-}
-
-/**
- * دمج الأوقات المتصلة
- */
-private function mergeConnectedSlots(array $slots)
-{
-    if (empty($slots)) {
-        return $slots;
-    }
-    
-    // ترتيب الأوقات حسب وقت البداية
-    usort($slots, function($a, $b) {
-        return strtotime($a['start_time']) - strtotime($b['start_time']);
-    });
-    
-    $merged = [];
-    $current = $slots[0];
-    
-    for ($i = 1; $i < count($slots); $i++) {
-        $next = $slots[$i];
-        
-        // إذا كان الوقت الحالي متصل مع التالي
-        if (strtotime($current['end_time']) >= strtotime($next['start_time'])) {
-            // دمج الأوقات
-            $current['end_time'] = date('H:i:s', max(
-                strtotime($current['end_time']), 
-                strtotime($next['end_time'])
-            ));
-        } else {
-            // إضافة الوقت الحالي للنتيجة والانتقال للتالي
-            $merged[] = $current;
-            $current = $next;
-        }
-    }
-    
-    // إضافة آخر وقت
-    $merged[] = $current;
-    
-    return $merged;
-}
+        return $savedSlots;
+    } 
     protected function registerTrainee(array $validated, Request $request)
     {
         $validLanguages = $this->getEnumValues('trainee_preferred_languages', 'Language');
