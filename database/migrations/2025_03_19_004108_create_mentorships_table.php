@@ -15,6 +15,16 @@ return new class extends Migration
             $table->unsignedBigInteger('service_id')->primary();
             $table->enum('mentorship_type', ['Mentorship session', 'Mentorship plan']);
             $table->foreign('service_id')->references('service_id')->on('services')->onDelete('cascade');
+             $table->enum('role', [
+                'Business',
+                'Lower-Tech',
+                'High-Tech',
+                'Global Aspiration'
+            ]);
+            $table->enum('career_phase', [
+                'Career Starter',
+                'Career Accelerator'
+            ]);
         });
     }
 
