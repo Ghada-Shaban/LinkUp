@@ -21,6 +21,8 @@ class GroupMentorship extends Model
         'available_slots',
         'current_participants',
         'trainee_ids',
+        'career_phase',
+        'role',
     ];
 
     protected $casts = [
