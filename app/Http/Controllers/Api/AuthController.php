@@ -160,14 +160,19 @@ class AuthController extends Controller
     }
     }
     
- private function setAvailability($userID, array $availability)
+private function setAvailability($userID, array $availability)
 {
     $savedSlots = [];
 
     try {
         foreach ($availability['days'] as $day) {
             if (isset($availability['time_slots'][$day])) {
-                // نتحقق من التداخل في الأوقات
+                // نتحقق من التكرار في الأوقات الجديدة
+                if ($this->hasDuplicateSlots($availability['time_slots'][$day])) {
+                    throw new \Exception("في أوقات مكررة يوم $day!");
+                }
+
+                // نتحقق من التداخل في الأوقات الجديدة
                 if ($this->hasOverlappingSlots($availability['time_slots'][$day])) {
                     throw new \Exception("في أوقات متداخلة يوم $day!");
                 }
@@ -194,6 +199,22 @@ class AuthController extends Controller
     }
 
     return $savedSlots;
+}
+
+/**
+ * بيتحقق لو في أوقات مكررة في اليوم
+ */
+private function hasDuplicateSlots(array $slots): bool
+{
+    $seen = [];
+    foreach ($slots as $slot) {
+        $key = $slot['start_time'] . '-' . $slot['end_time'];
+        if (isset($seen[$key])) {
+            return true; // وقت مكرر
+        }
+        $seen[$key] = true;
+    }
+    return false; // مفيش تكرار
 }
 
 /**
