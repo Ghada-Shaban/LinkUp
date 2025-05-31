@@ -7,6 +7,7 @@ use App\Models\NewSession;
 use App\Models\Service;
 use App\Models\Mentorship;
 use App\Models\MentorshipPlan;
+use App\Models\MentorshipSession;
 use App\Models\MockInterview;
 use App\Models\GroupMentorship;
 use App\Models\PerformanceReport;
