@@ -164,7 +164,13 @@ private function setAvailability($userID, array $availability)
 {
     $savedSlots = [];
     
+    // استخدام Transaction للتأكد من تنفيذ العملية بالكامل أو إلغاؤها
+    \DB::beginTransaction();
+    
     try {
+        // حذف جميع الأوقات المتاحة السابقة للمدرب
+        CoachAvailability::where('coach_id', $userID)->delete();
+        
         foreach ($availability['days'] as $day) {
             if (isset($availability['time_slots'][$day])) {
                 $daySlots = $availability['time_slots'][$day];
@@ -192,7 +198,13 @@ private function setAvailability($userID, array $availability)
                 }
             }
         }
+        
+        // تأكيد العملية
+        \DB::commit();
+        
     } catch (\Exception $e) {
+        // إلغاء العملية في حالة الخطأ
+        \DB::rollback();
         throw new \Exception("Error saving availability: " . $e->getMessage());
     }
     
@@ -276,7 +288,7 @@ private function mergeConnectedSlots(array $slots)
     $merged[] = $current;
     
     return $merged;
-}   
+}
     protected function registerTrainee(array $validated, Request $request)
     {
         $validLanguages = $this->getEnumValues('trainee_preferred_languages', 'Language');
