@@ -40,7 +40,7 @@ class PerformanceReportController extends Controller
         return response()->json(['message' => 'Performance report submitted successfully'], 200);
     }
 
-   public function getPerformanceReports(Request $request)
+ public function getPerformanceReports(Request $request)
 {
     $trainee = auth()->user();
     $reports = PerformanceReport::where('trainee_id', $trainee->User_ID)
@@ -52,7 +52,7 @@ class PerformanceReportController extends Controller
                 $query->select('new_session_id', 'date_time', 'duration', 'service_id')
                     ->with([
                         'service' => function ($query) {
-                            $query->select('service_id', 'service_type', 'title')
+                            $query->select('service_id', 'service_type')
                                 ->with([
                                     'mentorship' => function ($query) {
                                         $query->select('service_id', 'mentorship_type')
@@ -74,6 +74,15 @@ class PerformanceReportController extends Controller
                                     },
                                     'groupMentorship' => function ($query) {
                                         $query->select('service_id', 'title');
+                                    },
+                                    'projectEvaluation' => function ($query) {
+                                        $query->select('service_id'); 
+                                    },
+                                    'cvReview' => function ($query) {
+                                        $query->select('service_id'); 
+                                    },
+                                    'linkedinOptimization' => function ($query) {
+                                        $query->select('service_id'); 
                                     }
                                 ]);
                         }
@@ -85,6 +94,7 @@ class PerformanceReportController extends Controller
         ->each(function ($report) {
             $report->coach->makeHidden(['profile_photo_url', 'photo_url']);
 
+           
             $session = $report->session;
             $service = $session->service ?? null;
             $serviceTitle = 'N/A';
@@ -114,11 +124,18 @@ class PerformanceReportController extends Controller
                 } elseif ($service->service_type === 'Group_Mentorship') {
                     $groupMentorship = $service->groupMentorship;
                     $serviceTitle = $groupMentorship ? $groupMentorship->title : 'Group Mentorship';
+                } elseif ($service->service_type === 'Project_Evaluation') {
+                    $serviceTitle = 'Project Evaluation';
+                } elseif ($service->service_type === 'CV_Review') {
+                    $serviceTitle = 'CV Review';
+                } elseif ($service->service_type === 'Linkedin_Optimization') {
+                    $serviceTitle = 'LinkedIn Optimization';
                 } else {
-                    $serviceTitle = $service->title ?? 'N/A';
+                    $serviceTitle = str_replace('_', ' ', $service->service_type); 
                 }
             }
 
+      
             $report->serviceTitle = $serviceTitle;
         });
 
