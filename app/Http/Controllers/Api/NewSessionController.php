@@ -89,13 +89,13 @@ class NewSessionController extends Controller
                             ];
                         }
 
-                        // تجميع معرفات المتدربين من جدول GroupMentorship
+                        // تجميع معرفات المتدربين
                         $gmKey = $groupMentorship->id . '-' . $dateTime->toDateString();
                         if (!isset($groupMentorshipTrainees[$gmKey])) {
-                            // افترض إن فيه عمود train_ids في GroupMentorship يحتوي على array زي "[20, 27, 69, 88]"
-                            $traineeIdsJson = $groupMentorship->train_ids ?? '[]'; // استبدل train_ids بالعمود الصحيح لو مختلف
-                            $traineeIds = json_decode($traineeIdsJson, true) ?: [];
-                            $groupMentorshipTrainees[$gmKey] = array_filter($traineeIds);
+                            $groupMentorshipTrainees[$gmKey] = [];
+                        }
+                        if ($session->trainee_id && !in_array($session->trainee_id, $groupMentorshipTrainees[$gmKey])) {
+                            $groupMentorshipTrainees[$gmKey][] = $session->trainee_id;
                         }
                     }
                 } else {
@@ -154,13 +154,13 @@ class NewSessionController extends Controller
                         $sessionType = 'group mentorship';
                         $serviceTitle = $groupMentorship ? $groupMentorship->title : 'Group Mentorship';
 
-                        // استرجاع أسماء المتدربين بناءً على trainee_ids من GroupMentorship
+                        // استرجاع أسماء المتدربين بناءً على trainee_ids من new_sessions
                         $gmKey = $groupMentorship->id . '-' . $dateTime->toDateString();
                         $traineeIds = isset($groupMentorshipTrainees[$gmKey]) ? $groupMentorshipTrainees[$gmKey] : [];
                         $traineeNames = [];
                         if (!empty($traineeIds)) {
                             $trainees = User::whereIn('User_ID', $traineeIds)->pluck('full_name')->toArray();
-                            $traineeNames = $trainees; // جيب كل الأسماء
+                            $traineeNames = array_filter($trainees);
                             sort($traineeNames); // فرز الأسماء أبجديًا
                         }
                         $traineeNames = !empty($traineeNames) ? array_values($traineeNames) : ['N/A'];
@@ -339,13 +339,13 @@ class NewSessionController extends Controller
                         $sessionType = 'group mentorship';
                         $serviceTitle = $groupMentorship ? $groupMentorship->title : 'Group Mentorship';
 
-                        // استرجاع أسماء المتدربين بناءً على trainee_ids من GroupMentorship
+                        // استرجاع أسماء المتدربين بناءً على trainee_ids من new_sessions
                         $gmKey = $groupMentorship->id . '-' . $dateTime->toDateString();
                         $traineeIds = isset($groupMentorshipTrainees[$gmKey]) ? $groupMentorshipTrainees[$gmKey] : [];
                         $traineeNames = [];
                         if (!empty($traineeIds)) {
                             $trainees = User::whereIn('User_ID', $traineeIds)->pluck('full_name')->toArray();
-                            $traineeNames = $trainees; // جيب كل الأسماء
+                            $traineeNames = array_filter($trainees);
                             sort($traineeNames); // فرز الأسماء أبجديًا
                         }
                         $traineeNames = !empty($traineeNames) ? array_values($traineeNames) : ['N/A'];
@@ -528,7 +528,7 @@ class NewSessionController extends Controller
 
         Log::info('Meeting link updated', [
             'session_id' => $sessionId,
-            "meeting_link" => $session->meeting_link
+            'meeting_link' => $session->meeting_link
         ]);
 
         return response()->json([
