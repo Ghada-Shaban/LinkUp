@@ -23,6 +23,8 @@ class ServiceResource extends JsonResource
                             'title' => $this->mentorship->mentorshipPlan->title,
                             'duration' => '60 minutes',
                             'no_of_sessions' => '4 sessions',
+                         'role'=> $this->mentorship->role,
+                'career_phase' => $this->mentorship->career_phase
                         ]
                     ];
                 } else if ($this->mentorship->mentorship_type === 'Mentorship session' && $this->mentorship->mentorshipSession) {
@@ -31,6 +33,8 @@ class ServiceResource extends JsonResource
                             'session_type' => $this->mentorship->mentorshipSession->session_type,
                             'duration' => '60 minutes',
                             'no_of_sessions' => '1 session',
+                         'role'=> $this->mentorship->role,
+                'career_phase' => $this->mentorship->career_phase
                         ]
                     ];
                 }
