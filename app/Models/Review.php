@@ -9,7 +9,8 @@ class Review extends Model
 {
     use HasFactory;
     protected $table = 'reviews';
-    public $incrementing = false;
+    protected $primaryKey = "id";
+    public $incrementing = true;
     public $timestamps = true;
 
     protected $fillable = ['trainee_id', 'coach_id', 'rating', 'comment'];
