@@ -10,7 +10,7 @@ use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\CoachServiceController;
 use App\Http\Controllers\Api\ReviewController;
 use App\Http\Controllers\Api\ProfileController;
-use App\Http\Controllers\Api\ CoachController;
+use App\Http\Controllers\Api\CoachController;
 use App\Http\Controllers\Api\AdminController;
 use App\Http\Controllers\Api\BookingController;
 use App\Http\Controllers\Api\PerformanceReportController;
@@ -79,7 +79,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/trainee/mentorship-requests', [MentorshipRequestController::class, 'requestMentorship']);
     Route::get('/traineerequest', [MentorshipRequestController::class, 'traineegetrequest']);
     Route::get('/coach/requests', [MentorshipRequestController::class, 'viewRequests']);
-    Route::post('/brainee/requests/{id}/accept', [MentorshipRequestController::class, 'acceptRequest']);
+    Route::post('/coach/requests/{id}/accept', [MentorshipRequestController::class, 'acceptRequest']);
     Route::post('/coach/requests/{id}/reject', [MentorshipRequestController::class, 'rejectRequest']);
     Route::post('/trainee/reviews', [ReviewController::class, 'store']);
 });
@@ -108,9 +108,6 @@ Route::middleware('auth:sanctum')->group(function () {
 // Route الخاصة بـ Explore Services (Filtered by service type, no authentication)
 Route::get('/coaches/explore-services', [CoachController::class, 'exploreServices']);
 
-// Route الجديد لـ Explore Coaches في الـ Landing Page (بدون Middleware)
-Route::get('/landing-explore-coaches', [LandingPageCoachController::class, 'exploreCoaches']);
-
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/coach/profile/update/{user_id}', [ProfileController::class, 'updateCoachProfile']);
     Route::post('/trainee/profile/update/{user_id}', [ProfileController::class, 'updateTraineeProfile']);
@@ -138,7 +135,7 @@ Route::prefix('admin')->group(function () {
 // Routes for performance reports
 Route::group(['prefix' => 'performance-reports', 'middleware' => 'auth:api'], function () {
     Route::post('/sessions/{sessionId}/submit', [PerformanceReportController::class, 'submitPerformanceReport']);
-    Route::get('/trainee', [PerformanceReportController::class, 'getPerformanceReports']);
+    Route::get('/trainee', [PerformanceReportController::class, 'getPerformanceReports']); 
 });
 
 Route::middleware('auth:sanctum')->group(function () {
@@ -151,3 +148,6 @@ Route::middleware('auth:sanctum')->group(function () {
 
 // الراوت الجديد لـ Landing Page Reviews (بدون أي middleware عشان يكون متاح للجميع)
 Route::get('/landing-reviews', [\App\Http\Controllers\Api\LandingPageReviewController::class, 'getReviews']);
+
+// الراوت الجديد لـ Explore Coaches في الـ Landing Page (بدون Middleware)
+Route::get('/landing-explore-coaches', [\App\Http\Controllers\Api\LandingPageCoachController::class, 'exploreCoaches']);
