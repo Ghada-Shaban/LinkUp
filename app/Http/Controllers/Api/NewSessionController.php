@@ -89,13 +89,14 @@ class NewSessionController extends Controller
                             ];
                         }
 
-                        // تجميع معرفات المتدربين
+                        // تجميع معرفات المتدربين من جدول NewSession بناءً على service_id وتاريخ
                         $gmKey = $groupMentorship->id . '-' . $dateTime->toDateString();
                         if (!isset($groupMentorshipTrainees[$gmKey])) {
-                            $groupMentorshipTrainees[$gmKey] = [];
-                        }
-                        if ($session->trainee_id && !in_array($session->trainee_id, $groupMentorshipTrainees[$gmKey])) {
-                            $groupMentorshipTrainees[$gmKey][] = $session->trainee_id;
+                            $groupMentorshipTrainees[$gmKey] = NewSession::where('service_id', $session->service_id)
+                                ->whereDate('date_time', $dateTime->toDateString())
+                                ->whereIn('status', $statuses)
+                                ->pluck('trainee_id')
+                                ->toArray();
                         }
                     }
                 } else {
@@ -160,7 +161,7 @@ class NewSessionController extends Controller
                         $traineeNames = [];
                         if (!empty($traineeIds)) {
                             $trainees = User::whereIn('User_ID', $traineeIds)->pluck('full_name')->toArray();
-                            $traineeNames = array_filter($trainees);
+                            $traineeNames = $trainees; // جيب كل الأسماء بدون تصفية
                             sort($traineeNames); // فرز الأسماء أبجديًا
                         }
                         $traineeNames = !empty($traineeNames) ? array_values($traineeNames) : ['N/A'];
@@ -345,7 +346,7 @@ class NewSessionController extends Controller
                         $traineeNames = [];
                         if (!empty($traineeIds)) {
                             $trainees = User::whereIn('User_ID', $traineeIds)->pluck('full_name')->toArray();
-                            $traineeNames = array_filter($trainees);
+                            $traineeNames = $trainees; // جيب كل الأسماء بدون تصفية
                             sort($traineeNames); // فرز الأسماء أبجديًا
                         }
                         $traineeNames = !empty($traineeNames) ? array_values($traineeNames) : ['N/A'];
@@ -528,7 +529,7 @@ class NewSessionController extends Controller
 
         Log::info('Meeting link updated', [
             'session_id' => $sessionId,
-            'meeting_link' => $session->meeting_link
+            "meeting_link" => $session->meeting_link
         ]);
 
         return response()->json([
