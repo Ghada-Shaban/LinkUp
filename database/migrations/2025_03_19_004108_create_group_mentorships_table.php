@@ -27,6 +27,16 @@ return new class extends Migration
             $table->json('trainee_ids')->nullable();
             $table->boolean('is_active')->default(true);
             $table->foreign('service_id')->references('service_id')->on('services')->onDelete('cascade');
+            $table->enum('role', [
+                'Business',
+                'Lower-Tech',
+                'High-Tech',
+                'Global Aspiration'
+            ]);
+            $table->enum('career_phase', [
+                'Career Starter',
+                'Career Accelerator'
+            ]);
         });
     }
 
