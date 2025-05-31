@@ -45,20 +45,6 @@ class PerformanceReportController extends Controller
     }
 
 
-<?php
-
-namespace App\Http\Controllers\Api;
-
-use App\Http\Controllers\Controller;
-use App\Models\PerformanceReport;
-use App\Models\Mentorship;
-use App\Models\MentorshipPlan;
-use App\Models\MockInterview;
-use App\Models\GroupMentorship;
-use Illuminate\Http\Request;
-
-class PerformanceReportController extends Controller
-{
     public function getPerformanceReports(Request $request)
     {
         $trainee = auth()->user();
@@ -140,7 +126,7 @@ class PerformanceReportController extends Controller
 
         return response()->json($reports, 200);
     }
-}
+
                  
                 
 }
