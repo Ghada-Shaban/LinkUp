@@ -43,6 +43,19 @@ class MentorshipRequestController extends Controller
         $coachId = $service->service->coach_id;
 
         if ($serviceTypeInput === 'GroupMentorship') {
+            // التحقق من عدد المشاركين الحاليين
+            $currentParticipants = MentorshipRequest::where('requestable_type', $modelClass)
+                ->where('requestable_id', $serviceId)
+                ->where('status', 'accepted')
+                ->count();
+
+            $maxParticipants = 5; // الحد الأقصى للمشاركين
+            if ($currentParticipants >= $maxParticipants) {
+                return response()->json([
+                    'message' => "The group is full. The maximum number of participants ($maxParticipants) has been reached."
+                ], 400);
+            }
+
             $existingRequest = MentorshipRequest::where('trainee_id', Auth::user()->User_ID)
                 ->where('requestable_type', $modelClass)
                 ->where('requestable_id', $serviceId)
