@@ -14,12 +14,10 @@ class ServiceResource extends JsonResource
             'price' => $this->price ? $this->price->price : null,
         ];
 
-        // إضافة بيانات Mentorship إذا كان هذا هو نوع الخدمة
+     
         if ($this->service_type === 'Mentorship') {
-            // التحقق من وجود علاقة mentorship
             if ($this->mentorship) {
-                // التحقق من نوع الإرشاد ووجود البيانات المرتبطة
-                if ($this->mentorship->mentorship_type === 'Mentorship plan' && $this->mentorship->mentorshipPlan) {
+               if ($this->mentorship->mentorship_type === 'Mentorship plan' && $this->mentorship->mentorshipPlan) {
                     $data['mentorship'] = [
                         'mentorship_plan' => [
                             'title' => $this->mentorship->mentorshipPlan->title,
@@ -39,7 +37,6 @@ class ServiceResource extends JsonResource
             }
         }
 
-        // إضافة بيانات Group Mentorship إذا كان هذا هو نوع الخدمة
         if ($this->service_type === 'Group_Mentorship' && $this->groupMentorship) {
             $data['group_mentorship'] = [
                 'title' => $this->groupMentorship->title,
@@ -51,11 +48,12 @@ class ServiceResource extends JsonResource
                 'min_participants' => $this->groupMentorship->min_participants ?? 2,
                 'max_participants' => $this->groupMentorship->max_participants ?? 5,
                 'available_slots' => $this->groupMentorship->available_slots ?? 
-                    (($this->groupMentorship->max_participants ?? 5) - ($this->groupMentorship->current_participants ?? 0))
+                    (($this->groupMentorship->max_participants ?? 5) - ($this->groupMentorship->current_participants ?? 0)),
+                'role'=> $this->groupMentorship->role,
+                'career_phase' => $this->groupMentorship->career_phase
             ];
         }
 
-        // إضافة بيانات Mock Interview إذا كان هذا هو نوع الخدمة
         if ($this->service_type === 'Mock_Interview' && $this->mockInterview) {
             $data['mock_interview'] = [
                 'interview_type' => $this->mockInterview->interview_type,
@@ -65,8 +63,7 @@ class ServiceResource extends JsonResource
             ];
         }
 
-        // نحن لا نقوم بفلترة البيانات الأساسية مثل service_id و service_type
-        // ولكن نقوم بفلترة البيانات المرتبطة بالعلاقات فقط
+      
         return $data;
     }
 }
