@@ -163,98 +163,120 @@ class AuthController extends Controller
 private function setAvailability($userID, array $availability)
 {
     $savedSlots = [];
-
+    
     try {
         foreach ($availability['days'] as $day) {
             if (isset($availability['time_slots'][$day])) {
-                // نتحقق من التكرار في الأوقات الجديدة
-                if ($this->hasDuplicateSlots($availability['time_slots'][$day])) {
-                    throw new \Exception("في أوقات مكررة يوم $day!");
-                }
-
-                // نتحقق من التداخل في الأوقات الجديدة
-                if ($this->hasOverlappingSlots($availability['time_slots'][$day])) {
-                    throw new \Exception("في أوقات متداخلة يوم $day!");
-                }
-
-                foreach ($availability['time_slots'][$day] as $slot) {
-                    // نتأكد إن الوقت صح ومنطقي
-                    if (!$this->isValidTimeSlot($slot['start_time'], $slot['end_time'])) {
-                        throw new \Exception("الوقت غلط يوم $day: من {$slot['start_time']} لـ {$slot['end_time']}");
-                    }
-
+                $daySlots = $availability['time_slots'][$day];
+                
+                // التحقق من عدم وجود تداخل في الأوقات
+                $this->validateTimeSlots($daySlots, $day);
+                
+                // ترتيب الأوقات حسب وقت البداية
+                usort($daySlots, function($a, $b) {
+                    return strtotime($a['start_time']) - strtotime($b['start_time']);
+                });
+                
+                // دمج الأوقات المتصلة
+                $mergedSlots = $this->mergeConnectedSlots($daySlots);
+                
+                foreach ($mergedSlots as $slot) {
                     $availabilityRecord = CoachAvailability::create([
                         'coach_id' => $userID,
                         'Day_Of_Week' => $day,
                         'Start_Time' => $slot['start_time'],
                         'End_Time' => $slot['end_time'],
                     ]);
-
+                    
                     $savedSlots[] = $availabilityRecord;
                 }
             }
         }
     } catch (\Exception $e) {
-        throw new \Exception("مشكلة في حفظ الأوقات: " . $e->getMessage());
+        throw new \Exception("Error saving availability: " . $e->getMessage());
     }
-
+    
     return $savedSlots;
 }
 
 /**
- * بيتحقق لو في أوقات مكررة في اليوم
+ * التحقق من عدم وجود تداخل في الأوقات
  */
-private function hasDuplicateSlots(array $slots): bool
+private function validateTimeSlots(array $slots, string $day)
 {
-    $seen = [];
-    foreach ($slots as $slot) {
-        $key = $slot['start_time'] . '-' . $slot['end_time'];
-        if (isset($seen[$key])) {
-            return true; // وقت مكرر
-        }
-        $seen[$key] = true;
-    }
-    return false; // مفيش تكرار
-}
-
-/**
- * بيتحقق لو في أوقات متداخلة في اليوم
- */
-private function hasOverlappingSlots(array $slots): bool
-{
-    // نرتب الأوقات على حسب وقت البداية
-    usort($slots, function ($a, $b) {
-        return strcmp($a['start_time'], $b['start_time']);
-    });
-
-    for ($i = 0; $i < count($slots) - 1; $i++) {
-        $currentEnd = strtotime($slots[$i]['end_time']);
-        $nextStart = strtotime($slots[$i + 1]['start_time']);
-
-        // لو وقت النهاية أكبر من وقت البداية بتاع الوقت اللي بعده، يبقى في تداخل
-        if ($currentEnd > $nextStart) {
-            return true;
-        }
-    }
-
-    return false;
-}
-
-/**
- * بيتأكد إن الوقت صح ومنطقي (يعني البداية قبل النهاية)
- */
-private function isValidTimeSlot(string $startTime, string $endTime): bool
-{
-    // التأكد إن الوقت بصيغة HH:MM
-    $timePattern = '/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/';
-    if (!preg_match($timePattern, $startTime) || !preg_match($timePattern, $endTime)) {
-        return false;
-    }
-
-    // التأكد إن وقت البداية قبل النهاية
-    return strtotime($startTime) < strtotime($endTime);
-}
+    $count = count($slots);
     
+    for ($i = 0; $i < $count; $i++) {
+        $startTime1 = strtotime($slots[$i]['start_time']);
+        $endTime1 = strtotime($slots[$i]['end_time']);
+        
+        // التحقق من صحة الوقت (البداية قبل النهاية)
+        if ($startTime1 >= $endTime1) {
+            throw new \Exception("Invalid time slot on {$day}: Start time must be before end time");
+        }
+        
+        for ($j = $i + 1; $j < $count; $j++) {
+            $startTime2 = strtotime($slots[$j]['start_time']);
+            $endTime2 = strtotime($slots[$j]['end_time']);
+            
+            // التحقق من التداخل
+            if ($this->timeSlotsOverlap($startTime1, $endTime1, $startTime2, $endTime2)) {
+                throw new \Exception("Overlapping time slots found on {$day}: " . 
+                    $slots[$i]['start_time'] . "-" . $slots[$i]['end_time'] . 
+                    " overlaps with " . 
+                    $slots[$j]['start_time'] . "-" . $slots[$j]['end_time']);
+            }
+        }
+    }
+}
+
+/**
+ * التحقق من تداخل فترتين زمنيتين
+ */
+private function timeSlotsOverlap($start1, $end1, $start2, $end2)
+{
+    return ($start1 < $end2) && ($start2 < $end1);
+}
+
+/**
+ * دمج الأوقات المتصلة
+ */
+private function mergeConnectedSlots(array $slots)
+{
+    if (empty($slots)) {
+        return $slots;
+    }
+    
+    // ترتيب الأوقات حسب وقت البداية
+    usort($slots, function($a, $b) {
+        return strtotime($a['start_time']) - strtotime($b['start_time']);
+    });
+    
+    $merged = [];
+    $current = $slots[0];
+    
+    for ($i = 1; $i < count($slots); $i++) {
+        $next = $slots[$i];
+        
+        // إذا كان الوقت الحالي متصل مع التالي
+        if (strtotime($current['end_time']) >= strtotime($next['start_time'])) {
+            // دمج الأوقات
+            $current['end_time'] = date('H:i:s', max(
+                strtotime($current['end_time']), 
+                strtotime($next['end_time'])
+            ));
+        } else {
+            // إضافة الوقت الحالي للنتيجة والانتقال للتالي
+            $merged[] = $current;
+            $current = $next;
+        }
+    }
+    
+    // إضافة آخر وقت
+    $merged[] = $current;
+    
+    return $merged;
+}   
     protected function registerTrainee(array $validated, Request $request)
     {
         $validLanguages = $this->getEnumValues('trainee_preferred_languages', 'Language');
