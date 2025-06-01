@@ -24,6 +24,8 @@ class EnumController extends Controller
                 $day = $this->getEnumValues('group_mentorships', 'day');
                 $mentorshipType = $this->getEnumValues('mentorships', 'mentorship_type');
                 $sessionType = $this->getEnumValues('mentorship_sessions', 'session_type');
+                $role = $this->getEnumValues('mentorships', 'role');
+                $careerPhase = $this->getEnumValues('mentorships', 'career_phase');
 
                 return [
                     'service_type' => $serviceType,
@@ -32,6 +34,8 @@ class EnumController extends Controller
                     'interview_type' => $interviewType,
                     'interview_level' => $interviewLevel,
                     'day' => $day,
+                    'role' => $role, 
+                    'career_phase' => $careerPhase,
                 ];
             } catch (\Exception $e) {
                 return [
@@ -41,6 +45,8 @@ class EnumController extends Controller
                     'interview_type' => [],
                     'interview_level' => [],
                     'day' => [],
+                    'role' => [], 
+                    'career_phase' => [],
                 ];
             }
         });
