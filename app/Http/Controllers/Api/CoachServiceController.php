@@ -171,15 +171,11 @@ public function createService(Request $request, $coachId)
             'description' => 'required_if:service_type,Group_Mentorship',
             'day' => 'required_if:service_type,Group_Mentorship|in:Monday,Tuesday,Wednesday,Thursday,Friday,Saturday,Sunday',
             'start_time' => 'required_if:service_type,Group_Mentorship|date_format:H:i',
+            'role' => 'required_if:service_type,Mentorship,Group_Mentorship|in:Business,Lower-Tech,High-Tech,Global Aspiration',
+            'career_phase' => 'required_if:service_type,Mentorship,Group_Mentorship|in:Career Starter,Career Accelerator',
         ]);
 
-        \Log::info('Creating new service', [
-            'coach_id' => $coachId,
-            'service_type' => $request->service_type,
-            'mentorship_type' => $request->mentorship_type,
-            'session_type' => $request->session_type,
-        ]);
-
+       
         try {
             $service = Service::create([
                 'coach_id' => $coachId,
@@ -193,7 +189,9 @@ public function createService(Request $request, $coachId)
                 $mentorshipType = ($request->mentorship_type === 'Mentorship plan') ? 'Mentorship plan' : 'Mentorship session';
                 $mentorship = Mentorship::create([
                     'service_id' => $service->service_id,
-                    'mentorship_type' => $mentorshipType
+                    'mentorship_type' => $mentorshipType,
+                    'role' => $request->role, 
+                    'career_phase' => $request->career_phase,
                 ]);
 
 
@@ -222,6 +220,8 @@ public function createService(Request $request, $coachId)
                     'description' => $request->description,
                     'day' => $request->day,
                     'start_time' => $request->start_time,
+                    'role' => $request->role, 
+                    'career_phase' => $request->career_phase,
                     'trainee_ids' => json_encode([]),
                 ]);
             }
@@ -324,6 +324,8 @@ public function createService(Request $request, $coachId)
                 }
             },
         ],
+            'role' => 'sometimes|in:Business,Lower-Tech,High-Tech,Global Aspiration',
+            'career_phase' => 'sometimes|in:Career Starter,Career Accelerator',
     ]);
 
    
@@ -337,7 +339,9 @@ public function createService(Request $request, $coachId)
     if ($serviceType === 'Mentorship') {
         
         if ($request->has('mentorship_type')) {
-            $service->mentorship->update(['mentorship_type' => $request->mentorship_type]);
+            $service->mentorship->update(['mentorship_type' => $request->mentorship_type,
+                                          'role' => $request->has('role') ? $request->role : $service->mentorship->role, 
+                                          'career_phase' => $request->has('career_phase') ? $request->career_phase : $service->mentorship->career_phase]);
             if ($request->mentorship_type === 'Mentorship plan') {
                 $service->mentorship->mentorshipSession()->delete();
                 $service->mentorship->mentorshipPlan()->updateOrCreate([], ['title' => $request->title]);
@@ -349,6 +353,10 @@ public function createService(Request $request, $coachId)
             }
         } else {
             $hasPlan = $service->mentorship->mentorshipPlan()->exists();
+            $service->mentorship->update([
+                    'role' => $request->has('role') ? $request->role : $service->mentorship->role, 
+                    'career_phase' => $request->has('career_phase') ? $request->career_phase : $service->mentorship->career_phase, 
+                ]);
             if ($hasPlan) {
                 $service->mentorship->mentorshipPlan()->update([
                     'title' => $request->title,
@@ -369,7 +377,9 @@ public function createService(Request $request, $coachId)
             'title' => $request->has('title') ? $request->title : $service->groupMentorship->title,
             'description' => $request->has('description') ? $request->description : $service->groupMentorship->description,
             'day' => $request->has('day') ? $request->day : $service->groupMentorship->day,
-            'start_time' => $request->has('start_time') ? $request->start_time : $service->groupMentorship->start_time
+            'start_time' => $request->has('start_time') ? $request->start_time : $service->groupMentorship->start_time,
+            'role' => $request->has('role') ? $request->role : $service->groupMentorship->role,
+            'career_phase' => $request->has('career_phase') ? $request->career_phase : $service->groupMentorship->career_phase
         ]);
     }
 
@@ -422,7 +432,7 @@ public function createService(Request $request, $coachId)
     $groupMentorship->update([
         'trainee_ids' => json_encode($traineeIds),
         'current_participants' => $newParticipantCount,
-        'is_active' => $newParticipantCount >= 2, // لو عدد الـ trainees بقى 2 أو أكتر، الـ Group Mentorship هتبقى نشطة
+        'is_active' => $newParticipantCount >= 2,
     ]);
 
        
