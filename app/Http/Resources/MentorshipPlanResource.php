@@ -15,7 +15,7 @@ class MentorshipPlanResource extends JsonResource
     return $this->price->price ?? null;
 }),
             'role'=> $this->mentorship->role,
-            'career_phase' => $this->mentorship->career_phase
+            'career_phase' => $this->mentorship->career_phase,
             'duration'=>'60 minutes',
             'no.of sessions'=>'4 sessions',
             
