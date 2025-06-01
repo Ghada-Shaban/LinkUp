@@ -22,7 +22,7 @@ class ServiceResource extends JsonResource
                         'mentorship_plan' => [
                             'title' => $this->mentorship->mentorshipPlan->title,
                           'role'=> $this->mentorship->role,
-                          'career_phase' => $this->mentorship->career_phase
+                          'career_phase' => $this->mentorship->career_phase,
                             'duration' => '60 minutes',
                             'no_of_sessions' => '4 sessions',
                        
@@ -33,7 +33,7 @@ class ServiceResource extends JsonResource
                         'mentorship_session' => [
                             'session_type' => $this->mentorship->mentorshipSession->session_type,
                             'role'=> $this->mentorship->role,
-                            'career_phase' => $this->mentorship->career_phase
+                            'career_phase' => $this->mentorship->career_phase,
                             'duration' => '60 minutes',
                             'no_of_sessions' => '1 session',
                         
@@ -48,7 +48,7 @@ class ServiceResource extends JsonResource
                 'title' => $this->groupMentorship->title,
                 'description' => $this->groupMentorship->description,
                   'role'=> $this->groupMentorship->role,
-                'career_phase' => $this->groupMentorship->career_phase
+                'career_phase' => $this->groupMentorship->career_phase,
                 'day' => $this->groupMentorship->day,
                 'start_time' => $this->groupMentorship->start_time,
                 'duration' => '60 minutes',
