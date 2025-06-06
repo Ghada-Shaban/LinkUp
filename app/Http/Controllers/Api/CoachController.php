@@ -80,17 +80,17 @@ class CoachController extends Controller
                         $q->where('service_type', 'Mentorship');
                     } elseif ($serviceType === 'Mentorship session') {
                         $q->where('service_type', 'Mentorship')
-                          ->whereHas('mentorships', function ($subQuery) {
+                          ->whereHas('mentorship', function ($subQuery) {
                               $subQuery->where('mentorship_type', 'Mentorship session');
                           });
                     } elseif ($serviceType === 'Mentorship plan') {
                         $q->where('service_type', 'Mentorship')
-                          ->whereHas('mentorships', function ($subQuery) {
+                          ->whereHas('mentorship', function ($subQuery) {
                               $subQuery->where('mentorship_type', 'Mentorship plan');
                           });
                     } elseif (in_array($serviceType, ['Project Assessment', 'CV Review', 'LinkedIn Optimization'])) {
                         $q->where('service_type', 'Mentorship')
-                          ->whereHas('mentorships', function ($subQuery) use ($serviceType) {
+                          ->whereHas('mentorship', function ($subQuery) use ($serviceType) {
                               $subQuery->where('mentorship_type', 'Mentorship session')
                                        ->whereHas('mentorshipSessions', function ($subSubQuery) use ($serviceType) {
                                            $subSubQuery->where('session_type', $serviceType);
