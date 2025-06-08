@@ -173,12 +173,7 @@ public function createService(Request $request, $coachId)
             'start_time' => 'required_if:service_type,Group_Mentorship|date_format:H:i',
         ]);
 
-        \Log::info('Creating new service', [
-            'coach_id' => $coachId,
-            'service_type' => $request->service_type,
-            'mentorship_type' => $request->mentorship_type,
-            'session_type' => $request->session_type,
-        ]);
+       
 
         try {
             $service = Service::create([
@@ -237,7 +232,8 @@ public function createService(Request $request, $coachId)
             return response()->json(['message' => 'Error creating service', 'error' => $e->getMessage()], 500);
         }
     }
-   public function updateService(Request $request, $coachId, $serviceId)
+  
+      public function updateService(Request $request, $coachId, $serviceId)
 {
     $coach = Coach::findOrFail($coachId);
 
@@ -274,7 +270,6 @@ public function createService(Request $request, $coachId)
 
         $newServiceType = $request->input('service_type', $service->service_type);
         if ($newServiceType !== $service->service_type) {
-            // دمjrر العلاقات القديمة إذا اتغير النوع
             $service->mentorship()->delete();
             $service->mockInterview()->delete();
             $service->groupMentorship()->delete();
@@ -284,7 +279,12 @@ public function createService(Request $request, $coachId)
 
         if ($newServiceType === 'Mentorship') {
             $mentorshipType = $request->input('mentorship_type', $service->mentorship->mentorship_type ?? 'Mentorship plan');
-            $mentorship = $service->mentorship()->first() ?: $service->mentorship()->create(['mentorship_type' => $mentorshipType, 'service_id' => $service->service_id]);
+            $mentorship = $service->mentorship()->first();
+            if (!$mentorship) {
+                $mentorship = $service->mentorship()->create(['mentorship_type' => $mentorshipType, 'service_id' => $service->service_id]);
+            } else {
+                $mentorship->update(['mentorship_type' => $mentorshipType, 'service_id' => $service->service_id]);
+            }
 
             if ($mentorshipType === 'Mentorship plan') {
                 $mentorship->mentorshipSession()->delete();
