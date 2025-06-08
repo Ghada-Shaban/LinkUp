@@ -237,7 +237,14 @@ public function createService(Request $request, $coachId)
              
            
 
-   public function updateService(Request $request, $coachId, $serviceId)
+   
+         
+
+  
+
+       
+ 
+ public function updateService(Request $request, $coachId, $serviceId)
 {
     $coach = Coach::findOrFail($coachId);
 
@@ -386,28 +393,35 @@ private function deleteOldServiceData($service, $oldServiceType)
 // دالة للتعامل مع تحديث Mentorship
 private function handleMentorshipUpdate($service, $request)
 {
-    // إنشاء أو تحديث mentorship record مع تمرير service_id
+    // أولاً: إنشاء أو تحديث mentorship record - ده أساسي عشان الـ foreign key
     $mentorship = $service->mentorship()->firstOrCreate(
-        ['service_id' => $service->service_id],
-        ['service_id' => $service->service_id]
+        ['service_id' => $service->service_id],  // البحث
+        ['service_id' => $service->service_id, 'mentorship_type' => 'Mentorship session']  // البيانات لو مش موجود
     );
     
+    // تحديد نوع الـ mentorship
     $mentorshipType = $request->mentorship_type ?? ($mentorship->mentorship_type ?? 'Mentorship session');
-    $mentorship->update(['mentorship_type' => $mentorshipType]);
+    
+    // تحديث نوع الـ mentorship لو اتغير
+    if ($mentorship->mentorship_type !== $mentorshipType) {
+        $mentorship->update(['mentorship_type' => $mentorshipType]);
+    }
 
     if ($mentorshipType === 'Mentorship plan') {
         // حذف mentorship session إذا كان موجود
-        $mentorship->mentorshipSession()->delete();
+        MentorshipSession::where('service_id', $service->service_id)->delete();
+        
         // إنشاء أو تحديث mentorship plan
-        $mentorship->mentorshipPlan()->updateOrCreate(
+        MentorshipPlan::updateOrCreate(
             ['service_id' => $service->service_id],
             ['service_id' => $service->service_id, 'title' => $request->title]
         );
     } else {
         // حذف mentorship plan إذا كان موجود
-        $mentorship->mentorshipPlan()->delete();
+        MentorshipPlan::where('service_id', $service->service_id)->delete();
+        
         // إنشاء أو تحديث mentorship session
-        $mentorship->mentorshipSession()->updateOrCreate(
+        MentorshipSession::updateOrCreate(
             ['service_id' => $service->service_id],
             ['service_id' => $service->service_id, 'session_type' => $request->session_type]
         );
