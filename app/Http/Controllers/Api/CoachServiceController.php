@@ -232,8 +232,7 @@ public function createService(Request $request, $coachId)
             return response()->json(['message' => 'Error creating service', 'error' => $e->getMessage()], 500);
         }
     }
- 
-public function updateService(Request $request, $coachId, $serviceId)
+ public function updateService(Request $request, $coachId, $serviceId)
 {
     $coach = Coach::findOrFail($coachId);
 
@@ -247,32 +246,25 @@ public function updateService(Request $request, $coachId, $serviceId)
             'price' => 'required|numeric',
             'mentorship_type' => 'required_if:service_type,Mentorship|in:Mentorship plan,Mentorship session',
             'session_type' => 'required_if:mentorship_type,Mentorship session|in:CV Review,project Assessment,Linkedin Optimization',
-            'title' => [
-                'string',
-                'max:255',
-                function ($attribute, $value, $fail) use ($request, $service) {
-                    $currentType = $request->input('service_type', $service->service_type);
-                    $currentMentorshipType = $request->input('mentorship_type');
-                    
-                    // Get mentorship type from existing mentorship or use default
-                    if (!$currentMentorshipType && $service->mentorship) {
-                        $currentMentorshipType = $service->mentorship->mentorship_type;
-                    }
-                    
-                    if ($currentType === 'Mentorship' && $currentMentorshipType === 'Mentorship plan' && empty($value)) {
-                        $fail('The title field is required when mentorship type is Mentorship plan.');
-                    }
-                    if ($currentType === 'Group_Mentorship' && empty($value)) {
-                        $fail('The title field is required when service type is Group Mentorship.');
-                    }
-                },
-            ],
+            'title' => 'nullable|string|max:255',
             'interview_type' => 'required_if:service_type,Mock_Interview|in:Technical Interview,Soft Skills,Comprehensive Preparation',
             'interview_level' => 'required_if:service_type,Mock_Interview|in:Junior,Mid-Level,Senior,Premium (FAANG)',
             'description' => 'required_if:service_type,Group_Mentorship',
             'day' => 'required_if:service_type,Group_Mentorship|in:Monday,Tuesday,Wednesday,Thursday,Friday,Saturday,Sunday',
             'start_time' => 'required_if:service_type,Group_Mentorship|date_format:H:i',
         ]);
+
+        // Additional validation after basic validation
+        $newServiceType = $request->input('service_type', $service->service_type);
+        $mentorshipType = $request->input('mentorship_type');
+        
+        if ($newServiceType === 'Mentorship' && $mentorshipType === 'Mentorship plan' && !$request->input('title')) {
+            return response()->json(['error' => 'Title is required for Mentorship plan'], 422);
+        }
+        
+        if ($newServiceType === 'Group_Mentorship' && !$request->input('title')) {
+            return response()->json(['error' => 'Title is required for Group Mentorship'], 422);
+        }
 
         $newServiceType = $request->input('service_type', $service->service_type);
         
