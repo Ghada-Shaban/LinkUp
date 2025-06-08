@@ -237,8 +237,7 @@ public function createService(Request $request, $coachId)
             return response()->json(['message' => 'Error creating service', 'error' => $e->getMessage()], 500);
         }
     }
-    
-  public function updateService(Request $request, $coachId, $serviceId)
+    public function updateService(Request $request, $coachId, $serviceId)
 {
     $coach = Coach::findOrFail($coachId);
 
@@ -246,134 +245,79 @@ public function createService(Request $request, $coachId)
         ->where('coach_id', $coachId)
         ->firstOrFail();
 
+    // التحقق من البيانات
     $request->validate([
         'service_type' => 'sometimes|in:Mentorship,Mock_Interview,Group_Mentorship',
         'price' => 'required|numeric',
-        'mentorship_type' => [
-            'required_if:service_type,Mentorship',
-            'in:Mentorship plan,Mentorship session',
-            function ($attribute, $value, $fail) use ($request, $service) {
-                if ($service->service_type === 'Mentorship' && empty($value)) {
-                    $fail('The mentorship type is required for Mentorship services.');
-                }
-            },
-        ],
-        'session_type' => [
-            'required_if:mentorship_type,Mentorship session',
-            'in:CV Review,project Assessment,Linkedin Optimization',
-            function ($attribute, $value, $fail) use ($request, $service) {
-                $mentorshipType = $request->mentorship_type ?? $service->mentorship->mentorship_type;
-                if ($service->service_type === 'Mentorship' && $mentorshipType === 'Mentorship session' && empty($value)) {
-                    $fail('The session type is required when mentorship type is Mentorship session.');
-                }
-            },
-        ],
+        'mentorship_type' => 'required_if:service_type,Mentorship|in:Mentorship plan,Mentorship session',
+        'session_type' => 'required_if:mentorship_type,Mentorship session|in:CV Review,project Assessment,Linkedin Optimization',
         'title' => [
             'string',
             'max:255',
             function ($attribute, $value, $fail) use ($request, $service) {
-                if ($service->service_type === 'Mentorship' && $service->mentorship->mentorship_type === 'Mentorship plan' && empty($value)) {
+                if (($request->service_type ?? $service->service_type) === 'Mentorship' && 
+                    ($request->mentorship_type ?? $service->mentorship->mentorship_type ?? '') === 'Mentorship plan' && 
+                    empty($value)) {
                     $fail('The title field is required when mentorship type is Mentorship plan.');
                 }
-                if ($service->service_type === 'Group_Mentorship' && empty($value)) {
+                if (($request->service_type ?? $service->service_type) === 'Group_Mentorship' && empty($value)) {
                     $fail('The title field is required when service type is Group Mentorship.');
                 }
             },
         ],
-        'interview_type' => [
-            'required_if:service_type,Mock_Interview',
-            'in:Technical Interview,Soft Skills,Comprehensive Preparation',
-            function ($attribute, $value, $fail) use ($request, $service) {
-                if ($service->service_type === 'Mock_Interview' && empty($value)) {
-                    $fail('The interview type is required for Mock Interview services.');
-                }
-            },
-        ],
-        'interview_level' => [
-            'required_if:service_type,Mock_Interview',
-            'in:Junior,Mid-Level,Senior,Premium (FAANG)',
-            function ($attribute, $value, $fail) use ($request, $service) {
-                if ($service->service_type === 'Mock_Interview' && empty($value)) {
-                    $fail('The interview level is required for Mock Interview services.');
-                }
-            },
-        ],
-        'description' => [
-            'required_if:service_type,Group_Mentorship',
-            function ($attribute, $value, $fail) use ($request, $service) {
-                if ($service->service_type === 'Group_Mentorship' && empty($value)) {
-                    $fail('The description is required for Group Mentorship services.');
-                }
-            },
-        ],
-        'day' => [
-            'required_if:service_type,Group_Mentorship',
-            'in:Monday,Tuesday,Wednesday,Thursday,Friday,Saturday,Sunday',
-            function ($attribute, $value, $fail) use ($request, $service) {
-                if ($service->service_type === 'Group_Mentorship' && empty($value)) {
-                    $fail('The day is required for Group Mentorship services.');
-                }
-            },
-        ],
-        'start_time' => [
-            'required_if:service_type,Group_Mentorship',
-            'date_format:H:i',
-            function ($attribute, $value, $fail) use ($request, $service) {
-                if ($service->service_type === 'Group_Mentorship' && empty($value)) {
-                    $fail('The start time is required for Group Mentorship services.');
-                }
-            },
-        ],
+        'interview_type' => 'required_if:service_type,Mock_Interview|in:Technical Interview,Soft Skills,Comprehensive Preparation',
+        'interview_level' => 'required_if:service_type,Mock_Interview|in:Junior,Mid-Level,Senior,Premium (FAANG)',
+        'description' => 'required_if:service_type,Group_Mentorship',
+        'day' => 'required_if:service_type,Group_Mentorship|in:Monday,Tuesday,Wednesday,Thursday,Friday,Saturday,Sunday',
+        'start_time' => 'required_if:service_type,Group_Mentorship|date_format:H:i',
     ]);
 
-   
+    // التحديث الأساسي للـ Service
+    $newServiceType = $request->input('service_type', $service->service_type);
+    if ($newServiceType !== $service->service_type) {
+        // إذا اتغير النوع، ندمر العلاقات القديمة
+        $service->mentorship()->delete();
+        $service->mockInterview()->delete();
+        $service->groupMentorship()->delete();
+    }
+
+    $service->update([
+        'service_type' => $newServiceType,
+    ]);
+
+    // التعامل مع النوع الجديد
+    if ($newServiceType === 'Mentorship') {
+        $mentorshipType = $request->input('mentorship_type', $service->mentorship->mentorship_type ?? 'Mentorship plan');
+        $mentorship = $service->mentorship()->first() ?: $service->mentorship()->create(['mentorship_type' => $mentorshipType]);
+
+        if ($mentorshipType === 'Mentorship plan') {
+            $mentorship->mentorshipSession()->delete();
+            $mentorship->mentorshipPlan()->updateOrCreate([], ['title' => $request->input('title')]);
+        } else {
+            $mentorship->mentorshipPlan()->delete();
+            $mentorship->mentorshipSession()->updateOrCreate([], ['session_type' => $request->input('session_type')]);
+        }
+    } elseif ($newServiceType === 'Mock_Interview') {
+        $service->mockInterview()->updateOrCreate([], [
+            'interview_type' => $request->input('interview_type'),
+            'interview_level' => $request->input('interview_level'),
+        ]);
+    } elseif ($newServiceType === 'Group_Mentorship') {
+        $service->groupMentorship()->updateOrCreate([], [
+            'title' => $request->input('title'),
+            'description' => $request->input('description'),
+            'day' => $request->input('day'),
+            'start_time' => $request->input('start_time'),
+        ]);
+    }
+
+    // التحديث أو إنشاء السعر
     if ($request->has('price')) {
         $service->price()->updateOrCreate([], ['price' => $request->price]);
     }
 
-   
-    $serviceType = $request->service_type ?? $service->service_type;
-
-    if ($serviceType === 'Mentorship') {
-        
-        if ($request->has('mentorship_type')) {
-            $service->mentorship->update(['mentorship_type' => $request->mentorship_type]);
-            if ($request->mentorship_type === 'Mentorship plan') {
-                $service->mentorship->mentorshipSession()->delete();
-                $service->mentorship->mentorshipPlan()->updateOrCreate([], ['title' => $request->title]);
-                $hasPlan = true;
-            } else {
-                $service->mentorship->mentorshipPlan()->delete();
-                $service->mentorship->mentorshipSession()->updateOrCreate([], ['session_type' => $request->session_type]);
-                $hasPlan = false;
-            }
-        } else {
-            $hasPlan = $service->mentorship->mentorshipPlan()->exists();
-            if ($hasPlan) {
-                $service->mentorship->mentorshipPlan()->update([
-                    'title' => $request->title,
-                ]);
-            } else {
-                $service->mentorship->mentorshipSession()->update([
-                    'session_type' => $request->session_type,
-                ]);
-            }
-        }
-    } elseif ($serviceType === 'Mock_Interview') {
-        $service->mockInterview()->update([
-            'interview_type' => $request->interview_type,
-            'interview_level' => $request->interview_level
-        ]);
-    } elseif ($serviceType === 'Group_Mentorship') {
-        $service->groupMentorship()->update([
-            'title' => $request->has('title') ? $request->title : $service->groupMentorship->title,
-            'description' => $request->has('description') ? $request->description : $service->groupMentorship->description,
-            'day' => $request->has('day') ? $request->day : $service->groupMentorship->day,
-            'start_time' => $request->has('start_time') ? $request->start_time : $service->groupMentorship->start_time
-        ]);
-    }
-
-    return response()->json(['message' => 'Service updated successfully']);
+    $service->load('price');
+    return response()->json(['message' => 'Service updated successfully', 'service' => new ServiceResource($service)], 200);
 }
     
  
