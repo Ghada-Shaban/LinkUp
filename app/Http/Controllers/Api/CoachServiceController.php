@@ -233,7 +233,7 @@ public function createService(Request $request, $coachId)
         }
     }
   
-      public function updateService(Request $request, $coachId, $serviceId)
+     public function updateService(Request $request, $coachId, $serviceId)
 {
     $coach = Coach::findOrFail($coachId);
 
@@ -281,7 +281,8 @@ public function createService(Request $request, $coachId)
             $mentorshipType = $request->input('mentorship_type', $service->mentorship->mentorship_type ?? 'Mentorship plan');
             $mentorship = $service->mentorship()->first();
             if (!$mentorship) {
-                $mentorship = $service->mentorship()->create(['mentorship_type' => $mentorshipType, 'service_id' => $service->service_id]);
+                $mentorship = new Mentorship(['mentorship_type' => $mentorshipType, 'service_id' => $service->service_id]);
+                $service->mentorship()->save($mentorship);
             } else {
                 $mentorship->update(['mentorship_type' => $mentorshipType, 'service_id' => $service->service_id]);
             }
@@ -291,10 +292,13 @@ public function createService(Request $request, $coachId)
                 $mentorship->mentorshipPlan()->updateOrCreate(['service_id' => $service->service_id], ['title' => $request->input('title')]);
             } else {
                 $mentorship->mentorshipPlan()->delete();
-                $mentorship->mentorshipSession()->updateOrCreate(
-                    ['service_id' => $service->service_id],
-                    ['session_type' => $request->input('session_type')]
-                );
+                $mentorshipSession = $mentorship->mentorshipSession()->first();
+                if (!$mentorshipSession) {
+                    $mentorshipSession = new MentorshipSession(['session_type' => $request->input('session_type'), 'service_id' => $service->service_id]);
+                    $mentorship->mentorshipSession()->save($mentorshipSession);
+                } else {
+                    $mentorshipSession->update(['session_type' => $request->input('session_type'), 'service_id' => $service->service_id]);
+                }
             }
         } elseif ($newServiceType === 'Mock_Interview') {
             $service->mockInterview()->updateOrCreate(['service_id' => $service->service_id], [
@@ -316,9 +320,10 @@ public function createService(Request $request, $coachId)
 
         $service->load('price');
         return response()->json(['message' => 'Service updated successfully', 'service' => new ServiceResource($service)], 200);
-    });
-}
+    }
 
+     
+         
    
   
     
