@@ -450,39 +450,7 @@ public function createService(Request $request, $coachId)
 
 
   
-    // دالة للتعامل مع تحديث Mock Interview
-    private function handleMockInterviewUpdate($service, $request)
-    {
-        $service->mockInterview()->updateOrCreate(
-            ['service_id' => $service->service_id],
-            [
-                'service_id' => $service->service_id,
-                'interview_type' => $request->interview_type,
-                'interview_level' => $request->interview_level
-            ]
-        );
-        
-        Log::info('Updating service ID: ' . $service->service_id . ' Type: Mock Interview');
-    }
-
-    // دالة للتعامل مع تحديث Group Mentorship
-    private function handleGroupMentorshipUpdate($service, $request)
-    {
-        $service->groupMentorship()->updateOrCreate(
-            ['service_id' => $service->service_id],
-            [
-                'service_id' => $service->service_id,
-                'title' => $request->title,
-                'description' => $request->description,
-                'day' => $request->day,
-                'start_time' => $request->start_time
-            ]
-        );
-        
-        Log::info('Updating service ID: ' . $service->service_id . ' Type: Group Mentorship');
-    }
-
-     
+   
   
 
 
