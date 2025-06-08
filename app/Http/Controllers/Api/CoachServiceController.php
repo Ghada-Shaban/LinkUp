@@ -232,7 +232,9 @@ public function createService(Request $request, $coachId)
             return response()->json(['message' => 'Error creating service', 'error' => $e->getMessage()], 500);
         }
     }
- public function updateService(Request $request, $coachId, $serviceId)
+ 
+
+     public function updateService(Request $request, $coachId, $serviceId)
 {
     $coach = Coach::findOrFail($coachId);
 
@@ -301,23 +303,36 @@ public function createService(Request $request, $coachId)
         if ($newServiceType === 'Mentorship') {
             $mentorshipType = $request->input('mentorship_type', 'Mentorship plan');
             
-            $mentorship = new Mentorship([
+            // Create mentorship record first and make sure service_id is set
+            $mentorship = $targetService->mentorship()->create([
                 'mentorship_type' => $mentorshipType, 
                 'service_id' => $targetService->service_id
             ]);
-            $targetService->mentorship()->save($mentorship);
+            
+            // Refresh the mentorship to get the latest data
+            $mentorship->refresh();
 
             if ($mentorshipType === 'Mentorship plan') {
                 $mentorship->mentorshipPlan()->create([
-                    'service_id' => $targetService->service_id,
+                    'service_id' => $mentorship->service_id,
                     'title' => $request->input('title')
                 ]);
             } else {
-                $mentorship->mentorshipSession()->create([
-                    'service_id' => $targetService->service_id,
+                // For mentorship sessions, check what service_id should be used
+                // If the foreign key points to mentorships.service_id, use that
+                // If it points to mentorships.id, use mentorship_id only
+                $sessionData = [
                     'mentorship_id' => $mentorship->id,
                     'session_type' => $request->input('session_type')
-                ]);
+                ];
+                
+                // Only add service_id if the foreign key constraint expects it
+                // Based on the error, it seems like it expects mentorships.service_id
+                if ($mentorship->service_id) {
+                    $sessionData['service_id'] = $mentorship->service_id;
+                }
+                
+                $mentorship->mentorshipSession()->create($sessionData);
             }
         } elseif ($newServiceType === 'Mock_Interview') {
             $targetService->mockInterview()->create([
