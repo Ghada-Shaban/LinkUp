@@ -236,7 +236,8 @@ public function createService(Request $request, $coachId)
           
              
            
-         public function updateService(Request $request, $coachId, $serviceId)
+
+   public function updateService(Request $request, $coachId, $serviceId)
 {
     $coach = Coach::findOrFail($coachId);
 
@@ -385,8 +386,11 @@ private function deleteOldServiceData($service, $oldServiceType)
 // دالة للتعامل مع تحديث Mentorship
 private function handleMentorshipUpdate($service, $request)
 {
-    // إنشاء أو تحديث mentorship record
-    $mentorship = $service->mentorship()->firstOrCreate([]);
+    // إنشاء أو تحديث mentorship record مع تمرير service_id
+    $mentorship = $service->mentorship()->firstOrCreate(
+        ['service_id' => $service->service_id],
+        ['service_id' => $service->service_id]
+    );
     
     $mentorshipType = $request->mentorship_type ?? ($mentorship->mentorship_type ?? 'Mentorship session');
     $mentorship->update(['mentorship_type' => $mentorshipType]);
@@ -395,12 +399,18 @@ private function handleMentorshipUpdate($service, $request)
         // حذف mentorship session إذا كان موجود
         $mentorship->mentorshipSession()->delete();
         // إنشاء أو تحديث mentorship plan
-        $mentorship->mentorshipPlan()->updateOrCreate([], ['title' => $request->title]);
+        $mentorship->mentorshipPlan()->updateOrCreate(
+            ['service_id' => $service->service_id],
+            ['service_id' => $service->service_id, 'title' => $request->title]
+        );
     } else {
         // حذف mentorship plan إذا كان موجود
         $mentorship->mentorshipPlan()->delete();
         // إنشاء أو تحديث mentorship session
-        $mentorship->mentorshipSession()->updateOrCreate([], ['session_type' => $request->session_type]);
+        $mentorship->mentorshipSession()->updateOrCreate(
+            ['service_id' => $service->service_id],
+            ['service_id' => $service->service_id, 'session_type' => $request->session_type]
+        );
     }
     
     Log::info('Updating service ID: ' . $service->service_id . ' Type: Mentorship');
@@ -409,10 +419,14 @@ private function handleMentorshipUpdate($service, $request)
 // دالة للتعامل مع تحديث Mock Interview
 private function handleMockInterviewUpdate($service, $request)
 {
-    $service->mockInterview()->updateOrCreate([], [
-        'interview_type' => $request->interview_type,
-        'interview_level' => $request->interview_level
-    ]);
+    $service->mockInterview()->updateOrCreate(
+        ['service_id' => $service->service_id],
+        [
+            'service_id' => $service->service_id,
+            'interview_type' => $request->interview_type,
+            'interview_level' => $request->interview_level
+        ]
+    );
     
     Log::info('Updating service ID: ' . $service->service_id . ' Type: Mock Interview');
 }
@@ -420,12 +434,16 @@ private function handleMockInterviewUpdate($service, $request)
 // دالة للتعامل مع تحديث Group Mentorship
 private function handleGroupMentorshipUpdate($service, $request)
 {
-    $service->groupMentorship()->updateOrCreate([], [
-        'title' => $request->title,
-        'description' => $request->description,
-        'day' => $request->day,
-        'start_time' => $request->start_time
-    ]);
+    $service->groupMentorship()->updateOrCreate(
+        ['service_id' => $service->service_id],
+        [
+            'service_id' => $service->service_id,
+            'title' => $request->title,
+            'description' => $request->description,
+            'day' => $request->day,
+            'start_time' => $request->start_time
+        ]
+    );
     
     Log::info('Updating service ID: ' . $service->service_id . ' Type: Group Mentorship');
 }
