@@ -169,15 +169,14 @@ private function setAvailability($userID, array $availability)
             if (isset($availability['time_slots'][$day])) {
                 $daySlots = $availability['time_slots'][$day];
                 
-                // التحقق من عدم وجود تداخل في الأوقات
+           
                 $this->validateTimeSlots($daySlots, $day);
                 
-                // ترتيب الأوقات حسب وقت البداية
                 usort($daySlots, function($a, $b) {
                     return strtotime($a['start_time']) - strtotime($b['start_time']);
                 });
                 
-                // دمج الأوقات المتصلة
+           
                 $mergedSlots = $this->mergeConnectedSlots($daySlots);
                 
                 foreach ($mergedSlots as $slot) {
@@ -199,9 +198,7 @@ private function setAvailability($userID, array $availability)
     return $savedSlots;
 }
 
-/**
- * التحقق من عدم وجود تداخل في الأوقات
- */
+
 private function validateTimeSlots(array $slots, string $day)
 {
     $count = count($slots);
@@ -210,7 +207,6 @@ private function validateTimeSlots(array $slots, string $day)
         $startTime1 = strtotime($slots[$i]['start_time']);
         $endTime1 = strtotime($slots[$i]['end_time']);
         
-        // التحقق من صحة الوقت (البداية قبل النهاية)
         if ($startTime1 >= $endTime1) {
             throw new \Exception("Invalid time slot on {$day}: Start time must be before end time");
         }
@@ -219,7 +215,6 @@ private function validateTimeSlots(array $slots, string $day)
             $startTime2 = strtotime($slots[$j]['start_time']);
             $endTime2 = strtotime($slots[$j]['end_time']);
             
-            // التحقق من التداخل
             if ($this->timeSlotsOverlap($startTime1, $endTime1, $startTime2, $endTime2)) {
                 throw new \Exception("Overlapping time slots found on {$day}: " . 
                     $slots[$i]['start_time'] . "-" . $slots[$i]['end_time'] . 
@@ -230,24 +225,19 @@ private function validateTimeSlots(array $slots, string $day)
     }
 }
 
-/**
- * التحقق من تداخل فترتين زمنيتين
- */
+
 private function timeSlotsOverlap($start1, $end1, $start2, $end2)
 {
     return ($start1 < $end2) && ($start2 < $end1);
 }
 
-/**
- * دمج الأوقات المتصلة
- */
+
 private function mergeConnectedSlots(array $slots)
 {
     if (empty($slots)) {
         return $slots;
     }
     
-    // ترتيب الأوقات حسب وقت البداية
     usort($slots, function($a, $b) {
         return strtotime($a['start_time']) - strtotime($b['start_time']);
     });
@@ -258,21 +248,17 @@ private function mergeConnectedSlots(array $slots)
     for ($i = 1; $i < count($slots); $i++) {
         $next = $slots[$i];
         
-        // إذا كان الوقت الحالي متصل مع التالي
         if (strtotime($current['end_time']) >= strtotime($next['start_time'])) {
-            // دمج الأوقات
             $current['end_time'] = date('H:i:s', max(
                 strtotime($current['end_time']), 
                 strtotime($next['end_time'])
             ));
         } else {
-            // إضافة الوقت الحالي للنتيجة والانتقال للتالي
             $merged[] = $current;
             $current = $next;
         }
     }
     
-    // إضافة آخر وقت
     $merged[] = $current;
     
     return $merged;
