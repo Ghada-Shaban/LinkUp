@@ -10,13 +10,14 @@ class MentorshipSessionResource extends JsonResource
     {
         return [
             'service_id' => $this->service_id,
-            'session_type' => $this->mentorship->mentorshipSession ? $this->mentorship->mentorshipSession->session_type : null,
+            'session_type' => $this->whenLoaded('mentorship', function () {
+                return $this->mentorship->mentorshipSession->session_type ?? null;
+            }),
             'price' => $this->whenLoaded('price', function () {
-    return $this->price->price ?? null;
-}),
-            'duration'=>'60 minutes',
-            'no.of sessions'=>'1 session',
-            
+                return $this->price->price ?? null;
+            }),
+            'duration' => '60 minutes',
+            'no.of sessions' => '1 session',
         ];
     }
 }
