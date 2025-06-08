@@ -268,52 +268,54 @@ public function createService(Request $request, $coachId)
         ]);
 
         $newServiceType = $request->input('service_type', $service->service_type);
+        
+        // Check if service type is changing
         if ($newServiceType !== $service->service_type) {
-            $service->mentorship()->delete();
-            $service->mockInterview()->delete();
-            $service->groupMentorship()->delete();
+            // Create new service instead of updating existing one
+            $newService = Service::create([
+                'coach_id' => $coachId,
+                'service_type' => $newServiceType,
+                // Add any other default fields needed for Service model
+            ]);
+            
+            // Use the new service for further operations
+            $targetService = $newService;
+        } else {
+            // Keep using existing service if type hasn't changed
+            $targetService = $service;
         }
 
-        $service->update(['service_type' => $newServiceType]);
-
+        // Create related models based on service type
         if ($newServiceType === 'Mentorship') {
-            $mentorshipType = $request->input('mentorship_type', $service->mentorship->mentorship_type ?? 'Mentorship plan');
-            $mentorship = $service->mentorship()->first();
-            if (!$mentorship) {
-                $mentorship = new Mentorship(['mentorship_type' => $mentorshipType, 'service_id' => $service->service_id]);
-                $service->mentorship()->save($mentorship);
-            } else {
-                $mentorship->update(['mentorship_type' => $mentorshipType, 'service_id' => $service->service_id]);
-            }
+            $mentorshipType = $request->input('mentorship_type', 'Mentorship plan');
+            
+            $mentorship = new Mentorship([
+                'mentorship_type' => $mentorshipType, 
+                'service_id' => $targetService->service_id
+            ]);
+            $targetService->mentorship()->save($mentorship);
 
             if ($mentorshipType === 'Mentorship plan') {
-                $mentorship->mentorshipSession()->delete();
-                $mentorship->mentorshipPlan()->updateOrCreate(['service_id' => $service->service_id], ['title' => $request->input('title')]);
+                $mentorship->mentorshipPlan()->create([
+                    'service_id' => $targetService->service_id,
+                    'title' => $request->input('title')
+                ]);
             } else {
-                $mentorship->mentorshipPlan()->delete();
-                $mentorshipSession = $mentorship->mentorshipSession()->first();
-                if (!$mentorshipSession) {
-                    $mentorshipSession = new MentorshipSession([
-                        'service_id' => $service->service_id,
-                        'mentorship_id' => $mentorship->id,
-                        'session_type' => $request->input('session_type')
-                    ]);
-                    $mentorship->mentorshipSession()->save($mentorshipSession);
-                } else {
-                    $mentorshipSession->update([
-                        'service_id' => $service->service_id,
-                        'mentorship_id' => $mentorship->id,
-                        'session_type' => $request->input('session_type')
-                    ]);
-                }
+                $mentorship->mentorshipSession()->create([
+                    'service_id' => $targetService->service_id,
+                    'mentorship_id' => $mentorship->id,
+                    'session_type' => $request->input('session_type')
+                ]);
             }
         } elseif ($newServiceType === 'Mock_Interview') {
-            $service->mockInterview()->updateOrCreate(['service_id' => $service->service_id], [
+            $targetService->mockInterview()->create([
+                'service_id' => $targetService->service_id,
                 'interview_type' => $request->input('interview_type'),
                 'interview_level' => $request->input('interview_level'),
             ]);
         } elseif ($newServiceType === 'Group_Mentorship') {
-            $service->groupMentorship()->updateOrCreate(['service_id' => $service->service_id], [
+            $targetService->groupMentorship()->create([
+                'service_id' => $targetService->service_id,
                 'title' => $request->input('title'),
                 'description' => $request->input('description'),
                 'day' => $request->input('day'),
@@ -321,12 +323,25 @@ public function createService(Request $request, $coachId)
             ]);
         }
 
+        // Create price for the target service
         if ($request->has('price')) {
-            $service->price()->updateOrCreate(['service_id' => $service->service_id], ['price' => $request->price]);
+            $targetService->price()->create([
+                'service_id' => $targetService->service_id,
+                'price' => $request->price
+            ]);
         }
 
-        $service->load('price');
-        return response()->json(['message' => 'Service updated successfully', 'service' => new ServiceResource($service)], 200);
+        $targetService->load('price');
+        
+        $message = $newServiceType !== $service->service_type 
+            ? 'New service created successfully' 
+            : 'Service updated successfully';
+            
+        return response()->json([
+            'message' => $message,
+            'service' => new ServiceResource($targetService),
+            'is_new_service' => $newServiceType !== $service->service_type
+        ], 200);
     });
 }
     public function joinGroupMentorship(Request $request, $coachId, $groupMentorshipId)
