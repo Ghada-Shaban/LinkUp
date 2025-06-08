@@ -321,7 +321,7 @@ public function createService(Request $request, $coachId)
         $service->load('price');
         return response()->json(['message' => 'Service updated successfully', 'service' => new ServiceResource($service)], 200);
     }
-
+      }
      
          
    
