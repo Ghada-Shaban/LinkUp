@@ -233,8 +233,7 @@ public function createService(Request $request, $coachId)
         }
     }
  
-
-     public function updateService(Request $request, $coachId, $serviceId)
+public function updateService(Request $request, $coachId, $serviceId)
 {
     $coach = Coach::findOrFail($coachId);
 
@@ -253,7 +252,13 @@ public function createService(Request $request, $coachId)
                 'max:255',
                 function ($attribute, $value, $fail) use ($request, $service) {
                     $currentType = $request->input('service_type', $service->service_type);
-                    $currentMentorshipType = $request->input('mentorship_type', $service->mentorship->mentorship_type ?? '');
+                    $currentMentorshipType = $request->input('mentorship_type');
+                    
+                    // Get mentorship type from existing mentorship or use default
+                    if (!$currentMentorshipType && $service->mentorship) {
+                        $currentMentorshipType = $service->mentorship->mentorship_type;
+                    }
+                    
                     if ($currentType === 'Mentorship' && $currentMentorshipType === 'Mentorship plan' && empty($value)) {
                         $fail('The title field is required when mentorship type is Mentorship plan.');
                     }
