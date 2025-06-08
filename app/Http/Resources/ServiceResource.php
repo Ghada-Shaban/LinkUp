@@ -14,29 +14,22 @@ class ServiceResource extends JsonResource
             'price' => $this->price ? $this->price->price : null,
         ];
 
-     
         if ($this->service_type === 'Mentorship') {
             if ($this->mentorship) {
-               if ($this->mentorship->mentorship_type === 'Mentorship plan' && $this->mentorship->mentorshipPlan) {
+                if ($this->mentorship->mentorship_type === 'Mentorship plan' && $this->mentorship->mentorshipPlan) {
                     $data['mentorship'] = [
                         'mentorship_plan' => [
                             'title' => $this->mentorship->mentorshipPlan->title,
-                          'role'=> $this->mentorship->role,
-                          'career_phase' => $this->mentorship->career_phase,
                             'duration' => '60 minutes',
                             'no_of_sessions' => '4 sessions',
-                       
                         ]
                     ];
                 } else if ($this->mentorship->mentorship_type === 'Mentorship session' && $this->mentorship->mentorshipSession) {
                     $data['mentorship'] = [
                         'mentorship_session' => [
                             'session_type' => $this->mentorship->mentorshipSession->session_type,
-                            'role'=> $this->mentorship->role,
-                            'career_phase' => $this->mentorship->career_phase,
                             'duration' => '60 minutes',
                             'no_of_sessions' => '1 session',
-                        
                         ]
                     ];
                 }
@@ -47,8 +40,6 @@ class ServiceResource extends JsonResource
             $data['group_mentorship'] = [
                 'title' => $this->groupMentorship->title,
                 'description' => $this->groupMentorship->description,
-                  'role'=> $this->groupMentorship->role,
-                'career_phase' => $this->groupMentorship->career_phase,
                 'day' => $this->groupMentorship->day,
                 'start_time' => $this->groupMentorship->start_time,
                 'duration' => '60 minutes',
@@ -56,8 +47,7 @@ class ServiceResource extends JsonResource
                 'min_participants' => $this->groupMentorship->min_participants ?? 2,
                 'max_participants' => $this->groupMentorship->max_participants ?? 5,
                 'available_slots' => $this->groupMentorship->available_slots ?? 
-                    (($this->groupMentorship->max_participants ?? 5) - ($this->groupMentorship->current_participants ?? 0)),
-              
+                    (($this->groupMentorship->max_participants ?? 5) - ($this->groupMentorship->current_participants ?? 0))
             ];
         }
 
@@ -70,7 +60,6 @@ class ServiceResource extends JsonResource
             ];
         }
 
-      
         return $data;
     }
 }
