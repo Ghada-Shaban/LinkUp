@@ -12,8 +12,6 @@ class GroupMentorshipResource extends JsonResource
             'service_id' => $this->service_id,
             'title' => $this->groupMentorship ? $this->groupMentorship->title : null,
             'description' => $this->groupMentorship ? $this->groupMentorship->description : null,
-            'role'=> $this->groupMentorship->role,
-            'career_phase' => $this->groupMentorship->career_phase,
             'day' => $this->groupMentorship ? $this->groupMentorship->day : null,
             'start_time' => $this->groupMentorship ? $this->groupMentorship->start_time : null,
             'price' => $this->price ? $this->price->price : null,
