@@ -232,8 +232,8 @@ public function createService(Request $request, $coachId)
             return response()->json(['message' => 'Error creating service', 'error' => $e->getMessage()], 500);
         }
     }
-  
-     public function updateService(Request $request, $coachId, $serviceId)
+ 
+public function updateService(Request $request, $coachId, $serviceId)
 {
     $coach = Coach::findOrFail($coachId);
 
@@ -321,11 +321,6 @@ public function createService(Request $request, $coachId)
         $service->load('price');
         return response()->json(['message' => 'Service updated successfully', 'service' => new ServiceResource($service)], 200);
     }
-      }
-     
-         
-   
-  
     
  
     public function joinGroupMentorship(Request $request, $coachId, $groupMentorshipId)
