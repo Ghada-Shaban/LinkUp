@@ -446,7 +446,7 @@ public function createService(Request $request, $coachId)
         
         Log::info('Updating service ID: ' . $service->service_id . ' Type: Group Mentorship');
     }
-}
+
      
   
 
