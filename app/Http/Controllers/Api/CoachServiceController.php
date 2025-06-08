@@ -233,7 +233,9 @@ public function createService(Request $request, $coachId)
         }
     }
  
-public function updateService(Request $request, $coachId, $serviceId)
+      
+
+        public function updateService(Request $request, $coachId, $serviceId)
 {
     $coach = Coach::findOrFail($coachId);
 
@@ -320,8 +322,9 @@ public function updateService(Request $request, $coachId, $serviceId)
 
         $service->load('price');
         return response()->json(['message' => 'Service updated successfully', 'service' => new ServiceResource($service)], 200);
-    }
-    
+    });
+}
+   
  
     public function joinGroupMentorship(Request $request, $coachId, $groupMentorshipId)
     {
