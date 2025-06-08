@@ -232,10 +232,7 @@ public function createService(Request $request, $coachId)
             return response()->json(['message' => 'Error creating service', 'error' => $e->getMessage()], 500);
         }
     }
- 
-      
-
-        public function updateService(Request $request, $coachId, $serviceId)
+ public function updateService(Request $request, $coachId, $serviceId)
 {
     $coach = Coach::findOrFail($coachId);
 
@@ -296,10 +293,18 @@ public function createService(Request $request, $coachId)
                 $mentorship->mentorshipPlan()->delete();
                 $mentorshipSession = $mentorship->mentorshipSession()->first();
                 if (!$mentorshipSession) {
-                    $mentorshipSession = new MentorshipSession(['session_type' => $request->input('session_type'), 'service_id' => $service->service_id]);
+                    $mentorshipSession = new MentorshipSession([
+                        'service_id' => $service->service_id,
+                        'mentorship_id' => $mentorship->id,
+                        'session_type' => $request->input('session_type')
+                    ]);
                     $mentorship->mentorshipSession()->save($mentorshipSession);
                 } else {
-                    $mentorshipSession->update(['session_type' => $request->input('session_type'), 'service_id' => $service->service_id]);
+                    $mentorshipSession->update([
+                        'service_id' => $service->service_id,
+                        'mentorship_id' => $mentorship->id,
+                        'session_type' => $request->input('session_type')
+                    ]);
                 }
             }
         } elseif ($newServiceType === 'Mock_Interview') {
@@ -323,8 +328,6 @@ public function createService(Request $request, $coachId)
         $service->load('price');
         return response()->json(['message' => 'Service updated successfully', 'service' => new ServiceResource($service)], 200);
     });
-}
-   
  
     public function joinGroupMentorship(Request $request, $coachId, $groupMentorshipId)
     {
