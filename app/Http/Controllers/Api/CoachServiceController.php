@@ -272,11 +272,23 @@ public function createService(Request $request, $coachId)
         // Check if service type is changing
         if ($newServiceType !== $service->service_type) {
             // Create new service instead of updating existing one
-            $newService = Service::create([
+            // Copy all necessary fields from original service
+            $serviceData = [
                 'coach_id' => $coachId,
                 'service_type' => $newServiceType,
-                // Add any other default fields needed for Service model
-            ]);
+                'admin_id' => $service->admin_id,
+                'status' => $service->status ?? 'active',
+            ];
+            
+            // Copy other fields that might exist in the original service
+            $fieldsToKeep = ['name', 'description', 'category', 'duration', 'max_participants'];
+            foreach ($fieldsToKeep as $field) {
+                if (isset($service->$field)) {
+                    $serviceData[$field] = $service->$field;
+                }
+            }
+            
+            $newService = Service::create($serviceData);
             
             // Use the new service for further operations
             $targetService = $newService;
