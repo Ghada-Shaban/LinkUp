@@ -20,7 +20,7 @@ class ServiceResource extends JsonResource
                     'mentorship_plan' => [
                         'title' => $this->mentorship->mentorshipPlan->title ?? null,
                         'duration' => '60 minutes',
-                        'no_of_sessions' => '4 sessions',
+                        'no.of sessions' => '4 sessions',
                     ],
                 ];
             } elseif ($this->mentorship->mentorship_type === 'Mentorship session' && $this->relationLoaded('mentorship.mentorshipSession') && $this->mentorship->mentorshipSession) {
@@ -28,7 +28,7 @@ class ServiceResource extends JsonResource
                     'mentorship_session' => [
                         'session_type' => $this->mentorship->mentorshipSession->session_type ?? null,
                         'duration' => '60 minutes',
-                        'no_of_sessions' => '1 session',
+                        'no.of sessions' => '1 session',
                     ],
                 ];
             }
