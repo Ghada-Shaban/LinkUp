@@ -203,7 +203,8 @@ class NewSessionController extends Controller
 
                 // إضافة trainee_name فقط للجلسات غير Group Mentorship
                 if ($service && $service->service_type !== 'Group_Mentorship') {
-                    $traineeName = $session->trainees->first() ? $session->trainees->first()->full_name : 'N/A';
+                    $trainee = $session->trainee_id ? User::find($session->trainee_id) : null;
+                    $traineeName = $trainee ? $trainee->full_name : 'N/A';
                     $sessionData['trainee_name'] = $traineeName;
                 }
 
@@ -389,7 +390,8 @@ class NewSessionController extends Controller
 
                 // إضافة trainee_name فقط للجلسات غير Group Mentorship
                 if ($service && $service->service_type !== 'Group_Mentorship') {
-                    $traineeName = $session->trainees->first() ? $session->trainees->first()->full_name : 'N/A';
+                    $trainee = $session->trainee_id ? User::find($session->trainee_id) : null;
+                    $traineeName = $trainee ? $trainee->full_name : 'N/A';
                     $sessionData['trainee_name'] = $traineeName;
                 }
 
