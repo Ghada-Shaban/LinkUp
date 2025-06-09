@@ -23,12 +23,12 @@ use Illuminate\Support\Facades\Log;
 class CoachServiceController extends Controller
 {
 public function getServicesCount($coachId)
-{  
-    $coach = Coach::findOrFail($coachId);
-    $services = Service::where('coach_id', $coachId)
-                       ->whereNull('deleted_at')
-                       ->with('price')
-                       ->get();
+    {  
+        $coach = Coach::findOrFail($coachId);
+        $services = Service::where('coach_id', $coachId)
+                          ->whereNull('deleted_at')
+                          ->with('price')
+                          ->get();
 
         $countData = [
             'all' => [
@@ -388,7 +388,7 @@ public function updateService(Request $request, $coachId, $serviceId)
             'has_mentorship_plan' => $service->mentorship && $service->mentorship->mentorshipPlan ? true : false,
             'has_mentorship_session' => $service->mentorship && $service->mentorship->mentorshipSession ? true : false
         ]);
-
+          $updatedCountData = $this->getServicesCount($coachId);
         return response()->json([
             'message' => 'Service updated successfully', 
             'service' => new ServiceResource($service)
