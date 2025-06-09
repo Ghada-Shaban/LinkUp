@@ -16,9 +16,7 @@ class ServiceResource extends JsonResource
 
       
         if ($this->service_type === 'Mentorship') {
-            // التحقق من وجود علاقة mentorship
             if ($this->mentorship) {
-                // التحقق من نوع الإرشاد ووجود البيانات المرتبطة
                 if ($this->mentorship->mentorship_type === 'Mentorship plan' && $this->mentorship->mentorshipPlan) {
                     $data['mentorship'] = [
                         'mentorship_plan' => [
