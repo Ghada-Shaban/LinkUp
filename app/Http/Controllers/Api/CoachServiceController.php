@@ -233,14 +233,21 @@ public function createService(Request $request, $coachId)
         }
     }
 
-
-     public function updateService(Request $request, $coachId, $serviceId)
+public function updateService(Request $request, $coachId, $serviceId)
 {
     $coach = Coach::findOrFail($coachId);
 
     $service = Service::where('service_id', $serviceId)
         ->where('coach_id', $coachId)
         ->firstOrFail();
+
+    // إضافة debug logging
+    Log::info('Update Service Request Data:', [
+        'service_id' => $serviceId,
+        'service_type' => $request->service_type,
+        'mentorship_type' => $request->mentorship_type,
+        'all_request_data' => $request->all()
+    ]);
 
     $request->validate([
         'service_type' => 'sometimes|in:Mentorship,Mock_Interview,Group_Mentorship',
@@ -332,32 +339,75 @@ public function createService(Request $request, $coachId)
         ],
     ]);
 
-    // تحديث الـ price
-    if ($request->has('price')) {
-        $service->price()->updateOrCreate([], ['price' => $request->price]);
+    try {
+        DB::beginTransaction();
+
+        // تحديث الـ price
+        if ($request->has('price')) {
+            $service->price()->updateOrCreate([], ['price' => $request->price]);
+        }
+
+        // تحديد نوع الخدمة الجديد والقديم
+        $oldServiceType = $service->service_type;
+        $newServiceType = $request->service_type ?? $oldServiceType;
+
+        // إضافة debug logging إضافي
+        Log::info('Service Type Comparison:', [
+            'old_service_type' => $oldServiceType,
+            'new_service_type' => $newServiceType,
+            'mentorship_type_in_request' => $request->mentorship_type,
+            'current_mentorship_type' => $service->mentorship ? $service->mentorship->mentorship_type : 'null'
+        ]);
+
+        // إذا تغير نوع الخدمة، نحذف البيانات القديمة
+        if ($oldServiceType !== $newServiceType) {
+            $this->deleteOldServiceData($service, $oldServiceType);
+            $service->update(['service_type' => $newServiceType]);
+        }
+
+        // إنشاء أو تحديث البيانات حسب النوع الجديد
+        if ($newServiceType === 'Mentorship') {
+            $this->handleMentorshipUpdate($service, $request);
+        } elseif ($newServiceType === 'Mock_Interview') {
+            $this->handleMockInterviewUpdate($service, $request);
+        } elseif ($newServiceType === 'Group_Mentorship') {
+            $this->handleGroupMentorshipUpdate($service, $request);
+        }
+
+        DB::commit();
+
+        // إعادة تحميل العلاقات
+        $service->refresh();
+        $service->load('price', 'mentorship.mentorshipPlan', 'mentorship.mentorshipSession', 'groupMentorship', 'mockInterview');
+        
+        // تسجيل حالة الخدمة بعد التحديث
+        Log::info('Service after update: ', [
+            'service_id' => $service->service_id,
+            'service_type' => $service->service_type,
+            'mentorship_type' => $service->mentorship ? $service->mentorship->mentorship_type : 'null',
+            'has_mentorship_plan' => $service->mentorship && $service->mentorship->mentorshipPlan ? true : false,
+            'has_mentorship_session' => $service->mentorship && $service->mentorship->mentorshipSession ? true : false
+        ]);
+
+        return response()->json([
+            'message' => 'Service updated successfully', 
+            'service' => new ServiceResource($service)
+        ]);
+
+    } catch (\Exception $e) {
+        DB::rollBack();
+        Log::error('Error updating service: ' . $e->getMessage(), [
+            'service_id' => $serviceId,
+            'coach_id' => $coachId,
+            'request_data' => $request->all(),
+            'trace' => $e->getTraceAsString()
+        ]);
+        
+        return response()->json([
+            'message' => 'Error updating service', 
+            'error' => $e->getMessage()
+        ], 500);
     }
-
-    // تحديد نوع الخدمة الجديد والقديم
-    $oldServiceType = $service->service_type;
-    $newServiceType = $request->service_type ?? $oldServiceType;
-
-    // إذا تغير نوع الخدمة، نحذف البيانات القديمة
-    if ($oldServiceType !== $newServiceType) {
-        $this->deleteOldServiceData($service, $oldServiceType);
-        // تحديث نوع الخدمة في قاعدة البيانات
-        $service->update(['service_type' => $newServiceType]);
-    }
-
-    // إنشاء أو تحديث البيانات حسب النوع الجديد
-    if ($newServiceType === 'Mentorship') {
-        $this->handleMentorshipUpdate($service, $request);
-    } elseif ($newServiceType === 'Mock_Interview') {
-        $this->handleMockInterviewUpdate($service, $request);
-    } elseif ($newServiceType === 'Group_Mentorship') {
-        $this->handleGroupMentorshipUpdate($service, $request);
-    }
-
-    return response()->json(['message' => 'Service updated successfully']);
 }
 
 // دالة لحذف البيانات القديمة
@@ -380,44 +430,64 @@ private function deleteOldServiceData($service, $oldServiceType)
     }
 }
 
-// دالة للتعامل مع تحديث Mentorship
+// دالة للتعامل مع تحديث Mentorship - محدثة
 private function handleMentorshipUpdate($service, $request)
 {
-    // أولاً: إنشاء أو تحديث mentorship record - ده أساسي عشان الـ foreign key
-    $mentorship = $service->mentorship()->firstOrCreate(
-        ['service_id' => $service->service_id],  // البحث
-        ['service_id' => $service->service_id, 'mentorship_type' => 'Mentorship session']  // البيانات لو مش موجود
+    // تحديد نوع المنتورشيب من الـ request أو الموجود حالياً
+    $mentorshipType = $request->mentorship_type ?? ($service->mentorship ? $service->mentorship->mentorship_type : 'Mentorship session');
+    
+    Log::info('Handling Mentorship Update:', [
+        'service_id' => $service->service_id,
+        'requested_mentorship_type' => $request->mentorship_type,
+        'determined_mentorship_type' => $mentorshipType
+    ]);
+    
+    // إنشاء أو تحديث الـ mentorship مع النوع الصحيح
+    $mentorship = $service->mentorship()->updateOrCreate(
+        ['service_id' => $service->service_id],
+        ['mentorship_type' => $mentorshipType]
     );
     
-    // تحديد نوع الـ mentorship
-    $mentorshipType = $request->mentorship_type ?? ($mentorship->mentorship_type ?? 'Mentorship session');
-    
-    // تحديث نوع الـ mentorship لو اتغير
-    if ($mentorship->mentorship_type !== $mentorshipType) {
-        $mentorship->update(['mentorship_type' => $mentorshipType]);
-    }
+    Log::info('Mentorship record after updateOrCreate:', [
+        'service_id' => $service->service_id,
+        'mentorship_type' => $mentorship->mentorship_type
+    ]);
 
     if ($mentorshipType === 'Mentorship plan') {
-        // حذف mentorship session إذا كان موجود
+        // احذف أي mentorship session موجود
         MentorshipSession::where('service_id', $service->service_id)->delete();
         
         // إنشاء أو تحديث mentorship plan
-        MentorshipPlan::updateOrCreate(
+        $mentorshipPlan = MentorshipPlan::updateOrCreate(
             ['service_id' => $service->service_id],
-            ['service_id' => $service->service_id, 'title' => $request->title]
+            ['title' => $request->title]
         );
+        
+        Log::info('Updated MentorshipPlan:', [
+            'service_id' => $service->service_id,
+            'title' => $request->title,
+            'plan_id' => $mentorshipPlan->id ?? 'null'
+        ]);
     } else {
-        // حذف mentorship plan إذا كان موجود
+        // احذف أي mentorship plan موجود
         MentorshipPlan::where('service_id', $service->service_id)->delete();
         
         // إنشاء أو تحديث mentorship session
-        MentorshipSession::updateOrCreate(
+        $mentorshipSession = MentorshipSession::updateOrCreate(
             ['service_id' => $service->service_id],
-            ['service_id' => $service->service_id, 'session_type' => $request->session_type]
+            ['session_type' => $request->session_type]
         );
+        
+        Log::info('Updated MentorshipSession:', [
+            'service_id' => $service->service_id,
+            'session_type' => $request->session_type,
+            'session_id' => $mentorshipSession->id ?? 'null'
+        ]);
     }
     
-    Log::info('Updating service ID: ' . $service->service_id . ' Type: Mentorship');
+    Log::info('Completed Mentorship Update for service ID: ' . $service->service_id, [
+        'mentorship_type' => $mentorshipType
+    ]);
 }
 
 // دالة للتعامل مع تحديث Mock Interview
@@ -426,13 +496,15 @@ private function handleMockInterviewUpdate($service, $request)
     $service->mockInterview()->updateOrCreate(
         ['service_id' => $service->service_id],
         [
-            'service_id' => $service->service_id,
             'interview_type' => $request->interview_type,
             'interview_level' => $request->interview_level
         ]
     );
     
-    Log::info('Updating service ID: ' . $service->service_id . ' Type: Mock Interview');
+    Log::info('Updated Mock Interview for service ID: ' . $service->service_id, [
+        'interview_type' => $request->interview_type,
+        'interview_level' => $request->interview_level
+    ]);
 }
 
 // دالة للتعامل مع تحديث Group Mentorship
@@ -441,7 +513,6 @@ private function handleGroupMentorshipUpdate($service, $request)
     $service->groupMentorship()->updateOrCreate(
         ['service_id' => $service->service_id],
         [
-            'service_id' => $service->service_id,
             'title' => $request->title,
             'description' => $request->description,
             'day' => $request->day,
@@ -449,11 +520,12 @@ private function handleGroupMentorshipUpdate($service, $request)
         ]
     );
     
-    Log::info('Updating service ID: ' . $service->service_id . ' Type: Group Mentorship');
+    Log::info('Updated Group Mentorship for service ID: ' . $service->service_id, [
+        'title' => $request->title,
+        'day' => $request->day,
+        'start_time' => $request->start_time
+    ]);
 }
-
- 
-
 
     public function joinGroupMentorship(Request $request, $coachId, $groupMentorshipId)
     {
