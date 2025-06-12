@@ -106,6 +106,7 @@ class CoachDashboardController extends Controller
                     return [
                         'session_id' => $session->new_session_id,
                         'trainee_name' => $session->trainees->Full_Name ?? 'Unknown Trainee',
+                        'trainee_photo' => $trainee->user->photo,
                         'date_time' => Carbon::parse($session->date_time)->setTimezone('Africa/Cairo')->format('Y-m-d H:i:s'),
                         'duration' => $session->duration,
                         'service_type' => $session->service->service_type ?? 'Unknown Service',
