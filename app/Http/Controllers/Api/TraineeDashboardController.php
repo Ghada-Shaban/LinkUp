@@ -83,11 +83,13 @@ class TraineeDashboardController extends Controller
                     $coach = User::where('User_ID', $session->coach_id)
                         ->where('role_profile', 'Coach')
                         ->first();
+                    $coachName = $coach ? $coach->Full_Name : 'Unknown Coach';
+                    $coachPhoto = $coach ? ($coach->photo ?? null) : null; 
 
                     return [
                         'session_id' => $session->new_session_id,
-                        'coach_name' => $coach->Full_Name ?? 'Unknown Coach',
-                        'coach_photo' => $coach->user->photo,
+                       'coach_name' => $coachName,
+                       'coach_photo' => $coachPhoto,
                         'date_time' => Carbon::parse($session->date_time)->setTimezone('Africa/Cairo')->format('Y-m-d H:i:s'),
                         'duration' => $session->duration,
                         'service_type' => $session->service->service_type ?? 'Unknown Service',
