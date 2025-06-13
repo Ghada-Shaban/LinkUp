@@ -7,6 +7,7 @@ use App\Models\NewSession;
 use App\Models\Payment;
 use App\Models\Review;
 use App\Models\Service;
+use App\Models\User;
 use App\Models\Mentorship;
 use App\Models\MentorshipRequest;
 use Illuminate\Http\Request;
