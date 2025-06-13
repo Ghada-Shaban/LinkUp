@@ -47,7 +47,7 @@ class CoachDashboardController extends Controller
                 ->with('service.mentorship')
                 ->get();
             $totalCompletedSessionsCount = $completedSessions->count();
-            $totalMentoringTime = $completedSessions->sum('duration') / 60; // Convert minutes to hours
+            $totalMentoringTime = $completedSessions->sum('duration') / 60; 
             $averageRating = Review::where('coach_id', $authCoach->User_ID)
                 ->avg('rating');
             $averageRating = $averageRating ? round($averageRating, 2) : 0.0;
@@ -105,7 +105,7 @@ class CoachDashboardController extends Controller
                         
                     $trainee = $session->trainees->first();
                     $traineeName = $trainee ? $trainee->Full_Name : 'Unknown Trainee';
-                    $traineePhoto = $trainee ? ($trainee->user->photo ?? null) : null;
+                    $traineePhoto = $trainee ? ($trainee->photo ?? null) : null;
 
      
                     return [
