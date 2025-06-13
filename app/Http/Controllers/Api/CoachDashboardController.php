@@ -103,7 +103,7 @@ class CoachDashboardController extends Controller
                         }
                     }
                         
-                    $trainee = $session->trainees->first();
+                    $trainee = $session->trainee->first();
                     $traineeName = $trainee ? $trainee->Full_Name : 'Unknown Trainee';
                     $traineePhoto = $trainee ? ($trainee->photo ?? null) : null;
 
