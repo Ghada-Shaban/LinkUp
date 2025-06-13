@@ -102,11 +102,16 @@ class CoachDashboardController extends Controller
                             }
                         }
                     }
+                        
+                    $trainee = $session->trainees->first();
+                    $traineeName = $trainee ? $trainee->Full_Name : 'Unknown Trainee';
+                    $traineePhoto = $trainee ? ($trainee->user->photo ?? null) : null;
 
+     
                     return [
                         'session_id' => $session->new_session_id,
-                        'trainee_name' => $session->trainees->Full_Name ?? 'Unknown Trainee',
-                        'trainee_photo' => $trainee->user->photo,
+                        'trainee_name' => $traineeName,
+                        'trainee_photo' => $traineePhoto,
                         'date_time' => Carbon::parse($session->date_time)->setTimezone('Africa/Cairo')->format('Y-m-d H:i:s'),
                         'duration' => $session->duration,
                         'service_type' => $session->service->service_type ?? 'Unknown Service',
