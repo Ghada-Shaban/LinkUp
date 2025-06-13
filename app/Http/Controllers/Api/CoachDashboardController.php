@@ -103,7 +103,9 @@ class CoachDashboardController extends Controller
                         }
                     }
                         
-                    $trainee = $session->trainees;
+                $trainee = User::where('User_ID', $session->trainee_id)
+               ->where('role_profile', 'Trainee')
+               ->first();
                     $traineeName = $trainee ? $trainee->Full_Name : 'Unknown Trainee';
                     $traineePhoto = $trainee ? ($trainee->photo ?? null) : null;
 
