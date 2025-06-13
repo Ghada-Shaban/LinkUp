@@ -456,7 +456,7 @@ public function getDashboardStats(Request $request)
             ->get();
 
         $totalRevenue = $completedPayments->sum('amount');
-        $revenue20Percent = round($totalRevenue * 0.2, 2);
+        $revenue26Percent = round($totalRevenue * 0.26, 2);
         $completedSessions = NewSession::where('status', NewSession::STATUS_COMPLETED)
             ->whereHas('service', function ($query) {
                 $query->whereIn('service_type', ['Mentorship', 'Mock_Interview', 'Group_Mentorship'])
@@ -478,12 +478,12 @@ public function getDashboardStats(Request $request)
                 }
                 return $payment->service->service_type === $serviceType;
             });
-            $serviceRevenue = $paymentsForService->sum('amount') * 0.2;
+            $serviceRevenue = $paymentsForService->sum('amount') * 0.26;
             return [$serviceType => $serviceRevenue];
         });
-        $totalRevenue20 = $revenueByService->sum();
-        $sessionsByService = $revenueByService->mapWithKeys(function ($revenue, $serviceType) use ($totalRevenue20) {
-            $percentage = $totalRevenue20 > 0 ? ($revenue / $totalRevenue20) * 100 : 0;
+        $totalRevenue26 = $revenueByService->sum();
+        $sessionsByService = $revenueByService->mapWithKeys(function ($revenue, $serviceType) use ($totalRevenue26) {
+            $percentage = $totalRevenue26 > 0 ? ($revenue / $totalRevenue26) * 100 : 0;
             return [$serviceType => round($percentage, 2) . '%'];
         });
         
@@ -496,7 +496,7 @@ public function getDashboardStats(Request $request)
                 }
                 return $payment->service->service_type === $serviceType;
             });
-            $serviceRevenue = $paymentsForService->sum('amount') * 0.2;
+            $serviceRevenue = $paymentsForService->sum('amount') * 0.26;
             return [$serviceType => round($serviceRevenue, 2)];
         });
 
@@ -509,7 +509,7 @@ public function getDashboardStats(Request $request)
 
         return response()->json([
             'number_of_users' => $totalUsers,
-            'revenue' => $revenue20Percent,
+            'revenue' => $revenue26Percent,
             'sessions_percentage_by_service' => $sessionsByService,
             'revenue_by_service' => $revenueByService,
             'completed_sessions' => $totalCompletedSessionsCount,
